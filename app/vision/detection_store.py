@@ -3,8 +3,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional
 
-# Nemotron results older than this are considered stale for count merging
-_NEMOTRON_STALE_S = 300.0
+# VLM results older than this are considered stale for count merging
+_NEMOTRON_STALE_S = 45.0
 
 
 @dataclass
@@ -12,6 +12,12 @@ class FaceDetection:
     bbox: tuple        # (x1, y1, x2, y2)
     name: str
     confidence: float
+    thumb_b64: Optional[str] = None   # crop JPEG chico (base64), None si el crop falló
+    embedding: object = field(default=None, repr=False)   # InsightFace 512-d (solo uso interno)
+    det_score: float = 1.0
+    sharpness: float = 0.0
+    area: float = 0.0
+    yaw: float = 0.0
 
 
 @dataclass
@@ -23,6 +29,10 @@ class CameraDetection:
     updated_at: float = 0.0
     inference_ms: float = 0.0
     nemotron: Optional[dict] = None
+    yolo_persons: int = 0     # conteo YOLO puro (sin mezclar el del VLM)
+    yolo_ts: float = 0.0
+    frame_w: int = 0          # tamano del fotograma sobre el que YOLO dio person_bboxes
+    frame_h: int = 0
 
 
 class DetectionStore:
@@ -35,13 +45,15 @@ class DetectionStore:
     def update(self, result: CameraDetection) -> None:
         """
         YOLO update: preserva nemotron y toma el mayor conteo entre
-        YOLO y Nemotron (Nemotron es más semántico, YOLO da bboxes).
+        YOLO y VLM (VLM es más semántico, YOLO da bboxes).
         """
+        result.yolo_persons = result.person_count
+        result.yolo_ts = time.time()
         with self._lock:
             existing = self._data.get(result.cam_id)
             if existing and existing.nemotron is not None:
                 result.nemotron = existing.nemotron
-                # Si Nemotron tiene un conteo reciente y mayor, lo respeta
+                # Si VLM tiene un conteo reciente y mayor, lo respeta
                 nem_ts = existing.nemotron.get("_ts", 0)
                 nem_people = existing.nemotron.get("people", 0)
                 if (isinstance(nem_people, int)
@@ -53,7 +65,7 @@ class DetectionStore:
 
     def update_nemotron(self, cam_id: str, result: dict) -> None:
         """
-        Nemotron update: actualiza semántica y person_count.
+        VLM update: actualiza semántica y person_count.
         Preserva bboxes de YOLO si existen.
         """
         with self._lock:
@@ -64,9 +76,6 @@ class DetectionStore:
             if cam_id in self._data:
                 existing = self._data[cam_id]
                 existing.nemotron     = result
-                existing.updated_at   = result.get("_ts", time.time())
-                # Toma el mayor entre YOLO y Nemotron
-                existing.person_count = max(people, len(existing.person_bboxes))
             else:
                 d = CameraDetection(
                     cam_id=cam_id,
@@ -94,10 +103,13 @@ class DetectionStore:
                 cam_id: {
                     "person_count": d.person_count,
                     "faces": [
-                        {"name": f.name, "confidence": round(f.confidence, 3)}
+                        {"name": f.name, "confidence": round(f.confidence, 3),
+                         "thumb": f.thumb_b64}
                         for f in d.faces
                     ],
                     "nemotron": d.nemotron,
+                    "yolo_persons": d.yolo_persons,
+                    "yolo_ts": d.yolo_ts,
                     "updated_at": d.updated_at,
                     "inference_ms": round(d.inference_ms, 1),
                 }

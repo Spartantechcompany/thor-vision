@@ -41,7 +41,7 @@ def _offline_frame(w: int = 1280, h: int = 720) -> bytes:
 
 def _draw_overlay(frame: np.ndarray, detection) -> np.ndarray:
     """
-    Dibuja overlay con datos de Nemotron:
+    Dibuja overlay con datos de VLM:
     - Conteo de personas (badge superior-izquierdo)
     - Actividad / descripción (barra inferior)
     - Alertas reales (esquina superior-derecha)

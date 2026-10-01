@@ -6,15 +6,16 @@
 <title>THOR Vision — OXM Tech</title>
 <style>
 :root {
-  --oxm-blue:       #1E78C2;
-  --oxm-blue-dark:  #155A96;
-  --oxm-blue-glow:  rgba(30, 120, 194, 0.15);
+  --oxm-blue:       #76B900;       /* acento NVIDIA, antes azul OXM */
+  --oxm-blue-dark:  #5E9400;
+  --oxm-blue-glow:  rgba(118, 185, 0, 0.16);
+  --oxm-logo:       #1E78C2;       /* logo OXM: conserva su azul original */
   --oxm-gray:       #595959;
   --bg-primary:     #0E1117;
   --bg-card:        #161B24;
   --bg-panel:       #1C2130;
   --border:         #252C3A;
-  --border-active:  #1E78C2;
+  --border-active:  #76B900;
   --text-primary:   #E8EDF3;
   --text-secondary: #8B949E;
   --text-muted:     #484F58;
@@ -36,7 +37,8 @@ body {
 
 /* ── Header ── */
 header {
-  background: var(--bg-panel);
+  background: rgba(28,33,48,.82);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   padding: 0 24px;
   display: flex;
@@ -54,7 +56,7 @@ header {
 }
 .brand-logo { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.5px; }
 .brand-oxm  { color: var(--oxm-gray); }
-.brand-tech { color: var(--oxm-blue); }
+.brand-tech { color: var(--oxm-logo); }
 .brand-divider { width:1px; height:22px; background:var(--border); margin: 0 16px; }
 .header-title { font-size:.88rem; font-weight:500; color:var(--text-secondary); }
 
@@ -74,6 +76,34 @@ header {
 .persons-label { font-size:.65rem; text-transform:uppercase; letter-spacing:.6px; color:var(--text-muted); font-weight:600; }
 .persons-value { font-size:1.4rem; font-weight:800; color:var(--oxm-blue); font-variant-numeric:tabular-nums; line-height:1; }
 .persons-unit  { font-size:.6rem; color:var(--text-muted); margin-top:-1px; }
+
+/* ── VLM health card ── */
+.vlm-card {
+  display:flex; flex-direction:column; align-items:flex-start; gap:3px;
+  padding:10px 14px; border-radius:8px;
+  background:rgba(255,255,255,.03); border:1px solid var(--border);
+  min-width:132px; margin-left:4px; transition:border-color .3s;
+  cursor:default;
+}
+.vlm-card.ok       { border-color:rgba(63,185,80,.45); }
+.vlm-card.degraded { border-color:rgba(210,153,34,.55); }
+.vlm-card.down     { border-color:rgba(248,81,73,.6); background:rgba(248,81,73,.07); }
+.vlm-label { font-size:.65rem; text-transform:uppercase; letter-spacing:.6px; color:var(--text-muted); font-weight:600; }
+.vlm-model { display:flex; align-items:center; gap:6px; font-size:.85rem; font-weight:700;
+             color:var(--text-primary); line-height:1; font-variant-numeric:tabular-nums; }
+.vlm-dot { width:16px; height:16px; overflow:visible; flex:none; }
+.vlm-dot-core { fill:#3fb950; }
+.vlm-dot-ring {
+  fill:none; stroke:#3fb950; stroke-width:1; opacity:.7;
+  transform-origin:center; animation: vlm-pulse-ring 2.4s ease-out infinite;
+}
+@keyframes vlm-pulse-ring {
+  0%   { transform:scale(.55); opacity:.75; }
+  100% { transform:scale(2.1); opacity:0; }
+}
+.vlm-card.degraded .vlm-dot-core, .vlm-card.degraded .vlm-dot-ring { fill:#d29922; stroke:#d29922; }
+.vlm-card.down     .vlm-dot-core, .vlm-card.down     .vlm-dot-ring { fill:#f85149; stroke:#f85149; }
+.vlm-sub   { font-size:.6rem; color:var(--text-muted); }
 
 /* ── Gauge card ── */
 .gauge-card {
@@ -174,7 +204,7 @@ main {
 }
 .cam-persons:empty { display:none; }
 
-/* ── Nemotron activity bar ── */
+/* ── VLM activity bar ── */
 .cam-activity {
   padding:4px 12px 5px;
   font-size:.68rem; color:var(--text-secondary);
@@ -183,9 +213,33 @@ main {
   min-height:22px;
 }
 .cam-activity:empty { display:none; }
+.cam-activity-detail { color: var(--oxm-blue); font-style: italic; }
 .cam-activity .act-alert {
   color:var(--red-alert); font-weight:600;
 }
+
+/* ── Pipeline chips: MOV -> YOLO -> QWEN ── */
+.cam-pipe {
+  display:flex; gap:6px; flex-wrap:wrap; align-items:center;
+  padding:5px 12px; border-top:1px solid var(--border);
+  font-size:.64rem; color:var(--text-muted);
+}
+.pipe-chip {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:1px 7px; border-radius:9px; border:1px solid var(--border);
+  white-space:nowrap; transition:background .25s, border-color .25s, color .25s;
+}
+.pipe-chip .pdot { width:6px; height:6px; border-radius:50%; background:var(--text-muted); }
+.pipe-chip.on   { color:var(--oxm-blue); border-color:var(--oxm-blue); background:rgba(118,185,0,.12); }
+.pipe-chip.on .pdot { background:var(--oxm-blue); animation:pipe-pulse 1s infinite; }
+.pipe-chip.sw   { border-style:dashed; }
+.pipe-chip.flash { background:rgba(118,185,0,.35); border-color:var(--oxm-blue); color:var(--oxm-blue); }
+@keyframes pipe-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+.pipe-summary {
+  margin:0 0 10px; padding:6px 12px; font-size:.72rem;
+  color:var(--text-secondary); border:1px solid var(--border); border-radius:8px;
+}
+.pipe-summary b { color:var(--oxm-blue); }
 
 /* ── Faces panel ── */
 .faces-panel {
@@ -212,14 +266,72 @@ main {
 .face-chip.known { border-color:var(--green-live); color:var(--text-primary); }
 .face-chip-dot { width:5px; height:5px; border-radius:50%; background:var(--text-muted); flex-shrink:0; }
 .face-chip.known .face-chip-dot { background:var(--green-live); box-shadow:0 0 4px var(--green-live); }
+.face-chip-thumb { width:18px; height:18px; border-radius:50%; object-fit:cover; flex-shrink:0; }
 .face-chip-cam { font-size:.62rem; color:var(--text-muted); }
 .faces-empty { font-size:.75rem; color:var(--text-muted); font-style:italic; }
 
+/* ── Timeline de eventos (franja colapsable al fondo) ── */
+.timeline-panel {
+  margin: 14px 24px 0; background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.timeline-panel summary {
+  list-style: none; cursor: pointer; position: relative; padding: 12px 16px 12px 30px;
+  font-size: .8rem; font-weight: 600; color: var(--text-secondary);
+  display: flex; align-items: center; gap: 8px;
+}
+.timeline-panel summary::-webkit-details-marker { display: none; }
+.timeline-panel summary::before { left: 14px; }
+.timeline-panel-count { font-weight: 400; color: var(--text-muted); }
+.timeline-panel-body { padding: 0 16px 14px; border-top: 1px solid var(--border); }
+.timeline-panel .hist-events { margin-top: 10px; max-height: 320px; }
+.pp-card { width:170px; background:var(--bg-card,#1c2130); border:1px solid var(--border); border-radius:10px; padding:8px; display:flex; flex-direction:column; gap:4px; font-size:.7rem; cursor:pointer; }
+.pp-card:hover { border-color:var(--oxm-blue); }
+.pp-pics { display:flex; gap:6px; justify-content:center; align-items:center; min-height:84px; }
+.pp-face { width:64px; height:64px; border-radius:50%; object-fit:cover; }
+.pp-body { height:84px; max-width:60px; border-radius:6px; object-fit:cover; }
+.pp-name { font-weight:600; text-align:center; color:var(--text); }
+.pp-name.named { color:var(--green-live); }
+.pp-meta { color:var(--text-muted); text-align:center; }
+.pp-desc { color:var(--text-secondary); font-size:.66rem; }
+.pp-actions { display:flex; gap:4px; justify-content:center; }
+.pp-actions button { background:none; border:1px solid var(--border); color:var(--text-muted); border-radius:6px; cursor:pointer; font-size:.7rem; padding:1px 6px; }
+.pp-actions button:hover { color:var(--oxm-blue); border-color:var(--oxm-blue); }
+.fh-grid { display:flex; flex-wrap:wrap; gap:8px; max-height:420px; overflow-y:auto; padding-top:4px; }
+.fh-card {
+  display:flex; flex-direction:column; align-items:center; gap:4px; width:84px;
+  padding:6px; border:1px solid var(--border); border-radius:8px; background:rgba(255,255,255,.02);
+}
+.fh-thumb, .fh-thumb-missing { width:56px; height:56px; border-radius:50%; object-fit:cover; }
+.fh-pics { display:flex; gap:6px; align-items:center; justify-content:center; }
+.fh-body { height:84px; max-width:70px; border-radius:6px; object-fit:cover; cursor:zoom-in; }
+.fh-thumb-missing {
+  background:var(--bg-panel); display:flex; align-items:center; justify-content:center;
+  color:var(--text-muted); font-size:1.2rem;
+}
+.fh-name {
+  font-size:.68rem; font-weight:600; text-align:center; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; max-width:100%;
+}
+.fh-name.known { color: var(--green-live); }
+.fh-cam, .fh-t {
+  font-size:.6rem; color:var(--text-muted); text-align:center; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; max-width:100%;
+}
+
+.timeline-panel-more {
+  display: inline-block; margin-top: 8px; font-size: .74rem; color: var(--oxm-blue);
+  cursor: pointer; background: none; border: none; padding: 0;
+}
+
 /* ── Footer ── */
 footer {
-  background:var(--bg-panel); border-top:1px solid var(--border);
+  background: rgba(28,33,48,.82);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-top:1px solid var(--border);
   padding:10px 24px;
   display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+  position: sticky; bottom: 0; z-index: 100;
 }
 .footer-summary { display:flex; gap:20px; font-size:.78rem; color:var(--text-secondary); }
 .footer-summary .sum-item { display:flex; align-items:center; gap:5px; }
@@ -355,7 +467,311 @@ footer {
   font-size:.66rem; color:var(--text-muted);
   padding:0 14px 8px; line-height:1.3;
 }
+/* ── Markdown en respuestas del chat ── */
+.chat-msg .md-p { margin: 0 0 6px; }
+.chat-msg .md-p:last-child { margin-bottom: 0; }
+.chat-msg .md-list { margin: 4px 0 8px; padding-left: 18px; }
+.chat-msg .md-list li { margin: 2px 0; }
+.chat-msg strong { color: var(--text); font-weight: 600; }
+.chat-msg code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .92em; background: rgba(255,255,255,.07);
+  padding: 1px 4px; border-radius: 3px;
+}
+/* ── Boton de settings en el header ── */
+.hdr-btn {
+  background: rgba(255,255,255,.05); border: 1px solid var(--border);
+  color: var(--text-muted); border-radius: 8px; cursor: pointer;
+  font-size: 1rem; line-height: 1; padding: 7px 10px; margin-left: 10px;
+  transition: color .2s, border-color .2s;
+}
+.hdr-btn:hover { color: var(--text); border-color: var(--text-muted); }
+
+/* ── Modal de configuracion ── */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100; backdrop-filter: blur(2px);
+}
+.modal-backdrop[hidden] { display: none; }
+.modal {
+  background: #14171c; border: 1px solid var(--border); border-radius: 12px;
+  width: min(520px, 92vw); max-height: 86vh; overflow: auto;
+  box-shadow: 0 18px 50px rgba(0,0,0,.55);
+}
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+  font-weight: 600; font-size: .92rem;
+}
+.modal-x {
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; font-size: 1rem; padding: 2px 6px;
+}
+.modal-x:hover { color: var(--text); }
+.modal-body { padding: 14px 16px 18px; }
+.set-group { margin-bottom: 18px; }
+.set-group:last-child { margin-bottom: 0; }
+.set-group-title {
+  font-size: .7rem; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--text-muted); margin-bottom: 10px;
+}
+.set-row {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 9px 0; cursor: pointer;
+}
+.set-row input { margin-top: 3px; flex: none; accent-color: var(--oxm-blue); }
+.set-row b { display: block; font-size: .85rem; font-weight: 600; }
+.set-row small {
+  display: block; color: var(--text-muted); font-size: .74rem;
+  line-height: 1.35; margin-top: 2px;
+}
+.set-btn {
+  margin-top: 8px; background: rgba(255,255,255,.05);
+  border: 1px solid var(--border); color: var(--text-muted);
+  border-radius: 7px; padding: 7px 11px; font-size: .78rem; cursor: pointer;
+}
+.set-btn:hover { color: var(--text); }
+
+/* ── Payload de debug en la tarjeta ── */
+.cam-payload { padding: 0 10px 9px; font-size: .72rem; }
+.pl-block {
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 5px 8px; margin-top: 6px; background: rgba(0,0,0,.25);
+}
+.pl-block summary {
+  cursor: pointer; color: var(--text-muted);
+  font-size: .7rem; text-transform: uppercase; letter-spacing: .05em;
+}
+.pl-kv { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; }
+.pl-kv span { color: var(--text-muted); flex: none; }
+.pl-kv code { overflow-wrap: anywhere; text-align: right; }
+.pl-json {
+  margin: 6px 0 0; max-height: 190px; overflow: auto; white-space: pre-wrap;
+  overflow-wrap: anywhere; font-size: .68rem; line-height: 1.35;
+  color: var(--text-muted);
+}
+.pl-link { display: inline-block; margin-top: 6px; color: var(--oxm-blue); font-size: .72rem; }
+.pl-err { color: var(--text-muted); padding: 6px 0; }
+
+/* ── Modo editar layout ── */
+#cam-grid.edit-mode .cam-card { cursor: grab; user-select: none; }
+#cam-grid.edit-mode .cam-card img { pointer-events: none; }
+#cam-grid.edit-mode .cam-card:active { cursor: grabbing; }
+#cam-grid.edit-mode .cam-card.editable { outline: 1px dashed var(--border); }
+#cam-grid .cam-card.dragging { opacity: .45; }
+#cam-grid .cam-card.drop-target { outline: 2px solid var(--oxm-blue); }
+/* ── Histórico ── */
+.modal-wide { width: min(980px, 95vw); }
+.hist-controls {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  margin-bottom: 14px;
+}
+.hist-ranges { display: flex; gap: 4px; }
+.hist-range {
+  background: rgba(255,255,255,.05); border: 1px solid var(--border);
+  color: var(--text-muted); border-radius: 6px; padding: 5px 10px;
+  font-size: .76rem; cursor: pointer;
+}
+.hist-range.on { color: var(--oxm-blue); border-color: var(--oxm-blue); }
+.hist-select, .hist-check {
+  background: rgba(255,255,255,.05); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px; padding: 5px 8px; font-size: .76rem;
+}
+.hist-check { display: flex; align-items: center; gap: 6px; color: var(--text-muted); cursor: pointer; }
+.hist-check input { accent-color: var(--oxm-blue); }
+.hist-tiles { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.hist-tile {
+  flex: 1 1 110px; background: rgba(255,255,255,.03);
+  border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px;
+}
+.hist-tile b { display: block; font-size: 1.15rem; font-weight: 600; }
+.hist-tile span { font-size: .68rem; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .05em; }
+.hist-warn { flex: 1 1 100%; font-size: .72rem; color: #e0a458; padding-top: 4px; }
+.hist-section-title {
+  font-size: .7rem; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--text-muted); margin: 16px 0 8px;
+}
+.hist-section-title small { text-transform: none; letter-spacing: 0; margin-left: 6px; }
+.hist-bars {
+  display: flex; align-items: flex-end; gap: 2px; height: 90px;
+  border-bottom: 1px solid var(--border); overflow-x: auto; padding-bottom: 2px;
+}
+.hist-bar-wrap { flex: 1 0 18px; display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-end; height: 100%; }
+.hist-bar { width: 100%; background: #3d5a80; border-radius: 2px 2px 0 0; min-height: 2px; }
+.hist-bar.people { background: var(--oxm-blue); }
+.hist-bar.alert  { background: #d9534f; }
+.hist-bar-lbl { font-size: .58rem; color: var(--text-muted); margin-top: 3px; white-space: nowrap; }
+.hist-table { width: 100%; border-collapse: collapse; font-size: .76rem; }
+.hist-table th {
+  text-align: left; font-weight: 500; color: var(--text-muted);
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .05em;
+  padding: 4px 6px; border-bottom: 1px solid var(--border);
+}
+.hist-table td { padding: 5px 6px; border-bottom: 1px solid rgba(255,255,255,.04); }
+.hist-table td.hist-al { color: #d9534f; font-weight: 600; }
+.hist-events { max-height: 300px; overflow-y: auto; }
+.hist-ev {
+  display: grid; grid-template-columns: 78px 130px 34px 1fr 60px auto;
+  gap: 8px; align-items: center; padding: 5px 6px; font-size: .74rem;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.hist-ev.alert { background: rgba(217,83,79,.08); }
+.hist-ev-t, .hist-ev-p { color: var(--text-muted); align-self: baseline; }
+.hist-ev-c { color: var(--text); align-self: baseline; }
+.hist-ev-a { color: var(--text-muted); overflow-wrap: anywhere; align-self: baseline; }
+.hist-ev-al { color: #d9534f; margin-left: 6px; }
+.hist-ev-snap { display: block; line-height: 0; }
+/* Miniatura inline del snapshot — antes esto era un link de texto minúsculo
+   ("ver ↗") que abría una pestaña nueva por cada alerta, imposible de usar
+   para calificar 👍/👎 varias alertas seguidas sin ver la imagen primero. */
+.hist-ev-thumb {
+  width: 60px; height: 40px; object-fit: cover; border-radius: 4px;
+  display: block; border: 1px solid rgba(255,255,255,.08);
+  transition: transform .15s ease;
+}
+.hist-ev-thumb:hover { transform: scale(2.4); position: relative; z-index: 5; }
+/* Foto heredada de un evento anterior de la misma camara (sin cambio de
+   personas desde entonces, ver _snapshot_trigger) — atenuada + borde
+   punteado para no confundirla con una foto del momento exacto. */
+.hist-ev-snap.approx .hist-ev-thumb {
+  opacity: .55; border-style: dashed;
+}
+.hist-ev-nothumb {
+  color: var(--text-muted); font-size: .68rem; text-align: center;
+  align-self: baseline;
+}
+.hist-empty { color: var(--text-muted); font-size: .76rem; padding: 10px 0; }
+.hist-ev-review { display:flex; gap:2px; }
+.hev-btn {
+  background:none; border:1px solid var(--border); border-radius:5px;
+  padding:1px 4px; font-size:.7rem; cursor:pointer; opacity:.5; line-height:1.3;
+}
+.hev-btn:hover { opacity:1; }
+.hev-btn.on { opacity:1; }
+.hev-btn.hev-important.on { border-color: var(--green-live); background: rgba(63,185,80,.14); }
+.hev-btn.hev-noise.on { border-color: var(--text-muted); background: rgba(255,255,255,.08); }
+.rp-card {
+  border:1px solid var(--border); border-radius:8px; padding:10px 12px;
+  margin-bottom:8px; background:rgba(255,255,255,.02);
+}
+.rp-head {
+  display:flex; align-items:center; justify-content:space-between; cursor:pointer;
+  font-size:.78rem; gap:8px;
+}
+.rp-kind {
+  font-size:.62rem; text-transform:uppercase; letter-spacing:.05em; color: var(--oxm-blue);
+  border:1px solid var(--oxm-blue); border-radius:10px; padding:1px 7px; flex-shrink:0;
+}
+.rp-when { color: var(--text-muted); flex:1; }
+.rp-body {
+  margin-top:8px; padding-top:8px; border-top:1px solid var(--border);
+  font-size:.78rem; line-height:1.5; white-space:pre-wrap;
+}
+.rp-body[hidden] { display:none; }
+/* ── Gestion de rostros ── */
+.faces-enrolled { display: flex; flex-wrap: wrap; gap: 6px; min-height: 22px; margin-bottom: 10px; }
+.faces-empty-sm { font-size: .74rem; color: var(--text-muted); font-style: italic; }
+.face-chip-mgmt {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,.05); border: 1px solid var(--border);
+  border-radius: 20px; padding: 3px 6px 3px 10px; font-size: .76rem;
+}
+.face-chip-mgmt small { color: var(--text-muted); font-size: .66rem; }
+.face-chip-thumb-mgmt { width:24px; height:24px; border-radius:50%; object-fit:cover; margin-left:-6px; }
+.face-chip-del {
+  background: none; border: none; color: var(--text-muted); cursor: pointer;
+  font-size: .7rem; border-radius: 50%; width: 18px; height: 18px;
+  line-height: 1; padding: 0;
+}
+.face-chip-del:hover { color: #d9534f; }
+.face-enroll { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.face-enroll-name {
+  background: rgba(255,255,255,.05); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px; padding: 5px 8px;
+  font-size: .78rem; flex: 1 1 140px;
+}
+.face-enroll-msg { font-size: .72rem; color: var(--text-muted); margin-top: 6px; min-height: 1em; }
+
+/* ── Elevacion y movimiento (verde NVIDIA: resplandor en hover, pulso en vivo) ── */
+@keyframes pulse-live {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(118,185,0,.5); }
+  50%      { box-shadow: 0 0 0 5px rgba(118,185,0,0); }
+}
+.dot.live { animation: pulse-live 2.4s ease-out infinite; }
+
+.cam-card, .vlm-card, .persons-counter {
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+  position: relative; overflow: hidden;
+}
+.cam-card::before, .vlm-card::before, .persons-counter::before {
+  content: ""; position: absolute; inset: -60% -60%; pointer-events: none;
+  background: linear-gradient(115deg, transparent 42%, rgba(255,255,255,.07) 50%, transparent 58%);
+  transform: translateX(-120%); transition: transform .65s ease;
+}
+.cam-card:hover, .vlm-card:hover, .persons-counter:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,.35), 0 0 0 1px rgba(118,185,0,.12);
+}
+.cam-card:hover::before, .vlm-card:hover::before, .persons-counter:hover::before {
+  transform: translateX(120%);
+}
+
+.hdr-btn, .chat-send, .set-btn, .hist-range {
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.hdr-btn:hover, .chat-send:hover:not(:disabled), .set-btn:hover, .hist-range:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(118,185,0,.22);
+}
+.hdr-btn:active, .chat-send:active, .set-btn:active, .hist-range:active {
+  transform: translateY(0) scale(.97);
+}
+
+.pl-block summary { list-style: none; position: relative; padding-left: 14px; }
+.pl-block summary::-webkit-details-marker { display: none; }
+.pl-block summary::before, .timeline-panel summary::before {
+  content: "▸"; position: absolute; left: 0; top: 0;
+  color: var(--text-muted); transition: transform .2s ease;
+}
+.pl-block[open] summary::before, .timeline-panel[open] summary::before { transform: rotate(90deg); }
+.conn-table{width:100%;border-collapse:collapse;font-size:12px}
+.conn-table th{text-align:left;padding:6px 8px;color:var(--text-dim,#9aa3b5);font-weight:600;border-bottom:1px solid rgba(255,255,255,.12);white-space:nowrap}
+.conn-table td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.06);vertical-align:top}
+.conn-table code{font-size:11px}
+.conn-ok{color:#76B900}.conn-bad{color:#ff5c5c}.conn-warn{color:#e5b400}
+
+/* ── Chat flotante desplegable ── */
+main { grid-template-columns: 1fr !important; }
+.main-right { position:fixed !important; right:18px; bottom:72px; z-index:150; width:auto; top:auto !important; }
+.chat-fab { width:52px; height:52px; border-radius:50%; border:0; cursor:pointer; font-size:22px;
+  background:var(--oxm-blue); color:#0b0f14; box-shadow:0 6px 24px rgba(118,185,0,.35); float:right; }
+.chat-fab:hover { transform:translateY(-2px); }
+.main-right .chat-panel { display:none; width:min(400px, calc(100vw - 36px)); height:min(560px, 68vh);
+  min-height:0 !important; margin-bottom:10px; box-shadow:0 12px 40px rgba(0,0,0,.5); }
+.main-right.chat-open .chat-panel { display:flex; }
+.main-right.chat-open .chat-fab { display:none; }
+.chat-min { background:transparent; border:0; color:var(--text-muted,#9aa3b5); font-size:18px; cursor:pointer; margin-left:8px; }
+.chat-min:hover { color:#fff; }
+.spot-frame { width:100%; height:min(78vh,760px); border:0; border-radius:12px; background:#000; }
+
+/* ── UI/UX checklist: iconos SVG, foco visible, movimiento reducido ── */
+.ico { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8;
+  stroke-linecap:round; stroke-linejoin:round; display:block; }
+.hdr-btn { display:inline-grid; place-items:center; padding:7px 9px; }
+.chat-fab { display:grid; place-items:center; }
+.chat-fab .ico { width:24px; height:24px; stroke-width:2; }
+button, summary, [role="button"], .hist-range, select { cursor:pointer; }
+:focus-visible { outline:2px solid var(--oxm-blue); outline-offset:2px; border-radius:6px; }
+input:focus-visible, select:focus-visible { outline-offset:0; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration:.001ms !important; animation-iteration-count:1 !important;
+    transition-duration:.001ms !important; scroll-behavior:auto !important; }
+}
 </style>
+{% if umami_src and umami_id %}<script defer src="{{ umami_src }}" data-website-id="{{ umami_id }}"></script>{% endif %}
 </head>
 <body>
 
@@ -370,6 +786,12 @@ footer {
 
   <div class="metrics-bar" id="metrics-bar"></div>
 
+  <div class="vlm-card" id="vlm-card" title="Modelo de visión que analiza los frames">
+    <span class="vlm-label">IA Visión</span>
+    <span class="vlm-model"><svg class="vlm-dot" viewBox="0 0 16 16"><circle class="vlm-dot-ring" cx="8" cy="8" r="5"/><circle class="vlm-dot-core" cx="8" cy="8" r="3"/></svg><span id="vlm-model">—</span></span>
+    <span class="vlm-sub" id="vlm-sub">conectando…</span>
+  </div>
+
   <div class="persons-counter">
     <span class="persons-label">Personas</span>
     <span class="persons-value" id="h-persons">0</span>
@@ -377,16 +799,30 @@ footer {
   </div>
 
   <div class="header-clock" id="clock">—</div>
+  <button class="hdr-btn" id="btn-history" title="Histórico de eventos" aria-label="Histórico de eventos"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+  <button class="hdr-btn" id="btn-spot" title="Cómo funciona OXM Vision (animación)" aria-label="Cómo funciona OXM Vision (animación)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg></button>
+  <button class="hdr-btn" id="btn-conn" title="Conexiones a las cámaras" aria-label="Conexiones a las cámaras"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 2v6M15 2v6"/><path d="M6 8h12v3a6 6 0 0 1-12 0z"/><path d="M12 17v5"/></svg></button>
+  <button class="hdr-btn" id="btn-reports" title="Reportes generados por IA" aria-label="Reportes generados por IA"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h4"/></svg></button>
+  <button class="hdr-btn" id="btn-settings" title="Configuración" aria-label="Configuración"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
 </header>
 
 <main>
   <div class="main-left">
+    <div class="pipe-summary" id="pipe-summary"
+         title="Flujo: (1) la camara detecta movimiento -> (2) YOLO cuenta personas/caras a 0.5fps en todas las camaras, siempre -> (3) Qwen describe la escena solo cuando hay movimiento (o en un latido largo si la camara esta quieta).">
+      Pipeline: cargando…
+    </div>
     <div class="cam-grid" id="cam-grid"></div>
 
     <div class="faces-panel">
       <div class="faces-panel-header">
         <span class="faces-panel-title">Reconocimiento facial</span>
-        <span style="font-size:.7rem;color:var(--text-muted)" id="faces-count">0 rostros</span>
+        <span style="display:flex;align-items:center;gap:10px;">
+          <button class="timeline-panel-more" id="people-link">Personas e identidades →</button>
+          <button class="timeline-panel-more" id="faces-history-link">Historial de rostros (antiguo) →</button>
+          <button class="timeline-panel-more" id="faces-manage-link">Gestionar rostros capturados →</button>
+          <span style="font-size:.7rem;color:var(--text-muted)" id="faces-count">0 rostros</span>
+        </span>
       </div>
       <div class="faces-list" id="faces-list">
         <span class="faces-empty">Sin rostros detectados</span>
@@ -394,14 +830,17 @@ footer {
     </div>
   </div>
 
-  <aside class="main-right">
+</main>
+
+  <aside class="main-right" id="chat-dock">
+    <button class="chat-fab" id="chat-fab" title="Asistente IA" aria-label="Abrir asistente IA"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></button>
     <div class="chat-panel">
       <div class="chat-header">
         <div class="chat-title">
           <span class="dot-ai"></span>
-          Asistente Nemotron
+          Asistente IA · <span id="chat-model">…</span>
         </div>
-        <span class="chat-status" id="chat-status">listo</span>
+        <span class="chat-status" id="chat-status">listo</span><button class="chat-min" id="chat-min" title="Minimizar" aria-label="Minimizar chat">—</button>
       </div>
       <div class="chat-messages" id="chat-messages">
         <div class="chat-msg chat-msg-assistant">
@@ -418,11 +857,19 @@ footer {
         <button type="submit" class="chat-send" id="chat-send">Enviar</button>
       </form>
       <div class="chat-hint">
-        Las respuestas se generan con Nemotron usando las últimas observaciones de cada cámara.
+        Respuestas generadas por <span id="chat-model-hint">el modelo configurado</span>,
+        sobre las últimas observaciones de cada cámara.
       </div>
     </div>
   </aside>
-</main>
+
+<details class="timeline-panel" id="timeline-panel">
+  <summary>🕓 Timeline de eventos <span class="timeline-panel-count" id="timeline-panel-count"></span></summary>
+  <div class="timeline-panel-body">
+    <div class="hist-events" id="timeline-events"></div>
+    <button class="timeline-panel-more" id="timeline-open-full">Ver histórico completo y filtros →</button>
+  </div>
+</details>
 
 <footer>
   <div class="footer-summary">
@@ -503,10 +950,10 @@ function updateGauge(id, pct, label, unit='', warnAt=70, alertAt=90) {
   else if (pct >= warnAt) card.classList.add('warn');
 }
 const GAUGES = [
-  { id:'cpu',  label:'CPU',   stops:['#1E78C2','#38B2FF','#7DD8FF'] },
-  { id:'ram',  label:'RAM',   stops:['#155A96','#1E78C2','#38B2FF'] },
-  { id:'temp', label:'TEMP',  stops:['#1E78C2','#D29922','#F85149'] },
-  { id:'gpu',  label:'GPU',   stops:['#0D4F8C','#1E78C2','#5BAAFF'] },
+  { id:'cpu',  label:'CPU',   stops:['#5E9400','#76B900','#A8E063'] },
+  { id:'ram',  label:'RAM',   stops:['#3F6B00','#5E9400','#76B900'] },
+  { id:'temp', label:'TEMP',  stops:['#76B900','#D29922','#F85149'] },
+  { id:'gpu',  label:'GPU',   stops:['#4B7300','#76B900','#B6E667'] },
   { id:'disk', label:'DISCO', stops:['#595959','#888888','#AAAAAA'] },
 ];
 function initGauges() {
@@ -531,7 +978,8 @@ let initialized = false;
 function initGrid(cameras) {
   const grid = document.getElementById('cam-grid');
   grid.innerHTML = '';
-  cameras.forEach(cam => {
+  _allCams = cameras.map(c => ({ id: c.id, name: c.name }));
+  applyCamOrder(cameras).forEach(cam => {
     const card = document.createElement('div');
     card.className = 'cam-card connecting';
     card.id = `card-${cam.id}`;
@@ -544,7 +992,7 @@ function initGrid(cameras) {
         </div>
       </div>
       <div class="cam-video-wrap">
-        <img id="img-${cam.id}" alt="${cam.name}">
+        <img id="img-${cam.id}" alt="${cam.name}" draggable="false">
         <div class="cam-overlay" id="overlay-${cam.id}">
           <span class="overlay-icon">↺</span>
           <span class="overlay-text">Reconectando...</span>
@@ -557,12 +1005,52 @@ function initGrid(cameras) {
           <span class="cam-fps" id="fps-${cam.id}">— fps</span>
         </div>
       </div>
-      <div class="cam-activity" id="nem-act-${cam.id}"></div>`;
+      <div class="cam-pipe" id="pipe-${cam.id}">
+        <span class="pipe-chip" id="pc-mov-${cam.id}"><span class="pdot"></span><span class="pt">MOV</span></span>
+        <span class="pipe-chip" id="pc-yolo-${cam.id}"><span class="pdot"></span><span class="pt">YOLO</span></span>
+        <span class="pipe-chip" id="pc-vlm-${cam.id}"><span class="pdot"></span><span class="pt">QWEN</span></span>
+      </div>
+      <div class="cam-activity" id="nem-act-${cam.id}"></div>
+      <div class="cam-activity cam-activity-detail" id="nem-detail-${cam.id}"></div>
+      <div class="cam-payload" id="payload-${cam.id}" hidden></div>`;
+    card.addEventListener('dragstart', onCardDragStart);
+    card.addEventListener('dragover',  onCardDragOver);
+    card.addEventListener('dragleave', onCardDragLeave);
+    card.addEventListener('drop',      onCardDrop);
+    card.addEventListener('dragend',   onCardDragEnd);
     grid.appendChild(card);
   });
+  // El grid se construye una sola vez; aplicar aquí lo que dependa de él.
+  if (typeof applyEditLayoutMode === 'function') applyEditLayoutMode();
+  if (typeof refreshPayloads    === 'function') refreshPayloads();
   // Iniciar polling de snapshots para cada cámara (después de DOM listo)
   cameras.forEach(cam => startSnapshotPolling(cam.id));
+  // Pipeline de detalle de pantallas (experimento, opt-in en el backend
+  // vía COWORK_DETAIL_ENABLED) — solo si la cámara existe en este grid.
+  if (cameras.some(c => c.id === 'cam-cowork')) startCoworkDetailPolling();
   initialized = true;
+}
+
+const COWORK_DETAIL_POLL_MS = 20000;
+function startCoworkDetailPolling() {
+  async function tick() {
+    const el = document.getElementById('nem-detail-cam-cowork');
+    if (!el) return; // tarjeta ya no existe (reorden/eliminada del grid)
+    try {
+      const res = await fetch('/api/cowork/detail');
+      if (!res.ok) { el.textContent = ''; return; }
+      const d = await res.json();
+      if (!d.available) { el.textContent = ''; return; }
+      const n = d.monitor_count ?? (d.monitors || []).length;
+      const detail = (d.monitors || []).join(' · ');
+      el.textContent = n ? `🖥 ${n} pantalla${n === 1 ? '' : 's'}: ${detail}` : '';
+    } catch (e) {
+      el.textContent = '';
+    } finally {
+      setTimeout(tick, COWORK_DETAIL_POLL_MS);
+    }
+  }
+  tick();
 }
 
 function updateCard(cam) {
@@ -654,7 +1142,7 @@ function updateDetections(detections, totalPersons) {
   const fpEl = document.getElementById('f-persons');
   if (fpEl) fpEl.textContent = total;
 
-  // Per-camera badges + Nemotron activity
+  // Per-camera badges + VLM activity
   const _SKIP_ALERTS = new Set(['error','empty response','bad json','encode failed','unreachable','']);
   for (const [camId, d] of Object.entries(detections||{})) {
     // Personas
@@ -663,7 +1151,7 @@ function updateDetections(detections, totalPersons) {
       const n = d.person_count || 0;
       pctEl.textContent = n > 0 ? `👤 ${n}` : '';
     }
-    // Actividad Nemotron
+    // Actividad VLM
     const actEl = document.getElementById(`nem-act-${camId}`);
     if (actEl && d.nemotron && d.nemotron.activity !== 'error') {
       const activity = (d.nemotron.activity || '').trim();
@@ -684,15 +1172,31 @@ function updateDetections(detections, totalPersons) {
   _updateFacesPanel(detections);
 }
 
+// Deteccion de rostros es intermitente por diseño (YOLO+InsightFace a 0.5fps
+// por camara, solo detecta si la persona esta bien encuadrada en ese instante
+// exacto) — sin esto, la miniatura aparecia y desaparecia cada 5s (un poll
+// si, el siguiente no). Se mantiene "recientemente visto" unos segundos.
+const _lastSeenFaces = {};
+const FACE_GRACE_MS = 15000;
+
 function _updateFacesPanel(detections) {
   const list      = document.getElementById('faces-list');
   const countEl   = document.getElementById('faces-count');
   if (!list) return;
 
+  const now = Date.now();
   const allFaces = [];
   for (const [camId, d] of Object.entries(detections||{})) {
-    for (const face of d.faces||[]) {
-      allFaces.push({ name: face.name, confidence: face.confidence, cam_id: camId });
+    let faces = d.faces || [];
+    if (faces.length) {
+      _lastSeenFaces[camId] = { faces, ts: now };
+    } else {
+      const last = _lastSeenFaces[camId];
+      if (last && (now - last.ts) < FACE_GRACE_MS) faces = last.faces;
+      else delete _lastSeenFaces[camId];
+    }
+    for (const face of faces) {
+      allFaces.push({ name: face.name, confidence: face.confidence, cam_id: camId, thumb: face.thumb });
     }
   }
 
@@ -706,8 +1210,11 @@ function _updateFacesPanel(detections) {
   list.innerHTML = allFaces.map(f => {
     const known = f.name !== 'Desconocido';
     const conf  = known ? ` <span class="face-chip-cam">${Math.round(f.confidence*100)}%</span>` : '';
+    const pic   = f.thumb
+      ? `<img class="face-chip-thumb" src="data:image/jpeg;base64,${f.thumb}">`
+      : `<div class="face-chip-dot"></div>`;
     return `<div class="face-chip ${known?'known':''}">
-      <div class="face-chip-dot"></div>
+      ${pic}
       <span>${f.name}</span>${conf}
     </div>`;
   }).join('');
@@ -785,15 +1292,1041 @@ fetch('/api/stats')
   .then(r=>r.json()).then(applyStats)
   .catch(()=>setTimeout(()=>fetch('/api/stats').then(r=>r.json()).then(applyStats),3000));
 
-fetch('/api/detections')
-  .then(r=>r.json())
-  .then(d=>updateDetections(d.cameras, d.total_persons))
-  .catch(()=>{});
+function _pollDetections() {
+  fetch('/api/detections')
+    .then(r=>r.json())
+    .then(d=>updateDetections(d.cameras, d.total_persons))
+    .catch(()=>{});
+}
+_pollDetections();
+// El panel de "Reconocimiento facial" antes solo se llenaba una vez al cargar
+// la pagina (esto era el fetch de arriba, sin poll) — quedaba congelado.
+setInterval(_pollDetections, 5000);
+
+// ── Salud del modelo de visión ────────────────────────────────────────
+async function refreshVLM(){
+  const card = document.getElementById('vlm-card');
+  const mEl  = document.getElementById('vlm-model');
+  const sEl  = document.getElementById('vlm-sub');
+  if(!card) return;
+  try{
+    const v = await (await fetch('/api/vlm')).json();
+    card.className = 'vlm-card ' + (v.status || 'unknown');
+    // model_real = lo que respondio el backend; v.model = el alias que se pide
+    const shown = v.model_real || v.model || '—';
+    mEl.textContent = shown;
+    const cm = document.getElementById('chat-model');
+    const ch = document.getElementById('chat-model-hint');
+    if (cm) cm.textContent = shown;
+    if (ch) ch.textContent = v.endpoint ? `${shown} · ${v.endpoint}` : shown;
+    if(v.status === 'down'){
+      sEl.textContent = 'sin respuesta';
+    }else if(v.latency_ms){
+      const s = (v.latency_ms/1000).toFixed(1);
+      sEl.textContent = `${s}s · ${v.cams_fresh}/${v.cams_total} cám`;
+    }else{
+      sEl.textContent = `${v.cams_ok||0}/${v.cams_total||0} cám`;
+    }
+    card.title = `modelo real: ${v.model_real || '—'}\n` +
+                 `alias solicitado: ${v.model || '—'}\n` +
+                 `endpoint: ${v.endpoint || '—'}\nEstado: ${v.status}` +
+                 (v.latency_ms ? ` · ${v.latency_ms} ms promedio` : '');
+  }catch(e){
+    card.className = 'vlm-card down';
+    mEl.textContent = '—';
+    sEl.textContent = 'sin datos';
+  }
+}
+refreshVLM();
+setInterval(refreshVLM, 15000);
+
+// ── Pipeline: movimiento -> YOLO -> Qwen ─────────────────────────────
+const _pipeLast = {};
+function _setChip(id, cls, text, title, flash){
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'pipe-chip ' + cls + (flash ? ' flash' : '');
+  el.querySelector('.pt').textContent = text;
+  el.title = title;
+  if (flash) setTimeout(() => el.classList.remove('flash'), 1500);
+}
+const _TRIG = {
+  'cam-motion': 'movimiento de la cámara', 'idle': 'latido (cámara quieta)',
+  'heartbeat': 'latido periódico', 'motion': 'frame-diff por software',
+};
+async function refreshPipeline(){
+  try{
+    const d = await (await fetch('/api/pipeline')).json();
+    const now = d.ts;
+    for (const [cam, p] of Object.entries(d.cameras || {})){
+      const m = p.motion, n = m.native || {};
+      if (m.native_usable){
+        const act = n.active;
+        const since = act ? ` ${_fmtAgo(now - n.since)}` : (n.last_end_ts ? ` hace ${_fmtAgo(now - n.last_end_ts)}` : '');
+        _setChip(`pc-mov-${cam}`, act ? 'on' : '', act ? 'MOV' + since : 'quieto' + since,
+          `Detector de movimiento de la cámara (nativo). ${n.rises_1h} activaciones en la última hora.`);
+      } else {
+        const why = n.reachable === false ? 'sin acceso SUNAPI'
+                  : (n.detection_type === 'Off' ? 'detector apagado en la cámara' : 'sin señal nativa');
+        _setChip(`pc-mov-${cam}`, 'sw', 'MOV sw', `Sin movimiento nativo (${why}); se usa frame-diff por software.`);
+      }
+      const y = p.yolo, ya = y.last_ts ? now - y.last_ts : null;
+      _setChip(`pc-yolo-${cam}`, ya !== null && ya < 5 ? 'on' : '',
+        `YOLO ${y.persons}p${y.boosted ? " ⚡2fps" : ""}`, ya === null ? 'Sin inferencias aún' :
+        `YOLO corre a 0.5 fps en todas las cámaras. Última hace ${_fmtAgo(ya)} (${y.ms} ms).`);
+      const v = p.vlm || {};
+      const key = cam + ':' + (v.ts || 0);
+      const isNew = v.ts && _pipeLast[cam] !== undefined && _pipeLast[cam] !== key;
+      _pipeLast[cam] = key;
+      if (v.ts){
+        const t = _TRIG[v.trigger] || v.trigger;
+        const c = v.calls_1h || {};
+        const tot = Object.values(c).reduce((a, b) => a + b, 0);
+        _setChip(`pc-vlm-${cam}`, now - v.ts < 8 ? 'on' : '',
+          `QWEN ${_fmtAgo(now - v.ts)}`,
+          `Última llamada a Qwen: ${t} · ${v.media || ''} · ${v.ms ? Math.round(v.ms) + ' ms' : ''}. ` +
+          `${tot} llamadas en la última hora.`, isNew);
+      } else {
+        _setChip(`pc-vlm-${cam}`, '', 'QWEN —', 'Sin llamadas a Qwen desde el arranque.');
+      }
+    }
+    const c = d.vlm_calls_1h || {}, tot = Object.values(c).reduce((a, b) => a + b, 0);
+    const part = k => c[k] || 0;
+    document.getElementById('pipe-summary').innerHTML =
+      `Qwen última hora: <b>${tot}</b> llamadas — ` +
+      `${part('cam-motion')} por movimiento de cámara · ${part('motion')} por frame-diff · ` +
+      `${part('heartbeat')} latido 2 min · ${part('idle')} latido largo (cámara quieta). ` +
+      `Descartados sin personas: <b>${d.vlm_skips_1h||0}</b>. YOLO: 0.5 fps, sube a 2 fps con movimiento.`;
+  }catch(e){}
+}
+setInterval(refreshPipeline, 2000);
+setTimeout(refreshPipeline, 1500);
+
+// ══════════════════════════════════════════════════════════════
+// PREFERENCIAS DE UI — payload de debug y layout editable
+// Se guardan por navegador; no hay estado de UI en el servidor.
+// ══════════════════════════════════════════════════════════════
+const _PREFS_KEY = 'thor_ui_prefs';
+const _ORDER_KEY = 'thor_cam_order';
+const PREFS_DEFAULT = { showRequest: false, showResponse: false, editLayout: false };
+
+function loadPrefs(){
+  try { return { ...PREFS_DEFAULT, ...JSON.parse(localStorage.getItem(_PREFS_KEY) || '{}') }; }
+  catch(e){ return { ...PREFS_DEFAULT }; }
+}
+function savePrefs(){
+  try { localStorage.setItem(_PREFS_KEY, JSON.stringify(uiPrefs)); } catch(e){}
+}
+let uiPrefs = loadPrefs();
+
+function loadCamOrder(){
+  try {
+    const a = JSON.parse(localStorage.getItem(_ORDER_KEY) || '[]');
+    return Array.isArray(a) ? a : [];
+  } catch(e){ return []; }
+}
+function saveCamOrder(ids){
+  try { localStorage.setItem(_ORDER_KEY, JSON.stringify(ids)); } catch(e){}
+}
+
+// El orden guardado manda; cualquier cámara que no esté en él (nueva, o
+// renombrada en config) se agrega al final en el orden del backend.
+function applyCamOrder(cameras){
+  const order = loadCamOrder();
+  if (!order.length) return cameras;
+  const byId = new Map(cameras.map(c => [c.id, c]));
+  const out  = [];
+  order.forEach(id => {
+    if (byId.has(id)) { out.push(byId.get(id)); byId.delete(id); }
+  });
+  byId.forEach(c => out.push(c));
+  return out;
+}
+
+// ── Drag & drop ───────────────────────────────────────────────
+let _dragId = null;
+
+function onCardDragStart(e){
+  if (!uiPrefs.editLayout) { e.preventDefault(); return; }
+  _dragId = e.currentTarget.id;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', _dragId);
+}
+function onCardDragOver(e){
+  if (!uiPrefs.editLayout || !_dragId) return;
+  e.preventDefault();
+  if (e.currentTarget.id !== _dragId) e.currentTarget.classList.add('drop-target');
+}
+function onCardDragLeave(e){
+  e.currentTarget.classList.remove('drop-target');
+}
+function onCardDrop(e){
+  if (!uiPrefs.editLayout || !_dragId) return;
+  e.preventDefault();
+  const grid = document.getElementById('cam-grid');
+  const src  = document.getElementById(_dragId);
+  const tgt  = e.currentTarget;
+  tgt.classList.remove('drop-target');
+  if (!src || !tgt || src === tgt) return;
+  const cards = [...grid.children];
+  grid.insertBefore(src, cards.indexOf(src) < cards.indexOf(tgt) ? tgt.nextSibling : tgt);
+  persistCamOrder();
+}
+function onCardDragEnd(e){
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.cam-card.drop-target')
+          .forEach(c => c.classList.remove('drop-target'));
+  _dragId = null;
+}
+function persistCamOrder(){
+  saveCamOrder([...document.querySelectorAll('#cam-grid .cam-card')]
+    .map(c => c.id.replace(/^card-/, '')));
+}
+function applyEditLayoutMode(){
+  const on = !!uiPrefs.editLayout;
+  document.querySelectorAll('#cam-grid .cam-card').forEach(c => {
+    c.draggable = on;
+    c.classList.toggle('editable', on);
+  });
+  document.getElementById('cam-grid')?.classList.toggle('edit-mode', on);
+}
+
+// ── Payload del VLM por cámara ────────────────────────────────
+function renderPayload(d){
+  let h = '';
+  if (uiPrefs.showRequest){
+    const r = d.request || {}, m = r.media || {};
+    h += `<details class="pl-block" open><summary>Request payload</summary>
+      <div class="pl-kv"><span>endpoint</span><code>${_escapeHtml(r.endpoint || '—')}</code></div>
+      <div class="pl-kv"><span>modelo pedido</span><code>${_escapeHtml(r.model || '—')}</code></div>
+      <div class="pl-kv"><span>auth</span><code>${_escapeHtml(r.auth || '—')}</code></div>
+      <div class="pl-kv"><span>media</span><code>${_escapeHtml(m.kind || '—')} · ${m.bytes || 0} B</code></div>
+      ${m.url ? `<a class="pl-link" href="${m.url}" target="_blank" rel="noopener">ver lo que se le mandó al modelo ↗</a>` : ''}
+    </details>`;
+  }
+  if (uiPrefs.showResponse){
+    const u = (d.response && d.response.usage) || {};
+    const tok = u.total_tokens ? ` · ${u.total_tokens} tok` : '';
+    h += `<details class="pl-block"><summary>Response payload${tok}</summary>
+      <pre class="pl-json">${_escapeHtml(JSON.stringify(d.response, null, 2).slice(0, 4000))}</pre>
+    </details>`;
+  }
+  return h;
+}
+
+async function refreshPayloads(){
+  const activo = uiPrefs.showRequest || uiPrefs.showResponse;
+  if (!activo){
+    document.querySelectorAll('.cam-payload').forEach(el => {
+      el.hidden = true; el.innerHTML = '';
+    });
+    return;
+  }
+  for (const card of document.querySelectorAll('#cam-grid .cam-card')){
+    const id  = card.id.replace(/^card-/, '');
+    const box = document.getElementById(`payload-${id}`);
+    if (!box) continue;
+    try {
+      const res = await fetch(`/api/debug/payload/${encodeURIComponent(id)}`);
+      if (!res.ok) throw new Error(res.status);
+      box.innerHTML = renderPayload(await res.json());
+    } catch(e){
+      box.innerHTML = '<div class="pl-err">sin payload registrado todavía</div>';
+    }
+    box.hidden = false;
+  }
+}
+
+// ── Panel de Settings ─────────────────────────────────────────
+// ── Gestion de rostros ────────────────────────────────────────
+async function loadFacesList(){
+  const box = document.getElementById('faces-enrolled');
+  if (!box) return;
+  try {
+    const d = await (await fetch('/api/faces')).json();
+    const faces = d.faces || [];
+    if (!faces.length){
+      box.innerHTML = '<span class="faces-empty-sm">Nadie enrolado todavía</span>';
+      return;
+    }
+    box.innerHTML = faces.map(f => {
+      const dt = f.added_at ? new Date(f.added_at * 1000).toLocaleDateString('es-MX') : '';
+      return `<span class="face-chip-mgmt">
+        <img class="face-chip-thumb-mgmt" src="/api/faces/${f.id}/image" onerror="this.remove()">
+        ${_escapeHtml(f.name)}${dt ? ` <small>${dt}</small>` : ''}
+        <button class="face-chip-del" data-id="${f.id}" title="Eliminar">✕</button>
+      </span>`;
+    }).join('');
+    box.querySelectorAll('.face-chip-del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await fetch(`/api/faces/${encodeURIComponent(btn.dataset.id)}`, { method: 'DELETE' });
+          loadFacesList();
+        } catch(e){ btn.disabled = false; }
+      });
+    });
+  } catch(e){
+    box.innerHTML = '<span class="faces-empty-sm">Error cargando rostros</span>';
+  }
+}
+
+function populateFaceEnrollCams(){
+  const sel = document.getElementById('face-enroll-cam');
+  if (!sel || sel.options.length || !_allCams.length) return;
+  _allCams.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.id; o.textContent = c.name;
+    sel.appendChild(o);
+  });
+}
+
+function initFaceEnroll(){
+  const btn = document.getElementById('btn-face-enroll');
+  const msg = document.getElementById('face-enroll-msg');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    const cam  = document.getElementById('face-enroll-cam')?.value;
+    const name = document.getElementById('face-enroll-name')?.value.trim();
+    if (!cam || !name){
+      if (msg) msg.textContent = 'Elige cámara y escribe un nombre.';
+      return;
+    }
+    btn.disabled = true;
+    if (msg) msg.textContent = 'Capturando…';
+    try {
+      // Se usa el snapshot en vivo de la cámara: mismo endpoint que ya
+      // alimenta el video de la tarjeta, no hace falta nada nuevo.
+      const imgResp = await fetch(`/api/snapshot/${encodeURIComponent(cam)}?t=${Date.now()}`);
+      if (!imgResp.ok) throw new Error('No se pudo leer la cámara');
+      const blob = await imgResp.blob();
+
+      const fd = new FormData();
+      fd.append('name', name);
+      fd.append('image', blob, 'capture.jpg');
+      const res = await fetch('/api/faces', { method: 'POST', body: fd });
+      const data = await res.json();
+
+      if (res.ok){
+        if (msg) msg.textContent = `"${name}" registrado.`;
+        document.getElementById('face-enroll-name').value = '';
+        loadFacesList();
+      } else if (res.status === 422){
+        if (msg) msg.textContent = 'No se detectó ninguna cara en el frame actual — intenta cuando la persona mire a la cámara.';
+      } else {
+        if (msg) msg.textContent = data.error || 'Error registrando el rostro.';
+      }
+    } catch(e){
+      if (msg) msg.textContent = 'Error: ' + e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
+function initSettings(){
+  const btn   = document.getElementById('btn-settings');
+  const modal = document.getElementById('settings-modal');
+  if (!btn || !modal) return;
+  const close = () => { modal.hidden = true; };
+
+  btn.addEventListener('click', () => {
+    modal.hidden = !modal.hidden;
+    if (!modal.hidden){ populateFaceEnrollCams(); loadFacesList(); }
+  });
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  document.getElementById('settings-close')?.addEventListener('click', close);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+
+  [['sw-request','showRequest'], ['sw-response','showResponse'], ['sw-edit','editLayout']]
+    .forEach(([elId, key]) => {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      el.checked = !!uiPrefs[key];
+      el.addEventListener('change', () => {
+        uiPrefs[key] = el.checked;
+        savePrefs();
+        if (key === 'editLayout') applyEditLayoutMode(); else refreshPayloads();
+      });
+    });
+
+  document.getElementById('btn-reset-layout')?.addEventListener('click', () => {
+    saveCamOrder([]);
+    location.reload();
+  });
+}
+
+// El markup de los modales vive después del cierre del bloque de script,
+// así que hay que esperar a que
+// el documento esté parseado; si no, getElementById devuelve null y no se
+// registra ningún listener (los botones quedarían muertos).
+function _onDomReady(fn){
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', fn, { once: true });
+  else fn();
+}
+
+_onDomReady(() => {
+  initSettings();
+  initFaceEnroll();
+  loadFacesList();
+});
+setInterval(refreshPayloads, 20000);
+
+// ══════════════════════════════════════════════════════════════
+// HISTÓRICO — explora los eventos ya persistidos en SQLite.
+// Usa /api/events/aggregate (el mismo rollup que alimenta al chat, para que
+// UI y modelo no cuenten historias distintas) + /api/events para el detalle.
+// ══════════════════════════════════════════════════════════════
+let _allCams = [];
+const HIST_RANGES = [
+  { label: '6 h',  hours: 6   },
+  { label: '24 h', hours: 24  },
+  { label: '7 d',  hours: 168 },
+  { label: '30 d', hours: 720 },
+];
+let histState = { hours: 24, camId: '', alertsOnly: false, loading: false };
+
+function _fmtAgo(seconds){
+  const s = Math.max(0, Math.floor(seconds));
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s/60)}min`;
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
+  return h < 24 ? `${h}h${m ? ' '+m+'min' : ''}` : `${Math.floor(h/24)}d ${h%24}h`;
+}
+function _camName(id){
+  const c = _allCams.find(x => x.id === id);
+  return c ? c.name : id;
+}
+
+function renderHistRanges(){
+  const box = document.getElementById('hist-ranges');
+  if (!box) return;
+  box.innerHTML = HIST_RANGES.map(r =>
+    `<button class="hist-range${r.hours === histState.hours ? ' on' : ''}" data-h="${r.hours}">${r.label}</button>`
+  ).join('');
+  box.querySelectorAll('.hist-range').forEach(b => {
+    b.addEventListener('click', () => {
+      histState.hours = Number(b.dataset.h);
+      renderHistRanges();
+      loadHistory();
+    });
+  });
+}
+
+function renderHistTiles(ag){
+  const t = ag.totals || {}, w = ag.window || {};
+  const tiles = [
+    ['Observaciones', (t.events || 0).toLocaleString('es-MX')],
+    ['Con alerta',    t.alerts || 0],
+    ['Máx personas',  t.max_people || 0],
+    ['Cámaras',       t.cams || 0],
+  ];
+  let extra = '';
+  // La retención recorta por atrás: decirlo en vez de fingir el rango completo.
+  if (t.data_first_ts && t.data_first_ts > (w.since || 0)){
+    extra = `<div class="hist-warn">Solo hay datos desde hace
+             ${_fmtAgo(Date.now()/1000 - t.data_first_ts)} (retención)</div>`;
+  }
+  document.getElementById('hist-tiles').innerHTML =
+    tiles.map(([k, v]) => `<div class="hist-tile"><b>${v}</b><span>${k}</span></div>`).join('')
+    + extra;
+}
+
+function renderHistBuckets(ag){
+  const box = document.getElementById('hist-buckets');
+  const ttl = document.getElementById('hist-buckets-title');
+  const bs  = ag.buckets || [];
+  const w   = ag.window || {};
+  if (ttl) ttl.textContent = w.bucket === 'day' ? 'Actividad por día' : 'Actividad por hora';
+  if (!bs.length){ box.innerHTML = '<div class="hist-empty">Sin datos en el rango</div>'; return; }
+  const max = Math.max(...bs.map(b => b.n || 0), 1);
+  box.innerHTML = bs.map(b => {
+    const start = (b.b * (w.bucket_width_s || 3600) - (w.tz_offset_s || 0)) * 1000;
+    const d = new Date(start);
+    const lbl = w.bucket === 'day'
+      ? `${d.getDate()}/${d.getMonth()+1}`
+      : `${String(d.getHours()).padStart(2,'0')}h`;
+    const h = Math.max(2, Math.round((b.n / max) * 100));
+    const cls = b.alerts ? ' alert' : (b.max_people ? ' people' : '');
+    const tip = `${b.n} obs · máx ${b.max_people || 0}p` + (b.alerts ? ` · ${b.alerts} alerta(s)` : '');
+    return `<div class="hist-bar-wrap" title="${_escapeHtml(lbl + ' — ' + tip)}">
+              <div class="hist-bar${cls}" style="height:${h}%"></div>
+              <span class="hist-bar-lbl">${_escapeHtml(lbl)}</span>
+            </div>`;
+  }).join('');
+}
+
+function renderHistPerCam(ag){
+  const rows = ag.per_cam || [];
+  const box  = document.getElementById('hist-percam');
+  if (!rows.length){ box.innerHTML = '<div class="hist-empty">Sin datos</div>'; return; }
+  box.innerHTML = `<table class="hist-table">
+    <thead><tr><th>Cámara</th><th>Obs</th><th>Con gente</th><th>Máx</th><th>Alertas</th></tr></thead>
+    <tbody>${rows.map(c => `<tr>
+      <td>${_escapeHtml(_camName(c.cam_id))}</td>
+      <td>${c.n}</td>
+      <td>${c.n_with_people || 0}</td>
+      <td>${c.max_people || 0}</td>
+      <td class="${c.alerts ? 'hist-al' : ''}">${c.alerts || 0}</td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+// Indice cam_id -> [{ts,id}] ordenado por tiempo, para que un evento sin
+// snapshot propio (misma racha sin cambio de personas — ver _snapshot_trigger
+// en vlm_worker.py) pueda heredar la ULTIMA foto real de esa camara en
+// vez de quedar sin ninguna imagen. A peticion del usuario: "si es el mismo
+// evento, que apunten a la misma foto" en vez de mostrar "sin foto" seguido.
+function _buildCamSnapshotIndex(snapshots){
+  const idx = new Map();
+  for (const s of snapshots){
+    if (!s.cam_id) continue;
+    if (!idx.has(s.cam_id)) idx.set(s.cam_id, []);
+    idx.get(s.cam_id).push({ ts: s.ts, id: s.id });
+  }
+  for (const arr of idx.values()) arr.sort((a, b) => a.ts - b.ts);
+  return idx;
+}
+
+function _nearestSnapshotBefore(camIndex, camId, ts){
+  const arr = camIndex.get(camId);
+  if (!arr || !arr.length) return null;
+  let lo = 0, hi = arr.length - 1, ans = null;
+  while (lo <= hi){
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].ts <= ts){ ans = arr[mid]; lo = mid + 1; }
+    else hi = mid - 1;
+  }
+  return ans;
+}
+
+function renderHistEvents(events, snapMap, boxId = 'hist-events', camIndex = null){
+  const box = document.getElementById(boxId);
+  if (boxId === 'hist-events') {
+    const note = document.getElementById('hist-events-note');
+    if (note) note.textContent = events.length ? `(${events.length} más recientes)` : '';
+  }
+  if (!events.length){ box.innerHTML = '<div class="hist-empty">Sin eventos en el rango</div>'; return; }
+  const now = Date.now() / 1000;
+  box.innerHTML = events.map(e => {
+    const d  = e.data || {};
+    const al = (d.alerts || []).filter(x => String(x).trim());
+    let snapId = snapMap.get(e.id);
+    let approx = false;
+    if (!snapId && camIndex){
+      const fb = _nearestSnapshotBefore(camIndex, e.cam_id, e.ts);
+      if (fb){ snapId = fb.id; approx = true; }
+    }
+    const rl = e.review_label;
+    return `<div class="hist-ev${e.has_alert ? ' alert' : ''}">
+      <span class="hist-ev-t">hace ${_fmtAgo(now - e.ts)}</span>
+      <span class="hist-ev-c">${_escapeHtml(_camName(e.cam_id))}</span>
+      <span class="hist-ev-p">${e.people || 0}p</span>
+      <span class="hist-ev-a">${_escapeHtml(d.activity || '—')}
+        ${al.length ? `<b class="hist-ev-al">⚠ ${_escapeHtml(al.join(', '))}</b>` : ''}</span>
+      ${snapId ? `<a class="hist-ev-snap${approx ? ' approx' : ''}" href="/api/snapshots/file/${snapId}"
+                     target="_blank" rel="noopener"
+                     title="${approx ? 'Última foto conocida de esta cámara (no es el momento exacto)' : 'Ver snapshot completo'}">
+                     <img class="hist-ev-thumb" src="/api/snapshots/file/${snapId}"
+                          loading="lazy" alt="snapshot"></a>`
+               : '<span class="hist-ev-nothumb">sin foto</span>'}
+      ${e.has_alert ? `<span class="hist-ev-review" data-id="${e.id}">
+        <button class="hev-btn hev-important${rl==='important'?' on':''}" data-label="important" title="Marcar importante">👍</button>
+        <button class="hev-btn hev-noise${rl==='noise'?' on':''}" data-label="noise" title="Marcar ruido">👎</button>
+      </span>` : ''}
+    </div>`;
+  }).join('');
+  _wireEventReview(box);
+}
+
+function _wireEventReview(box){
+  box.querySelectorAll('.hev-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const wrap = btn.closest('.hist-ev-review');
+      const id = wrap?.dataset.id;
+      if (!id) return;
+      const label = btn.classList.contains('on') ? null : btn.dataset.label;
+      btn.disabled = true;
+      try {
+        await fetch(`/api/events/${id}/review`, {
+          method: 'PATCH',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({label}),
+        });
+        wrap.querySelectorAll('.hev-btn').forEach(b =>
+          b.classList.toggle('on', b.dataset.label === label));
+      } catch(e){ /* silencioso, no bloquea la UI */ }
+      finally { btn.disabled = false; }
+    });
+  });
+}
+
+async function loadHistory(){
+  if (histState.loading) return;
+  histState.loading = true;
+  const box = document.getElementById('hist-events');
+  try {
+    const ag = await (await fetch(`/api/events/aggregate?hours=${histState.hours}`)).json();
+    renderHistTiles(ag);
+    renderHistBuckets(ag);
+    renderHistPerCam(ag);
+
+    const since = Date.now()/1000 - histState.hours * 3600;
+    let url = `/api/events?type=nemotron&since=${since}&limit=100`;
+    if (histState.camId)     url += `&cam_id=${encodeURIComponent(histState.camId)}`;
+    if (histState.alertsOnly) url += '&has_alert=1';
+    const ev = await (await fetch(url)).json();
+
+    // Mapear event_id -> snapshot_id para poder enlazar la imagen del evento
+    const snapMap = new Map();
+    let camIndex = null;
+    try {
+      let su = `/api/snapshots?since=${since}&limit=500`;
+      if (histState.camId) su += `&cam_id=${encodeURIComponent(histState.camId)}`;
+      const sn = await (await fetch(su)).json();
+      (sn.snapshots || []).forEach(x => { if (x.event_id) snapMap.set(x.event_id, x.id); });
+      camIndex = _buildCamSnapshotIndex(sn.snapshots || []);
+    } catch(e){ /* sin snapshots no es fatal */ }
+
+    renderHistEvents(ev.events || [], snapMap, 'hist-events', camIndex);
+  } catch(e){
+    if (box) box.innerHTML = `<div class="hist-empty">Error consultando histórico: ${_escapeHtml(String(e))}</div>`;
+  } finally {
+    histState.loading = false;
+  }
+}
+
+function openHistoryModal(){
+  const modal = document.getElementById('history-modal');
+  if (!modal) return;
+  modal.hidden = false;
+  const sel = document.getElementById('hist-cam');
+  if (sel && sel.options.length <= 1 && _allCams.length){
+    _allCams.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id; o.textContent = c.name;
+      sel.appendChild(o);
+    });
+  }
+  populateFaceEnrollCams();
+  renderHistRanges();
+  loadHistory();
+}
+
+const TIMELINE_WINDOW_H = 6;
+let _timelineRefreshTimer = null;
+
+async function loadTimelinePreview(){
+  try {
+    const ag = await (await fetch(`/api/events/aggregate?hours=${TIMELINE_WINDOW_H}`)).json();
+    const n = (ag.totals || {}).events || 0;
+    const el = document.getElementById('timeline-panel-count');
+    if (el) el.textContent = `· ${n.toLocaleString('es-MX')} en las últimas ${TIMELINE_WINDOW_H}h`;
+  } catch (e) { /* silencioso: es solo un contador de cortesia */ }
+}
+
+async function loadTimelineEvents(){
+  const box = document.getElementById('timeline-events');
+  try {
+    const since = Date.now()/1000 - TIMELINE_WINDOW_H * 3600;
+    const ev = await (await fetch(`/api/events?type=nemotron&since=${since}&limit=50`)).json();
+    const snapMap = new Map();
+    let camIndex = null;
+    try {
+      const sn = await (await fetch(`/api/snapshots?since=${since}&limit=200`)).json();
+      (sn.snapshots || []).forEach(x => { if (x.event_id) snapMap.set(x.event_id, x.id); });
+      camIndex = _buildCamSnapshotIndex(sn.snapshots || []);
+    } catch (e) { /* sin snapshots no es fatal */ }
+    renderHistEvents(ev.events || [], snapMap, 'timeline-events', camIndex);
+  } catch (e) {
+    if (box) box.innerHTML = `<div class="hist-empty">Error consultando eventos: ${_escapeHtml(String(e))}</div>`;
+  }
+}
+
+function initTimelinePanel(){
+  const panel = document.getElementById('timeline-panel');
+  if (!panel) return;
+  loadTimelinePreview();
+  panel.addEventListener('toggle', () => {
+    if (panel.open) {
+      loadTimelineEvents();
+      _timelineRefreshTimer = setInterval(loadTimelineEvents, 20000);
+    } else if (_timelineRefreshTimer) {
+      clearInterval(_timelineRefreshTimer);
+      _timelineRefreshTimer = null;
+    }
+  });
+}
+
+function initHistory(){
+  const btn   = document.getElementById('btn-history');
+  const modal = document.getElementById('history-modal');
+  if (!btn || !modal) return;
+  const close = () => { modal.hidden = true; };
+
+  btn.addEventListener('click', openHistoryModal);
+  document.getElementById('timeline-open-full')?.addEventListener('click', openHistoryModal);
+
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  document.getElementById('history-close')?.addEventListener('click', close);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+
+  document.getElementById('hist-cam')?.addEventListener('change', e => {
+    histState.camId = e.target.value; loadHistory();
+  });
+  document.getElementById('hist-alerts')?.addEventListener('change', e => {
+    histState.alertsOnly = e.target.checked; loadHistory();
+  });
+}
+// ══════════════════════════════════════════════════════════════
+// HISTORIAL DE ROSTROS VISTOS — log persistente (/api/face-sightings,
+// cooldown 30s/camara), distinto del panel en vivo de arriba que se
+// pierde en cuanto la persona sale de cuadro.
+// ══════════════════════════════════════════════════════════════
+let fhState = { hours: 24, camId: '', name: '' };
+
+function renderFhRanges(){
+  const box = document.getElementById('fh-ranges');
+  if (!box) return;
+  box.innerHTML = HIST_RANGES.map(r =>
+    `<button class="hist-range${r.hours === fhState.hours ? ' on' : ''}" data-h="${r.hours}">${r.label}</button>`
+  ).join('');
+  box.querySelectorAll('.hist-range').forEach(b => {
+    b.addEventListener('click', () => {
+      fhState.hours = Number(b.dataset.h);
+      renderFhRanges();
+      loadFaceSightings();
+    });
+  });
+}
+
+async function loadFaceSightings(){
+  const box  = document.getElementById('fh-grid');
+  const note = document.getElementById('fh-note');
+  if (!box) return;
+  try {
+    const since = Date.now()/1000 - fhState.hours * 3600;
+    let url = `/api/face-sightings?since=${since}&limit=150`;
+    if (fhState.camId) url += `&cam_id=${encodeURIComponent(fhState.camId)}`;
+    if (fhState.name)  url += `&name=${encodeURIComponent(fhState.name)}`;
+    const d = await (await fetch(url)).json();
+    const sightings = d.sightings || [];
+    if (note) note.textContent = sightings.length ? `(${sightings.length})` : '';
+    if (!sightings.length){
+      box.innerHTML = '<div class="hist-empty">Sin avistamientos en el rango</div>';
+      return;
+    }
+    const now = Date.now()/1000;
+    box.innerHTML = sightings.map(s => {
+      const known = s.name !== 'Desconocido';
+      const pic = s.has_thumb
+        ? `<img class="fh-thumb" src="/api/face-sightings/${s.id}/image" loading="lazy" onerror="this.remove()">`
+        : `<div class="fh-thumb-missing">?</div>`;
+      const body = s.has_body
+        ? `<img class="fh-body" src="/api/face-sightings/${s.id}/body" loading="lazy" onclick="window.open(this.src)" onerror="this.remove()">` : '';
+      return `<div class="fh-card">
+        <div class="fh-pics">${(s.has_thumb || !s.has_body) ? pic : ''}${body}</div>
+        <span class="fh-name${known?' known':''}">${_escapeHtml(s.name)}</span>
+        <span class="fh-cam">${_escapeHtml(_camName(s.cam_id))}</span>
+        <span class="fh-t">hace ${_fmtAgo(now - s.ts)}</span>
+      </div>`;
+    }).join('');
+  } catch(e){
+    box.innerHTML = `<div class="hist-empty">Error consultando avistamientos: ${_escapeHtml(String(e))}</div>`;
+  }
+}
+
+async function populateFhFilters(){
+  const camSel = document.getElementById('fh-cam');
+  if (camSel && camSel.options.length <= 1 && _allCams.length){
+    _allCams.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id; o.textContent = c.name;
+      camSel.appendChild(o);
+    });
+  }
+  const nameSel = document.getElementById('fh-name');
+  if (nameSel && nameSel.options.length <= 1){
+    try {
+      const d = await (await fetch('/api/faces')).json();
+      const names = ['Desconocido', ...(d.faces||[]).map(f => f.name)];
+      names.forEach(n => {
+        const o = document.createElement('option');
+        o.value = n; o.textContent = n;
+        nameSel.appendChild(o);
+      });
+    } catch(e){ /* filtro de nombre queda vacio, no es fatal */ }
+  }
+}
+
+const ppState = { tab: 'subjects', hours: 24, camId: '', subject: null };
+function _ppImg(url, cls){ return `<img class="${cls}" src="${url}" loading="lazy" onerror="this.style.display='none'">`; }
+async function loadPeople(){
+  const grid = document.getElementById('pp-grid'), note = document.getElementById('pp-note');
+  const since = Math.floor(Date.now()/1000) - ppState.hours*3600;
+  document.getElementById('pp-back').hidden = ppState.subject === null;
+  try{
+    if (ppState.tab === 'subjects' && ppState.subject === null){
+      document.getElementById('pp-title').textContent = 'Sujetos';
+      const d = await (await fetch(`/api/subjects?since=${since}&limit=200`)).json();
+      let list = d.subjects || [];
+      if (ppState.camId) list = list.filter(x => (x.cams||[]).includes(ppState.camId));
+      note.textContent = `${list.length}`;
+      grid.innerHTML = list.map(x => `
+        <div class="pp-card" data-id="${x.id}">
+          <div class="pp-pics">${x.face_visit ? _ppImg(`/api/person-visits/${x.face_visit}/face`, 'pp-face') : ''}${x.body_visit ? _ppImg(`/api/person-visits/${x.body_visit}/body`, 'pp-body') : ''}</div>
+          <div class="pp-name${x.named ? ' named' : ''}">${_escapeHtml(x.name)}</div>
+          <div class="pp-meta">#${x.id} · ${x.visits} visita${x.visits===1?'':'s'}</div>
+          <div class="pp-meta">${(x.cams||[]).map(c => _escapeHtml(_camName(c))).join(', ')}</div>
+          <div class="pp-meta">visto hace ${_fmtAgo(Date.now()/1000 - x.last_ts)}</div>
+          <div class="pp-actions">
+            <button data-act="rename" title="Nombrar">✎</button>
+            <button data-act="merge" title="Fusionar con otro sujeto">⇄</button>
+            <button data-act="del" title="Borrar sujeto y sus datos">🗑</button>
+          </div>
+        </div>`).join('') || '<div class="pp-meta">Sin sujetos en este rango.</div>';
+    } else {
+      document.getElementById('pp-title').textContent = ppState.subject !== null ? `Visitas del sujeto #${ppState.subject}` : 'Visitas';
+      let q = `since=${since}&limit=200`;
+      if (ppState.camId) q += `&cam_id=${encodeURIComponent(ppState.camId)}`;
+      if (ppState.subject !== null) q += `&subject_id=${ppState.subject}`;
+      const d = await (await fetch(`/api/person-visits?${q}`)).json();
+      const v = d.visits || [];
+      note.textContent = `${v.length}`;
+      grid.innerHTML = v.map(x => `
+        <div class="pp-card" style="cursor:default">
+          <div class="pp-pics">${x.has_face ? _ppImg(`/api/person-visits/${x.id}/face`, 'pp-face') : ''}${x.has_body ? _ppImg(`/api/person-visits/${x.id}/body`, 'pp-body') : ''}</div>
+          <div class="pp-name">${_escapeHtml(x.subject_name || x.known_name || 'Sin identificar')}</div>
+          <div class="pp-meta">${_escapeHtml(_camName(x.cam_id))}</div>
+          <div class="pp-meta">${new Date(x.start_ts*1000).toLocaleString()} · ${_fmtAgo(x.end_ts - x.start_ts)}</div>
+          ${x.vlm_desc ? `<div class="pp-desc">${_escapeHtml(x.vlm_desc)}</div>` : ''}
+        </div>`).join('') || '<div class="pp-meta">Sin visitas en este rango.</div>';
+    }
+  }catch(e){ grid.innerHTML = '<div class="pp-meta">Error cargando personas.</div>'; }
+}
+function initPeople(){
+  const btn = document.getElementById('people-link'), modal = document.getElementById('people-modal');
+  if (!btn || !modal) return;
+  const close = () => { modal.hidden = true; };
+  const ranges = document.getElementById('pp-ranges');
+  const drawRanges = () => {
+    ranges.innerHTML = HIST_RANGES.map(r => `<button class="hist-range${r.hours===ppState.hours?' on':''}" data-h="${r.hours}">${r.label}</button>`).join('');
+    ranges.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { ppState.hours = +b.dataset.h; drawRanges(); loadPeople(); }));
+  };
+  btn.addEventListener('click', () => {
+    modal.hidden = false;
+    const sel = document.getElementById('pp-cam');
+    if (sel.options.length <= 1) _allCams.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; sel.appendChild(o); });
+    drawRanges(); loadPeople();
+  });
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  document.getElementById('people-close').addEventListener('click', close);
+  document.getElementById('pp-cam').addEventListener('change', e => { ppState.camId = e.target.value; loadPeople(); });
+  document.getElementById('pp-back').addEventListener('click', () => { ppState.subject = null; ppState.tab = 'subjects'; loadPeople(); });
+  document.querySelectorAll('#pp-tabs button').forEach(b => b.addEventListener('click', () => {
+    ppState.tab = b.dataset.tab; ppState.subject = null;
+    document.querySelectorAll('#pp-tabs button').forEach(x => x.classList.toggle('on', x === b));
+    loadPeople();
+  }));
+  document.getElementById('pp-grid').addEventListener('click', async e => {
+    const card = e.target.closest('.pp-card[data-id]');
+    if (!card) return;
+    const id = +card.dataset.id, act = e.target.dataset.act;
+    if (!act){ ppState.subject = id; ppState.tab = 'visits'; loadPeople(); return; }
+    if (act === 'rename'){
+      const n = prompt('Nombre para este sujeto (se aplica a todo su historial):');
+      if (n && n.trim()) await fetch(`/api/subjects/${id}`, {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name:n.trim()})});
+    } else if (act === 'merge'){
+      const t = parseInt(prompt(`Fusionar #${id} dentro del sujeto # (id destino):`), 10);
+      if (t && t !== id) await fetch(`/api/subjects/${id}/merge`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({into:t})});
+    } else if (act === 'del'){
+      if (confirm(`¿Borrar el sujeto #${id} y todas sus visitas? Es dato biométrico y no se puede deshacer.`))
+        await fetch(`/api/subjects/${id}`, {method:'DELETE'});
+    }
+    loadPeople();
+  });
+}
+document.addEventListener('DOMContentLoaded', initPeople);
+if (document.readyState !== 'loading') initPeople();
+
+function initFacesHistory(){
+  const btn   = document.getElementById('faces-history-link');
+  const modal = document.getElementById('faces-history-modal');
+  if (!btn || !modal) return;
+  const close = () => { modal.hidden = true; };
+
+  btn.addEventListener('click', () => {
+    modal.hidden = false;
+    populateFhFilters();
+    renderFhRanges();
+    loadFaceSightings();
+  });
+
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  document.getElementById('faces-history-close')?.addEventListener('click', close);
+  document.getElementById('fh-cam')?.addEventListener('change', e => {
+    fhState.camId = e.target.value; loadFaceSightings();
+  });
+  document.getElementById('fh-name')?.addEventListener('change', e => {
+    fhState.name = e.target.value; loadFaceSightings();
+  });
+}
+
+_onDomReady(initHistory);
+_onDomReady(initTimelinePanel);
+// ══════════════════════════════════════════════════════════════
+// REPORTES — texto generado por el VLM a partir de eventos agregados
+// (/api/reports), parte del flywheel de triage de alertas.
+// ══════════════════════════════════════════════════════════════
+function _fmtWhen(ts){
+  const d = new Date(ts * 1000);
+  return d.toLocaleString('es-MX', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'});
+}
+
+async function loadReports(){
+  const box  = document.getElementById('rp-list');
+  const note = document.getElementById('rp-note');
+  if (!box) return;
+  box.innerHTML = '<div class="hist-empty">Cargando…</div>';
+  try {
+    const d = await (await fetch('/api/reports?limit=30')).json();
+    const reports = d.reports || [];
+    if (note) note.textContent = reports.length ? `(${reports.length})` : '';
+    if (!reports.length){
+      box.innerHTML = '<div class="hist-empty">Todavía no hay reportes generados</div>';
+      return;
+    }
+    box.innerHTML = reports.map((r, i) => {
+      const hours = Math.round((r.period_end - r.period_start) / 3600);
+      return `<div class="rp-card">
+        <div class="rp-head" data-idx="${i}">
+          <span class="rp-kind">${_escapeHtml(r.kind)}</span>
+          <span class="rp-when">${_fmtWhen(r.generated_at)} · últimas ${hours}h</span>
+          <span>▾</span>
+        </div>
+        <div class="rp-body" id="rp-body-${i}" hidden>${_escapeHtml(r.content)}</div>
+      </div>`;
+    }).join('');
+    box.querySelectorAll('.rp-head').forEach(h => {
+      h.addEventListener('click', () => {
+        const body = document.getElementById(`rp-body-${h.dataset.idx}`);
+        if (body) body.hidden = !body.hidden;
+      });
+    });
+  } catch(e){
+    box.innerHTML = `<div class="hist-empty">Error consultando reportes: ${_escapeHtml(String(e))}</div>`;
+  }
+}
+
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('.modal-backdrop:not([hidden])').forEach(m => {
+    const x = m.querySelector('.modal-x'); if (x) x.click(); else m.hidden = true;
+  });
+});
+
+function initChatDock(){
+  const dock = document.getElementById('chat-dock');
+  if (!dock) return;
+  const set = o => { dock.classList.toggle('chat-open', o); try { localStorage.setItem('thor_chat_open', o ? '1' : '0'); } catch(e){} };
+  let open = false; try { open = localStorage.getItem('thor_chat_open') === '1'; } catch(e){}
+  set(open);
+  document.getElementById('chat-fab')?.addEventListener('click', () => { set(true); document.getElementById('chat-input')?.focus(); });
+  document.getElementById('chat-min')?.addEventListener('click', () => set(false));
+}
+_onDomReady(initChatDock);
+function initSpot(){
+  const btn = document.getElementById('btn-spot'), modal = document.getElementById('spot-modal'), fr = document.getElementById('spot-frame');
+  if (!btn || !modal) return;
+  const close = () => { modal.hidden = true; fr.src = 'about:blank'; };
+  btn.addEventListener('click', () => { fr.src = '/spot'; modal.hidden = false; });
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  document.getElementById('spot-close')?.addEventListener('click', close);
+}
+_onDomReady(initSpot);
+
+function initConnections(){
+  const btn = document.getElementById('btn-conn'), modal = document.getElementById('conn-modal');
+  if (!btn || !modal) return;
+  let timer = null;
+  const close = () => { modal.hidden = true; if (timer){ clearInterval(timer); timer = null; } };
+  const mark = (ok, t) => `<span class="${ok ? 'conn-ok' : 'conn-bad'}">${t}</span>`;
+  async function load(){
+    try {
+      const d = await (await fetch('/api/connections')).json();
+      const now = Date.now() / 1000;
+      document.getElementById('conn-body').innerHTML = (d.cameras || []).map(c => {
+        const wh = c.native_wh ? c.native_wh.join('x') : '-';
+        const cfg = c.cfg_resolution ? c.cfg_resolution.join('x') : 'global';
+        const up = c.connected_since ? 'hace ' + _fmtAgo(now - c.connected_since) : '';
+        const sx = c.sunapi, sn = c.snapshot;
+        return `<tr>
+          <td><b>${_escapeHtml(c.name || c.id)}</b><br><small>${_escapeHtml(c.id)} · ${_escapeHtml(c.zone || '')}</small></td>
+          <td><code>${_escapeHtml(c.scheme)}://${_escapeHtml(c.host)}:${c.port}${_escapeHtml(c.path)}</code><br><small>credenciales: Digest/Basic en la URL (ocultas)</small></td>
+          <td>${_escapeHtml(c.transport)}<br><small>${_escapeHtml(c.method)}</small></td>
+          <td>nativa ${wh}<br><small>cfg ${cfg}${c.rotate ? ' · rot ' + c.rotate + '°' : ''}</small></td>
+          <td>${mark(c.state === 'streaming', _escapeHtml(c.state || '?'))}<br><small>${up}${c.attempts > 1 ? ' · intentos ' + c.attempts : ''}</small>${c.error ? '<br><small class="conn-bad">' + _escapeHtml(c.error) + '</small>' : ''}</td>
+          <td>${c.fps != null ? Number(c.fps).toFixed(1) : '-'} fps<br><small>${c.latency_ms != null ? c.latency_ms + ' ms' : ''}</small></td>
+          <td>${sx ? mark(sx.motion_usable, sx.motion_usable ? 'nativo OK' : 'sin señal') + '<br><small><code>' + _escapeHtml(sx.base || '') + '</code> · ' + _escapeHtml(sx.detector || '?') + ' · ' + (sx.rises_1h || 0) + '/h</small>' : '-'}</td>
+          <td>${sn ? mark(sn.usable, sn.usable ? 'OK' : 'pausado ' + sn.paused_s + 's') + '<br><small>' + sn.grabs + ' capturas' + (sn.last_ms ? ' · ' + sn.last_ms + ' ms' : '') + '</small>' : '-'}</td>
+          <td>${c.rtt_ms != null ? mark(true, c.rtt_ms + ' ms') : mark(false, 'sin respuesta')}</td></tr>`;
+      }).join('');
+      document.getElementById('conn-note').textContent = 'Actualiza cada 5 s. Las credenciales nunca se muestran.';
+    } catch(e){ document.getElementById('conn-note').textContent = 'Error al leer /api/connections'; }
+  }
+  btn.addEventListener('click', () => { modal.hidden = false; load(); timer = setInterval(load, 5000); });
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  document.getElementById('conn-close')?.addEventListener('click', close);
+}
+
+_onDomReady(initConnections);
+function initReports(){
+  const btn   = document.getElementById('btn-reports');
+  const modal = document.getElementById('reports-modal');
+  if (!btn || !modal) return;
+  const close = () => { modal.hidden = true; };
+
+  btn.addEventListener('click', () => { modal.hidden = false; loadReports(); });
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  document.getElementById('reports-close')?.addEventListener('click', close);
+
+  document.getElementById('rp-generate')?.addEventListener('click', async () => {
+    const genBtn = document.getElementById('rp-generate');
+    const msg    = document.getElementById('rp-generate-msg');
+    genBtn.disabled = true;
+    if (msg) msg.textContent = 'Generando… puede tardar unos segundos';
+    try {
+      const res = await fetch('/api/reports/generate', { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        if (msg) msg.textContent = err.detail || 'No se pudo generar el reporte';
+      } else {
+        if (msg) msg.textContent = 'Listo.';
+        loadReports();
+      }
+    } catch(e){
+      if (msg) msg.textContent = 'Error de red';
+    } finally {
+      genBtn.disabled = false;
+      setTimeout(() => { if (msg) msg.textContent = ''; }, 4000);
+    }
+  });
+}
+
+_onDomReady(initFacesHistory);
+_onDomReady(initReports);
+_onDomReady(() => {
+  document.getElementById('faces-manage-link')?.addEventListener('click', () => {
+    document.getElementById('btn-settings')?.click();
+  });
+});
 
 connectWS();
 
 // ══════════════════════════════════════════════════════════════
-// CHAT — Asistente Nemotron sobre observaciones de cámaras
+// CHAT — el modelo se resuelve en runtime desde /api/vlm, no se fija aquí
 // ══════════════════════════════════════════════════════════════
 const chatHistory = [];           // memoria de turnos (cliente)
 const MAX_HISTORY = 10;
@@ -834,6 +2367,41 @@ async function _loadChatHistory() {
   }
 }
 
+function _escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  })[c]);
+}
+
+// Markdown inline minimo. Se aplica SOBRE texto ya escapado.
+function _inlineMd(s){
+  return s
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
+// El modelo responde en markdown (negritas, listas) y antes se pintaba con
+// textContent, asi que se veian los asteriscos crudos. Se escapa PRIMERO y
+// luego se formatea: el texto del LLM nunca puede inyectar HTML.
+function _renderMarkdown(text){
+  const lines = _escapeHtml(text).split('\n');
+  let html = '', inList = false;
+  for (const raw of lines){
+    const line = raw.trim();
+    const li = line.match(/^(?:[*\-•]|\d+\.)\s+(.*)$/);
+    if (li){
+      if (!inList){ html += '<ul class="md-list">'; inList = true; }
+      html += `<li>${_inlineMd(li[1])}</li>`;
+      continue;
+    }
+    if (inList){ html += '</ul>'; inList = false; }
+    if (!line){ continue; }
+    html += `<div class="md-p">${_inlineMd(line)}</div>`;
+  }
+  if (inList) html += '</ul>';
+  return html;
+}
+
 function _appendChatMessage(role, text, opts = {}) {
   const div = document.createElement('div');
   const id  = `cmsg-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
@@ -842,7 +2410,11 @@ function _appendChatMessage(role, text, opts = {}) {
   if (opts.loading) cls += ' loading';
   if (opts.error)   cls = 'chat-msg chat-msg-error';
   div.className = cls;
-  div.textContent = text;
+  if (role === 'assistant' && !opts.loading && !opts.error) {
+    div.innerHTML = _renderMarkdown(text);
+  } else {
+    div.textContent = text;
+  }
   chatMsgsEl.appendChild(div);
   chatMsgsEl.scrollTop = chatMsgsEl.scrollHeight;
   return id;
@@ -910,5 +2482,156 @@ chatFormEl.addEventListener('submit', async (e) => {
 // Cargar historial al inicio (después de WS para no bloquear el primer paint)
 setTimeout(_loadChatHistory, 300);
 </script>
+  <div class="modal-backdrop" id="history-modal" hidden>
+    <div class="modal modal-wide">
+      <div class="modal-head">
+        <span>🕓 Histórico de eventos</span>
+        <button class="modal-x" id="history-close" title="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="hist-controls">
+          <div class="hist-ranges" id="hist-ranges"></div>
+          <select class="hist-select" id="hist-cam"><option value="">Todas las cámaras</option></select>
+          <label class="hist-check">
+            <input type="checkbox" id="hist-alerts"> solo alertas
+          </label>
+        </div>
+        <div class="hist-tiles" id="hist-tiles"></div>
+        <div class="hist-section-title" id="hist-buckets-title">Actividad</div>
+        <div class="hist-bars" id="hist-buckets"></div>
+        <div class="hist-section-title">Por cámara</div>
+        <div class="hist-percam" id="hist-percam"></div>
+        <div class="hist-section-title">Eventos <small id="hist-events-note"></small></div>
+        <div class="hist-events" id="hist-events"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="people-modal" hidden>
+    <div class="modal modal-wide">
+      <div class="modal-head">
+        <span>👥 Personas e identidades</span>
+        <button class="modal-x" id="people-close" title="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="hist-controls">
+          <div class="hist-ranges" id="pp-tabs">
+            <button class="hist-range on" data-tab="subjects">Sujetos</button>
+            <button class="hist-range" data-tab="visits">Visitas</button>
+          </div>
+          <div class="hist-ranges" id="pp-ranges"></div>
+          <select class="hist-select" id="pp-cam"><option value="">Todas las cámaras</option></select>
+          <button class="hist-range" id="pp-back" hidden>← Todos</button>
+        </div>
+        <div class="hist-section-title"><span id="pp-title">Sujetos</span> <small id="pp-note"></small></div>
+        <div class="fh-grid" id="pp-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="faces-history-modal" hidden>
+    <div class="modal modal-wide">
+      <div class="modal-head">
+        <span>🕓 Historial de rostros vistos</span>
+        <button class="modal-x" id="faces-history-close" title="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="hist-controls">
+          <div class="hist-ranges" id="fh-ranges"></div>
+          <select class="hist-select" id="fh-cam"><option value="">Todas las cámaras</option></select>
+          <select class="hist-select" id="fh-name"><option value="">Todos los nombres</option></select>
+        </div>
+        <div class="hist-section-title">Avistamientos <small id="fh-note"></small></div>
+        <div class="fh-grid" id="fh-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="spot-modal" hidden>
+    <div class="modal modal-wide">
+      <div class="modal-head"><span>🎬 OXM Vision · el pipeline</span>
+        <button class="modal-x" id="spot-close" title="Cerrar">✕</button></div>
+      <div class="modal-body"><iframe class="spot-frame" id="spot-frame" title="Animación OXM Vision" allow="autoplay"></iframe></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="conn-modal" hidden>
+    <div class="modal modal-wide">
+      <div class="modal-head">
+        <span>🔌 Conexiones a las cámaras</span>
+        <button class="modal-x" id="conn-close" title="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="hist-controls"><span class="face-enroll-msg" id="conn-note"></span></div>
+        <div style="overflow-x:auto"><table class="conn-table"><thead><tr>
+          <th>Cámara</th><th>RTSP (IP:puerto/ruta)</th><th>Transporte / decodificador</th><th>Resolución</th>
+          <th>Estado</th><th>fps / lat.</th><th>SUNAPI movimiento</th><th>SUNAPI snapshot</th><th>TCP</th></tr></thead>
+          <tbody id="conn-body"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="reports-modal" hidden>
+    <div class="modal modal-wide">
+      <div class="modal-head">
+        <span>📋 Reportes generados por IA</span>
+        <button class="modal-x" id="reports-close" title="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="hist-controls">
+          <button class="hist-range" id="rp-generate">Generar reporte ahora</button>
+          <span class="face-enroll-msg" id="rp-generate-msg"></span>
+        </div>
+        <div class="hist-section-title">Reportes <small id="rp-note"></small></div>
+        <div id="rp-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="settings-modal" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <span>⚙ Configuración</span>
+        <button class="modal-x" id="settings-close" title="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="set-group">
+          <div class="set-group-title">Debug del VLM</div>
+          <label class="set-row">
+            <input type="checkbox" id="sw-request">
+            <span><b>Mostrar request payload</b>
+              <small>Endpoint, modelo solicitado y el frame exacto que se le mandó</small></span>
+          </label>
+          <label class="set-row">
+            <input type="checkbox" id="sw-response">
+            <span><b>Mostrar response payload</b>
+              <small>JSON completo de la respuesta, incluido el consumo de tokens</small></span>
+          </label>
+        </div>
+        <div class="set-group">
+          <div class="set-group-title">Layout</div>
+          <label class="set-row">
+            <input type="checkbox" id="sw-edit">
+            <span><b>Editar layout</b>
+              <small>Arrastra las tarjetas para reordenarlas. El orden se guarda en este navegador</small></span>
+          </label>
+          <button class="set-btn" id="btn-reset-layout">Restablecer orden original</button>
+        </div>
+        <div class="set-group">
+          <div class="set-group-title">Rostros capturados</div>
+          <div class="faces-enrolled" id="faces-enrolled">
+            <span class="faces-empty-sm">cargando…</span>
+          </div>
+          <div class="face-enroll">
+            <select class="hist-select" id="face-enroll-cam"></select>
+            <input type="text" id="face-enroll-name" class="face-enroll-name"
+                   placeholder="Nombre de la persona" maxlength="60">
+            <button class="set-btn" id="btn-face-enroll">Capturar de esta cámara</button>
+          </div>
+          <div class="face-enroll-msg" id="face-enroll-msg"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

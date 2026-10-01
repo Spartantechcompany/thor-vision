@@ -1,0 +1,190 @@
+# Contexto de escena por camara para el VLM (Qwen). Se inyecta en el prompt.
+# Editable sin tocar cameras.yml; se relee al reiniciar thor-vision.
+#
+# Campos por camara:
+#   where        donde esta y que ve (hechos verificables en la imagen)
+#   focus        lo que SI importa reportar aqui
+#   ignore       lo que es normal/ruido y NO debe generar alerta
+#   alert_types  codigos de alerta permitidos en esta camara (del catalogo)
+#   night_person "alert" = cualquier persona en horario nocturno es alerta;
+#                "note"  = solo se anota, sin alerta
+#   vehicles     true si contar/describir vehiculos aporta valor
+
+night_hours: [22, 6]   # horario nocturno local (inicio, fin)
+
+alert_catalog:
+  persona_en_suelo:        "persona caida, tirada o inmovil en el piso"
+  acceso_no_autorizado:    "persona entrando o intentando entrar a una zona restringida o forzando una puerta/reja"
+  merodeo:                 "persona que permanece o vuelve a pasar frente al inmueble mirando o probando accesos, sin ir de paso"
+  persona_nocturna:        "presencia de persona en horario nocturno en un area que deberia estar vacia"
+  vehiculo_detenido:       "vehiculo que se detiene, estaciona o permanece frente al acceso"
+  manipulacion_vehiculo:   "persona tocando, abriendo o forzando un vehiculo"
+  grupo_inusual:           "grupo de 3 o mas personas donde normalmente hay 0-1"
+  objeto_abandonado:       "paquete, bolsa o bulto dejado sin dueno visible"
+  fuego_humo:              "fuego, humo o chispas"
+  puerta_abierta:          "puerta, porton o reja que deberia estar cerrada aparece abierta"
+  animal:                  "animal (perro, gato, etc.) dentro de un area interior"
+  uso_telefono_exterior:   "persona en el exterior (calle, banqueta, moto o auto estacionado) mirando o usando su telefono celular"
+
+cameras:
+  cam-189:
+    name: Exterior 1
+    where: >
+      Exterior, banqueta y calle frente al inmueble vistas desde arriba en
+      diagonal. A la izquierda un muro con rejas del propio inmueble y un
+      farol muy brillante; al fondo arboles y autos estacionados en la calle.
+      Imagen infrarroja/nocturna con ruido en la noche.
+    focus:
+      - persona de pie, sentada o sobre una moto/auto que mira o usa su telefono celular (alerta uso_telefono_exterior, severidad low)
+      - personas que caminan pegadas al muro/rejas del inmueble o se detienen frente a el
+      - personas que vuelven a pasar o observan (merodeo)
+      - vehiculos que se detienen frente al inmueble o se estacionan y quedan con gente adentro
+      - personas tocando un vehiculo estacionado
+    ignore:
+      - autos ya estacionados que no se mueven
+      - transeuntes que solo cruzan de lado a lado sin detenerse
+      - destellos del farol, reflejos, hojas, sombras de arboles, ruido infrarrojo
+    alert_types: [merodeo, acceso_no_autorizado, vehiculo_detenido, manipulacion_vehiculo, grupo_inusual, fuego_humo, uso_telefono_exterior]
+    night_person: note
+    vehicles: true
+
+  cam-191:
+    name: Exterior 2
+    where: >
+      Exterior, la misma banqueta y calle que Exterior 1 desde otro angulo:
+      calle a la izquierda, banqueta amplia al centro, muro con rejas del
+      inmueble a la derecha, cochera/porton de un vecino al fondo.
+    focus:
+      - persona de pie, sentada o sobre una moto/auto que mira o usa su telefono celular (alerta uso_telefono_exterior, severidad low)
+      - personas que caminan pegadas al muro/rejas del inmueble o se detienen
+      - merodeo (pasar varias veces, mirar hacia adentro, probar la reja)
+      - vehiculos que se detienen o se estacionan frente al inmueble
+    ignore:
+      - autos ya estacionados, transeuntes de paso, reflejos, hojas, sombras, ruido infrarrojo
+    alert_types: [merodeo, acceso_no_autorizado, vehiculo_detenido, manipulacion_vehiculo, grupo_inusual, fuego_humo, uso_telefono_exterior]
+    night_person: note
+    vehicles: true
+
+  cam-113:
+    name: Escaleras entrada
+    where: >
+      Interior, recibidor de entrada con el logo de OXM tech en la pared,
+      una palmera, jardineras y la escalera de madera que sube. La camara
+      esta montada rotada: la imagen sale de lado (vertical 1080x1920);
+      interpreta la escena aunque se vea girada.
+    focus:
+      - cualquier persona que entra, sube o baja por la escalera
+      - persona caida o tirada en escalones o piso
+      - persona que llega al acceso y espera o intenta abrir
+    ignore:
+      - la palmera y objetos decorativos, luces de emergencia, ruido por poca luz
+    alert_types: [persona_en_suelo, acceso_no_autorizado, persona_nocturna, objeto_abandonado, fuego_humo, puerta_abierta]
+    night_person: alert
+    vehicles: false
+
+  cam-sala-juntas:
+    name: Sala de Juntas
+    where: >
+      Interior, sala de descanso con sofas (tambien mesa y sillas). Uso esperado:
+      personal descansando o conversando en horario laboral. Sillas y sofas
+      vacios no son personas.
+    focus:
+      - cuantas personas hay y si estan en reunion, de pie o de paso
+      - la sala ocupada fuera de horario laboral
+      - objetos o equipo que aparecen o desaparecen
+    ignore:
+      - pantallas encendidas, sillas vacias, reflejos de ventanas
+    alert_types: [persona_nocturna, acceso_no_autorizado, objeto_abandonado, persona_en_suelo, fuego_humo]
+    night_person: alert
+    vehicles: false
+
+  cam-118:
+    name: Garage posterior
+    where: >
+      Interior, cochera cerrada con un auto blanco estacionado en el centro,
+      bicicleta/moto y objetos guardados a la izquierda, pared a la derecha.
+      Imagen infrarroja en blanco y negro.
+    focus:
+      - cualquier persona que entra a la cochera o se acerca al auto
+      - persona tocando o abriendo el vehiculo o las puertas
+      - el auto se mueve, sale o llega otro
+      - objetos que aparecen o desaparecen de los lados
+    ignore:
+      - el auto blanco y los objetos guardados estaticos, ruido infrarrojo, reflejos en la pared
+    alert_types: [manipulacion_vehiculo, acceso_no_autorizado, persona_nocturna, objeto_abandonado, persona_en_suelo, fuego_humo, animal]
+    night_person: alert
+    vehicles: true
+
+  cam-228:
+    name: Garage frontal
+    where: >
+      Interior/semi-exterior, acceso frontal de cochera. En la noche la
+      imagen es casi negra con tinte azul; puede haber muy poca informacion.
+    focus:
+      - personas o vehiculos que entran o salen por el acceso
+      - persona parada frente al porton o forzandolo
+    ignore:
+      - oscuridad, ruido de imagen, puntos de luz aislados
+    alert_types: [acceso_no_autorizado, manipulacion_vehiculo, persona_nocturna, vehiculo_detenido, puerta_abierta, fuego_humo]
+    night_person: alert
+    vehicles: true
+
+  cam-120:
+    name: Acceso Site
+    where: >
+      Interior, acceso al cuarto de site (equipo de red/servidores). En la
+      noche la imagen es casi negra con algunos puntos de luz de equipos.
+    focus:
+      - CUALQUIER persona frente a la puerta o dentro del site
+      - la puerta abierta o alguien manipulando equipos
+    ignore:
+      - los LEDs de los equipos y el ruido por poca luz
+    alert_types: [acceso_no_autorizado, persona_nocturna, puerta_abierta, objeto_abandonado, fuego_humo]
+    night_person: alert
+    vehicles: false
+
+  cam-215:
+    name: Cocina-Patio
+    where: >
+      Interior, cocina con refrigerador con imanes a la izquierda, mesa con
+      sillas al centro y una puerta corrediza de vidrio hacia un patio con
+      plantas a la derecha/fondo. Desde aqui tambien se ve el patio exterior.
+    focus:
+      - personas en la cocina o cruzando al patio, y que hacen (cocinar, comer, de paso)
+      - persona en el patio en la noche
+      - animales dentro de la cocina
+      - persona caida en el piso
+    ignore:
+      - plantas movidas por el viento en el patio, reflejos en el vidrio, luces del refrigerador
+    alert_types: [persona_nocturna, persona_en_suelo, animal, fuego_humo, acceso_no_autorizado]
+    night_person: alert
+    vehicles: false
+
+  cam-cowork:
+    name: Cowork
+    where: >
+      Interior, area de coworking del piso 1 con escritorios y monitores,
+      puerta/ventanal de vidrio al fondo. Uso esperado: trabajo en horario laboral.
+    focus:
+      - cuantas personas hay y si trabajan sentadas, conversan o solo pasan
+      - personas fuera de horario laboral
+      - personas en la puerta de vidrio entrando o saliendo
+    ignore:
+      - monitores encendidos, luces de standby, reflejos del vidrio
+    alert_types: [persona_nocturna, acceso_no_autorizado, objeto_abandonado, persona_en_suelo, fuego_humo]
+    night_person: alert
+    vehicles: false
+
+  cam-236:
+    name: Escaleras P2
+    where: >
+      Interior, escalera y descanso del piso 2. En la noche la imagen es
+      casi negra; de dia es un pasillo/escalera de transito.
+    focus:
+      - personas que suben o bajan, y si alguien se detiene o se queda
+      - persona caida o tirada en escalones o piso
+    ignore:
+      - oscuridad, ruido de imagen, puntos de luz aislados
+    alert_types: [persona_en_suelo, persona_nocturna, objeto_abandonado, acceso_no_autorizado, fuego_humo]
+    night_person: alert
+    vehicles: false

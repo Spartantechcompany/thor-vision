@@ -7,49 +7,36 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 
-Sistema de vigilancia inteligente con análisis de escena en tiempo real usando **Nemotron** (LLM multimodal) corriendo en un **DGX Spark** remoto.
+Sistema de vigilancia inteligente que combina **YOLO** (personas), **InsightFace** (identidad) y un **VLM** remoto (semántica de la escena) sobre cámaras RTSP, con decodificación por hardware (GStreamer + NVDEC).
 
-Corre sobre **Jetson NVIDIA AGX Thor** con Docker.
+Corre sobre **NVIDIA Jetson AGX Thor** con Docker. El VLM se consume vía un gateway OpenAI-compatible. Ver [INTEGRATION.md](INTEGRATION.md) para el contrato de API y el flujo de trabajo.
 
 ---
 
 ## ¿Qué hace?
 
-- Captura streams RTSP de múltiples cámaras IP simultáneamente
-- Analiza escenas con Nemotron (motion-gated: solo llama al LLM cuando hay movimiento)
-- Dashboard web en tiempo real: grid de cámaras, estado, snapshots
-- Chat IA: pregunta sobre lo que ven las cámaras en lenguaje natural
-- Persistencia en SQLite: eventos, snapshots y conversaciones
-- Retención automática configurable
+- Captura RTSP con GStreamer + NVDEC (fallback FFmpeg) y resolución nativa por cámara
+- Movimiento nativo de la cámara (SUNAPI) para decidir cuándo llamar al VLM
+- Pre-roll de 6 s en memoria para análisis retroactivo
+- Tracker de visitas por cámara e identidad por rostro (sujetos, renombrar, fusionar)
+- Análisis de escena por cámara con prompts editables (`config/scenes.yml`)
+- Dashboard: grid, estado del pipeline, conexiones, personas, histórico, reportes y chat flotante
+- Persistencia en SQLite con retención configurable; datos biométricos sin nombre caducan (`UNNAMED_TTL_DAYS`)
 
 ---
 
-## Arquitectura
+## Flujo
 
 ```
-Cámaras IP (RTSP)
-      │
-      ▼
- CaptureManager          ← un thread por cámara
-      │
-      ├──► FrameBuffer   ← buffer circular en memoria
-      │
-      ▼
- NemotronWorker          ← motion detection → análisis LLM
-      │
-      ├──► DetectionStore  ← estado en vivo (memoria)
-      ├──► EventDB         ← persistencia SQLite
-      └──► SnapshotManager ← JPGs en disco
-      │
-      ▼
- FastAPI :8080
-      ├── /                        → Dashboard (grid + chat)
-      ├── /api/stream/{cam_id}     → MJPEG stream
-      ├── /api/status              → estado de cámaras
-      ├── /api/chat                → chat con Nemotron
-      ├── /api/events              → historial de eventos
-      ├── /api/snapshots           → galería de snapshots
-      └── /ws/detections           → WebSocket tiempo real
+RTSP ─► GStreamer+NVDEC ─► FrameBuffer ─► pre-roll (JPEG 0.25 s × 6 s)
+                               │
+                  YOLO personas (0.5/2/4 fps según movimiento)
+                               │
+                  InsightFace (rostro) ─► VisitManager ─► subjects / person_visits
+                               │
+                  VLM (por movimiento + persona, o al cerrar la visita) ─► events
+                               │
+                       FastAPI :8080  (dashboard, API, WebSocket)
 ```
 
 ---
@@ -58,7 +45,7 @@ Cámaras IP (RTSP)
 
 - Jetson NVIDIA (Orin / Thor o compatible) con [JetPack 6.x](https://developer.nvidia.com/embedded/jetpack)
 - [Docker](https://docs.docker.com/engine/install/) + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
-- Servidor con [Nemotron](https://build.nvidia.com/nvidia/nemotron-4-340b-instruct) corriendo en `/v1/chat/completions` (compatible con OpenAI API)
+- Un VLM accesible por una API compatible con OpenAI (`/v1/chat/completions`), local o vía gateway
 - Cámaras IP con stream RTSP
 
 ---
@@ -83,7 +70,7 @@ nano config/cameras.yml   # agregar URLs RTSP y credenciales
 
 ```bash
 cp docker-compose.example.yml docker-compose.yml
-nano docker-compose.yml   # ajustar IP del servidor Nemotron
+nano docker-compose.yml   # ajustar la URL del VLM (VLM_ENDPOINT)
 ```
 
 ### 4. Crear carpetas de datos
@@ -123,11 +110,11 @@ Acceder en: `http://<IP_JETSON>:8080`
 
 | Variable | Default | Descripción |
 |---|---|---|
-| `NEMOTRON_ENDPOINT` | `http://localhost:8003` | URL del servidor LLM |
-| `NEMOTRON_MODEL` | `nemotron-omni` | Modelo a usar |
-| `NEMOTRON_MIN_INTERVAL_S` | `30` | Cooldown mínimo entre análisis por cámara |
-| `NEMOTRON_MAX_INTERVAL_S` | `120` | Heartbeat máximo sin movimiento |
-| `NEMOTRON_MOTION_THRESHOLD` | `0.04` | Fracción de píxeles para disparar análisis (0–1) |
+| `VLM_ENDPOINT` | `http://localhost:8003` | URL del VLM (antes `NEMOTRON_ENDPOINT`, aún aceptada) |
+| `VLM_MODEL` | `thor-vision` | Modelo o alias a usar |
+| `VLM_MIN_INTERVAL_S` | `30` | Cooldown mínimo entre análisis por cámara |
+| `VLM_MAX_INTERVAL_S` | `120` | Heartbeat máximo sin movimiento |
+| `VLM_MOTION_THRESHOLD` | `0.04` | Fracción de píxeles para disparar análisis (0–1) |
 | `SNAPSHOT_PERIODIC_S` | `600` | Snapshot programado cada N segundos |
 | `RETENTION_MAX_EVENTS` | `200000` | Máximo de eventos en SQLite |
 | `RETENTION_MAX_SNAPSHOT_GB` | `50` | Máximo de GB de snapshots en disco |
@@ -144,7 +131,7 @@ thor-vision/
 │   ├── main.py                  ← FastAPI app + lifespan
 │   ├── config.py                ← carga cameras.yml + settings.yml
 │   ├── api/
-│   │   ├── routes_chat.py       ← POST /api/chat (Nemotron)
+│   │   ├── routes_chat.py       ← POST /api/chat (VLM)
 │   │   ├── routes_history.py    ← GET /api/events, /api/snapshots
 │   │   ├── routes_status.py     ← GET /api/status, /api/cameras
 │   │   ├── routes_stream.py     ← GET /api/stream/{cam_id} (MJPEG)
@@ -155,8 +142,8 @@ thor-vision/
 │   │   ├── rtsp_reader.py       ← thread de captura por cámara
 │   │   └── frame_buffer.py      ← buffer circular de frames
 │   ├── vision/
-│   │   ├── nemotron_worker.py   ← motion detection + análisis LLM
-│   │   ├── nemotron_analyzer.py ← cliente HTTP a Nemotron
+│   │   ├── vlm_worker.py        ← disparo por movimiento/persona + análisis VLM
+│   │   ├── vlm_analyzer.py      ← cliente HTTP al VLM (imagen/video + recorte)
 │   │   ├── detection_store.py   ← estado en vivo de todas las cámaras
 │   │   ├── face_db.py           ← base de datos de rostros conocidos
 │   │   └── worker.py            ← worker genérico de visión
@@ -194,7 +181,7 @@ Los datos se guardan en `./data/` (montado en `/app/data` dentro del contenedor)
 
 ```
 data/
-├── events.db          ← SQLite WAL (eventos Nemotron + chat + index snapshots)
+├── events.db          ← SQLite WAL (eventos del VLM + chat + index snapshots)
 ├── snapshots/
 │   └── cam-01/
 │       └── 20260605/
@@ -216,7 +203,7 @@ data/
 | Visión computacional | [OpenCV](https://docs.opencv.org/) | Captura RTSP, motion detection |
 | Detección de objetos | [Ultralytics YOLOv8](https://docs.ultralytics.com/) | Detección de personas |
 | Reconocimiento facial | [InsightFace](https://github.com/deepinsight/insightface) + [ONNX Runtime](https://onnxruntime.ai/) | Identificación de rostros |
-| LLM / Análisis semántico | [NVIDIA Nemotron](https://build.nvidia.com/nvidia/nemotron-4-340b-instruct) vía [OpenAI-compatible API](https://platform.openai.com/docs/api-reference) | Descripción de escenas |
+| VLM / Análisis semántico | cualquier modelo multimodal vía [OpenAI-compatible API](https://platform.openai.com/docs/api-reference) | Descripción de escenas |
 | Persistencia | SQLite (WAL mode) | Eventos, snapshots, chat |
 | Templates | [Jinja2](https://jinja.palletsprojects.com/) | Dashboard HTML |
 | Configuración | [PyYAML](https://pyyaml.org/) | `cameras.yml`, `settings.yml` |

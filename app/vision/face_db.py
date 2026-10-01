@@ -16,6 +16,7 @@ class FaceDB:
     def __init__(self, db_path: str, recognition_threshold: float = 0.40):
         self.db_path = Path(db_path)
         self.threshold = recognition_threshold
+        self.thumbs_dir = self.db_path.parent / "face_thumbs"
         self._entries: list[dict] = []
         self._load()
 
@@ -42,7 +43,8 @@ class FaceDB:
         with open(self.db_path, "w") as f:
             json.dump(data, f)
 
-    def add(self, name: str, embedding: np.ndarray) -> str:
+    def add(self, name: str, embedding: np.ndarray,
+            thumb_jpeg: Optional[bytes] = None) -> str:
         face_id = str(uuid.uuid4())[:8]
         norm = np.linalg.norm(embedding)
         emb = embedding / norm if norm > 0 else embedding
@@ -53,14 +55,25 @@ class FaceDB:
             "added_at": time.time(),
         })
         self._save()
+        if thumb_jpeg:
+            try:
+                self.thumbs_dir.mkdir(parents=True, exist_ok=True)
+                (self.thumbs_dir / f"{face_id}.jpg").write_bytes(thumb_jpeg)
+            except Exception as exc:
+                logger.warning("No se pudo guardar thumbnail de '%s': %s", name, exc)
         logger.info("FaceDB: registered '%s' (id=%s)", name, face_id)
         return face_id
+
+    def thumb_path(self, face_id: str) -> Optional[Path]:
+        p = self.thumbs_dir / f"{face_id}.jpg"
+        return p if p.exists() else None
 
     def remove(self, face_id: str) -> bool:
         before = len(self._entries)
         self._entries = [e for e in self._entries if e["id"] != face_id]
         if len(self._entries) < before:
             self._save()
+            (self.thumbs_dir / f"{face_id}.jpg").unlink(missing_ok=True)
             return True
         return False
 

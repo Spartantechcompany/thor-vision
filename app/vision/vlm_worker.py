@@ -2,6 +2,7 @@ import logging
 import random
 import threading
 import time
+from collections import deque
 from typing import Optional
 
 import cv2
@@ -9,7 +10,7 @@ import numpy as np
 
 from app.capture.frame_buffer     import FrameBuffer
 from app.vision.detection_store   import DetectionStore
-from app.vision.nemotron_analyzer import NemotronAnalyzer
+from app.vision.vlm_analyzer import VLMAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -19,18 +20,27 @@ _FAKE_ALERTS = {"error", "empty response", "bad json", "encode failed",
                 "unreachable", ""}
 
 
-class NemotronWorker(threading.Thread):
+class VLMWorker(threading.Thread):
     """
     Worker por cámara con disparo por movimiento.
 
     Estrategia para no quemar la GPU del DGX Spark:
     - Cada `check_interval_s` segundos, compara el frame actual contra el
       anterior (diferencia absoluta en escala de grises, sub-muestreada).
-    - Solo llama a Nemotron si:
+    - Solo llama a VLM si:
         a) Hay movimiento significativo, Y han pasado >= min_interval_s
         b) O han pasado >= max_interval_s desde el último análisis (heartbeat)
     - Resultado: escenas estáticas casi no consumen GPU, escenas con
       actividad se actualizan ágilmente.
+
+    Momentos clave como clip de video, no frame único:
+    - Cuando el disparo es por movimiento real (no heartbeat), se manda
+      el clip reciente del buffer (`video_window_s` segundos) como
+      `video_url` en vez de un solo frame — el modelo ve la secuencia
+      completa (quién entra, sale, hacia dónde se mueve), no un instante.
+    - El heartbeat (sin movimiento, solo por tiempo transcurrido) sigue
+      usando un frame único: no tiene sentido gastar tokens/latencia de
+      video en confirmar que una escena estática sigue estática.
     """
 
     def __init__(
@@ -38,7 +48,7 @@ class NemotronWorker(threading.Thread):
         cam_id: str,
         buffer: FrameBuffer,
         store: DetectionStore,
-        analyzer: NemotronAnalyzer,
+        analyzer: VLMAnalyzer,
         min_interval_s:      float = 30.0,
         max_interval_s:      float = 120.0,
         motion_threshold:    float = 0.04,
@@ -46,8 +56,32 @@ class NemotronWorker(threading.Thread):
         db                         = None,        # EventDB | None
         snapshots                  = None,        # SnapshotManager | None
         snapshot_periodic_s: float = 600.0,
+        # Default alineado a la capacidad real del FrameBuffer
+        # (buffer_size=30 @ stream_fps=10 en cameras.yml ≈ 3s de historia).
+        # Pedir más de lo que el buffer puede dar no falla — get_recent_frames
+        # simplemente devuelve lo que haya — pero mantenerlo realista evita
+        # logs confusos sobre "ventana pedida" vs "ventana real obtenida".
+        video_window_s:      float = 3.0,
+        # Solo para pipelines secundarios sobre la misma cámara (ej. detalle
+        # de pantallas en cam-cowork): permite escribir bajo un cam_id
+        # sintético (sin pisar el resultado del pipeline general en
+        # DetectionStore/events) mientras se sigue leyendo el contexto de
+        # personas/caras del cam_id real. Default None = usa self.cam_id,
+        # cero cambio de comportamiento para los workers existentes.
+        context_cam_id: Optional[str] = None,
+        event_type: str = "nemotron",
+        # Movimiento nativo de la camara (CameraMotionMonitor). Si esta
+        # disponible y el detector esta encendido en la camara, Qwen se
+        # dispara por ese evento y el heartbeat pasa a idle_heartbeat_s;
+        # si no, se conserva el comportamiento anterior (frame-diff + 120s).
+        motion_source=None,
+        native_min_interval_s: float = 30.0,
+        idle_heartbeat_s:      float = 900.0,
+        scene=None,
+        require_person: bool = False,
+        sustain_s: float = 10.0,
     ):
-        super().__init__(daemon=True, name=f"nemotron-{cam_id}")
+        super().__init__(daemon=True, name=f"vlm-{cam_id}")
         self.cam_id              = cam_id
         self.buffer              = buffer
         self.store               = store
@@ -59,12 +93,47 @@ class NemotronWorker(threading.Thread):
         self.db                  = db
         self.snapshots           = snapshots
         self.snapshot_periodic_s = snapshot_periodic_s
+        self.video_window_s      = video_window_s
+        self.context_cam_id      = context_cam_id or cam_id
+        self.event_type          = event_type
+        self.motion_source       = motion_source
+        self.native_min_interval_s = native_min_interval_s
+        self.idle_heartbeat_s    = idle_heartbeat_s
+        self.scene               = scene
+        self.require_person      = require_person
+        self.sustain_s           = sustain_s
+        self._skip_log: deque    = deque(maxlen=3000)
 
         self._stop             = threading.Event()
         self._prev_gray        = None
         self._last_analysis_t  = 0.0
         self._last_people      = 0
         self._last_periodic_t  = 0.0
+        self._handled_rise     = 0.0
+        self.last_info: dict   = {}
+        self._call_log: deque  = deque(maxlen=3000)
+
+    def skips_last_hour(self) -> int:
+        cutoff = time.time() - 3600
+        return sum(1 for ts in list(self._skip_log) if ts >= cutoff)
+
+    def _person_gate(self, st: dict) -> bool:
+        """Con movimiento nativo: Qwen solo si YOLO vio personas (<8s) o el
+        movimiento se sostiene (vehiculo/animal/fuego, no un destello)."""
+        if not self.require_person:
+            return True
+        det = self.store.get(self.context_cam_id)
+        if det and det.yolo_persons > 0 and time.time() - det.yolo_ts < 8.0:
+            return True
+        return st["active"] and time.time() - st["since"] >= self.sustain_s
+
+    def calls_last_hour(self) -> dict:
+        cutoff = time.time() - 3600
+        out: dict = {}
+        for ts, kind in list(self._call_log):
+            if ts >= cutoff:
+                out[kind] = out.get(kind, 0) + 1
+        return out
 
     # ── Motion ────────────────────────────────────────────────────────────
 
@@ -86,11 +155,12 @@ class NemotronWorker(threading.Thread):
 
     def run(self) -> None:
         logger.info(
-            "NemotronWorker started — cam=%s min=%.0fs max=%.0fs thr=%.3f",
+            "VLMWorker started — cam=%s min=%.0fs max=%.0fs thr=%.3f",
             self.cam_id, self.min_interval_s, self.max_interval_s, self.motion_threshold
         )
         # Stagger inicial para no saturar la GPU con 10 cámaras a la vez
         self._stop.wait(random.uniform(0, min(self.max_interval_s, 15)))
+        self._handled_rise = time.time()
 
         while not self._stop.is_set():
             frame = self.buffer.get_latest()
@@ -104,8 +174,27 @@ class NemotronWorker(threading.Thread):
             should_analyze = False
             reason         = ""
 
+            native = (self.motion_source is not None
+                      and self.motion_source.usable())
+
+            if native:
+                # Movimiento nativo de la camara: Qwen solo entra cuando la
+                # camara detecta movimiento (o en el heartbeat largo idle).
+                if elapsed >= self.idle_heartbeat_s:
+                    should_analyze = True
+                    reason         = "idle"
+                elif elapsed >= self.native_min_interval_s:
+                    st = self.motion_source.snapshot()
+                    if st["active"] or st["last_rise_ts"] > self._handled_rise:
+                        if self._person_gate(st):
+                            should_analyze = True
+                            reason         = "cam-motion"
+                        elif not st["active"]:
+                            # movimiento breve y sin personas: descartado
+                            self._handled_rise = time.time()
+                            self._skip_log.append(time.time())
             # Heartbeat: siempre analizar si pasó demasiado tiempo
-            if elapsed >= self.max_interval_s:
+            elif elapsed >= self.max_interval_s:
                 should_analyze = True
                 reason         = "heartbeat"
             # Motion-triggered: solo si pasó el mínimo intervalo
@@ -120,17 +209,28 @@ class NemotronWorker(threading.Thread):
                 self._compute_motion(frame)
 
             if should_analyze:
-                detection = self.store.get(self.cam_id)
+                detection = self.store.get(self.context_cam_id)
                 context = None
-                if detection:
+                if detection and time.time() - detection.yolo_ts < 10.0:
                     context = {
-                        "person_count": detection.person_count,
+                        "person_count": detection.yolo_persons,
+                        "person_bboxes": [tuple(b) for b in (detection.person_bboxes or [])[:4]],
+                        "frame_wh": (int(frame.shape[1]), int(frame.shape[0])),
                         "faces": [
                             {"name": f.name, "confidence": round(f.confidence, 2)}
                             for f in detection.faces
                         ],
                     }
-                result = self.analyzer.analyze(frame, context)
+
+                is_motion_trigger = reason.startswith("motion=") or reason == "cam-motion"
+                self._handled_rise = time.time()
+                media_kind = "frame"
+                if is_motion_trigger:
+                    result, media_kind = self._analyze_as_video(frame, context)
+                else:
+                    result = self.analyzer.analyze(frame, context, tag=self.cam_id,
+                                                   scene=self.scene)
+
                 self.store.update_nemotron(self.cam_id, result)
                 self._last_analysis_t = now
 
@@ -142,10 +242,14 @@ class NemotronWorker(threading.Thread):
                 if self.db is not None and result.get("activity") != "error":
                     try:
                         # Adjuntar el trigger del análisis (heartbeat/motion=...)
+                        # y qué se mandó de verdad al modelo (video real vs
+                        # frame único de fallback) — sin esto solo quedaba en
+                        # el log de texto, que rota (max-file=3 en compose).
                         payload = dict(result)
-                        payload["_trigger"] = reason
+                        payload["_trigger"]    = reason
+                        payload["_media_kind"] = media_kind
                         event_id = self.db.insert_event(
-                            type      = "nemotron",
+                            type      = self.event_type,
                             cam_id    = self.cam_id,
                             payload   = payload,
                             people    = max(people, 0),
@@ -168,15 +272,47 @@ class NemotronWorker(threading.Thread):
 
                 self._last_people = max(people, 0)
 
+                kind = reason.split("=")[0]
+                self.last_info = {
+                    "ts": time.time(), "trigger": kind, "media": media_kind,
+                    "ms": result.get("_ms"), "people": result.get("people"),
+                }
+                self._call_log.append((time.time(), kind))
+
                 logger.info(
-                    "Nemotron cam=%s [%s] people=%s activity=%s %.0fms",
-                    self.cam_id, reason,
+                    "VLM cam=%s [%s] via=%s people=%s activity=%s %.0fms",
+                    self.cam_id, reason, media_kind,
                     result.get("people"),
                     str(result.get("activity", ""))[:40],
                     result.get("_ms", 0),
                 )
 
             self._stop.wait(self.check_interval_s)
+
+    # ── Video analysis ───────────────────────────────────────────────────
+
+    def _analyze_as_video(self, current_frame: np.ndarray,
+                           context: Optional[dict]) -> tuple[dict, str]:
+        """
+        Toma la ventana reciente del buffer (`video_window_s`) y la manda
+        como clip de video. Si el buffer trae muy pocos frames (arranque
+        en frío, cámara recién reconectada), cae a analizar `current_frame`
+        solo — nunca bloquea el análisis esperando a que el buffer se llene.
+
+        Devuelve (result, media_kind) — media_kind es "video" o "frame"
+        (fallback), para que el log de arriba sea preciso sobre qué se
+        mandó de verdad, no solo qué se intentó.
+        """
+        entries = self.buffer.get_recent_frames(self.video_window_s)
+        if len(entries) < 2:
+            return self.analyzer.analyze(current_frame, context, tag=self.cam_id,
+                                         scene=self.scene), "frame"
+
+        frames = [e.frame for e in entries]
+        fps = self.buffer.fps or (len(frames) / self.video_window_s)
+        return self.analyzer.analyze_video(frames, fps, context, tag=self.cam_id,
+                                           scene=self.scene,
+                                           crop_frame=current_frame), "video"
 
     # ── Snapshot trigger logic ────────────────────────────────────────────
 

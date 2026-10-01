@@ -1,0 +1,39 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compilar
+        run: python -m compileall -q app
+      - name: "Ruff (imports faltantes y nombres indefinidos)"
+        run: |
+          pip install ruff
+          ruff check app --select F,E9 --ignore F401,F841
+      - name: Plantillas Jinja validas
+        run: |
+          pip install jinja2
+          python - <<'PY'
+          import jinja2, pathlib
+          env = jinja2.Environment()
+          for p in pathlib.Path("app/dashboard/templates").glob("*.html"):
+              env.parse(p.read_text())
+          PY
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
