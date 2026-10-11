@@ -229,7 +229,7 @@ main {
   color:var(--red-alert); font-weight:600;
 }
 
-/* ── Pipeline chips: MOV -> YOLO -> ATHENA ── */
+/* ── Pipeline chips: MOV -> YOLO -> QWEN ── */
 .cam-pipe {
   display:flex; gap:6px; flex-wrap:wrap; align-items:center;
   padding:5px 12px; border-top:1px solid var(--border);
@@ -1301,7 +1301,7 @@ function initGrid(cameras) {
       <div class="cam-pipe" id="pipe-${cam.id}">
         <span class="pipe-chip" id="pc-mov-${cam.id}"><span class="pdot"></span><span class="pt">MOV</span></span>
         <span class="pipe-chip" id="pc-yolo-${cam.id}"><span class="pdot"></span><span class="pt">YOLO</span></span>
-        <span class="pipe-chip" id="pc-vlm-${cam.id}"><span class="pdot"></span><span class="pt">ATHENA</span></span>
+        <span class="pipe-chip" id="pc-vlm-${cam.id}"><span class="pdot"></span><span class="pt">QWEN</span></span>
       </div>
       <div class="cam-activity" id="nem-act-${cam.id}"></div>
       <div class="cam-activity cam-activity-detail" id="nem-detail-${cam.id}"></div>
@@ -1679,7 +1679,7 @@ async function refreshVLM(){
 refreshVLM();
 setInterval(refreshVLM, 15000);
 
-// ── Pipeline: movimiento -> YOLO -> Athena ─────────────────────────────
+// ── Pipeline: movimiento -> YOLO -> Qwen ─────────────────────────────
 const _pipeLast = {};
 function _setChip(id, cls, text, title, flash){
   const el = document.getElementById(id);
@@ -1722,17 +1722,17 @@ async function refreshPipeline(){
         const c = v.calls_1h || {};
         const tot = Object.values(c).reduce((a, b) => a + b, 0);
         _setChip(`pc-vlm-${cam}`, now - v.ts < 8 ? 'on' : '',
-          `ATHENA ${_fmtAgo(now - v.ts)}`,
-          `Última llamada a Athena: ${t} · ${v.media || ''} · ${v.ms ? Math.round(v.ms) + ' ms' : ''}. ` +
+          `QWEN ${_fmtAgo(now - v.ts)}`,
+          `Última llamada a Qwen: ${t} · ${v.media || ''} · ${v.ms ? Math.round(v.ms) + ' ms' : ''}. ` +
           `${tot} llamadas en la última hora.`, isNew);
       } else {
-        _setChip(`pc-vlm-${cam}`, '', 'ATHENA —', 'Sin llamadas a Athena desde el arranque.');
+        _setChip(`pc-vlm-${cam}`, '', 'QWEN —', 'Sin llamadas a Qwen desde el arranque.');
       }
     }
     const c = d.vlm_calls_1h || {}, tot = Object.values(c).reduce((a, b) => a + b, 0);
     const part = k => c[k] || 0;
     document.getElementById('pipe-summary').innerHTML =
-      `Athena última hora: <b>${tot}</b> llamadas — ` +
+      `Qwen última hora: <b>${tot}</b> llamadas — ` +
       `${part('cam-motion')} por movimiento de cámara · ${part('motion')} por frame-diff · ` +
       `${part('heartbeat')} latido 2 min · ${part('idle')} latido largo (cámara quieta). ` +
       `Descartados sin personas: <b>${d.vlm_skips_1h||0}</b>. YOLO: 0.5 fps, sube a 2 fps con movimiento.`;
@@ -3778,7 +3778,7 @@ setTimeout(_loadChatHistory, 300);
       </div>
       <div class="modal-body">
         <div class="pipe-summary" id="pipe-summary"
-         title="Flujo: (1) la camara detecta movimiento -> (2) YOLO cuenta personas/caras a 0.5fps en todas las camaras, siempre -> (3) Athena describe la escena solo cuando hay movimiento (o en un latido largo si la camara esta quieta).">
+         title="Flujo: (1) la camara detecta movimiento -> (2) YOLO cuenta personas/caras a 0.5fps en todas las camaras, siempre -> (3) Qwen describe la escena solo cuando hay movimiento (o en un latido largo si la camara esta quieta).">
       Pipeline: cargando…
     </div>
         <div class="hist-controls"><span class="face-enroll-msg" id="conn-note"></span></div>

@@ -4,7 +4,7 @@
 Separar dos trabajos que hoy se mezclan:
 
 1. **Registro continuo (barato, siempre encendido, sin VLM):** YOLO + seguimiento + identidad. Responde "quién/qué estuvo, dónde y cuándo".
-2. **Alertas por escena (VLM, como hoy):** Athena sigue leyendo la escena y generando alertas; al generarlas **consulta el registro continuo** para saber quién está presente, en vez de adivinarlo.
+2. **Alertas por escena (VLM, como hoy):** Qwen sigue leyendo la escena y generando alertas; al generarlas **consulta el registro continuo** para saber quién está presente, en vez de adivinarlo.
 
 ## Qué datos tenemos hoy (24 h, 2026-10-05)
 | Cámara | Visitas | Con rostro | Con identidad | Con nombre |

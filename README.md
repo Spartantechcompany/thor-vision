@@ -217,6 +217,9 @@ data/
 |---|---|
 | [Diego Reyes](https://github.com/Diegooxm) | Desarrollo principal, arquitectura |
 | [Brayan Iván López Carlos](https://github.com/brayanlopez-oxm) | Desarrollo, integración de hardware |
+| Oswaldo A. Pérez Castillo | Operación y desarrollo continuo en el Jetson Thor: tracker de personas e identidades, viajes entre cámaras, integración Tuya, videoportero y control de acceso, búsqueda semántica, armado, panel y CI |
+
+Desarrollado con asistencia de [Claude Code](https://claude.com/claude-code) (Anthropic); los commits asistidos llevan la línea `Co-Authored-By`.
 
 **OXM Tech** — [oxmtech.com](https://oxmtech.com)
 

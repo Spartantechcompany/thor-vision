@@ -92,7 +92,7 @@ def rules(request: Request, days: int = 7):
     for t in types:
         s = st.get(t) or {"total": 0, "important": 0, "noise": 0, "sin": 0, "cams": {}}
         rev = s["important"] + s["noise"]
-        out.append({"type": t, "definition": catalog.get(t) or DEFS.get(t, ""), "source": SOURCES.get(t, "VLM (Athena) con el prompt de la camara"),
+        out.append({"type": t, "definition": catalog.get(t) or DEFS.get(t, ""), "source": SOURCES.get(t, "VLM (Qwen) con el prompt de la camara"),
                     "cams": [{"id": c, "name": names.get(c, c), "alerts": s["cams"].get(c, 0)} for c in cams_by_type.get(t, [])],
                     "other_cams": [{"id": c, "name": names.get(c, c), "alerts": n} for c, n in s["cams"].items() if c not in cams_by_type.get(t, [])],
                     "stats": {k: s[k] for k in ("total", "important", "noise", "sin")}, "noise_rate": round(s["noise"] / rev, 2) if rev else None})

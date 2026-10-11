@@ -7,7 +7,7 @@ ep=os.environ["NEMOTRON_ENDPOINT"].rstrip("/"); key=os.environ["NEMOTRON_API_KEY
 H={"Authorization":"Bearer "+key,"Content-Type":"application/json"}
 def snap(c,w=480): return urllib.request.urlopen(f"http://localhost:8080/api/snapshot/{c}?w={w}",timeout=8).read()
 def call(label,content,mt=120,extra=None,timeout=75):
-    body={"model":os.environ.get("PROBE_MODEL") or os.environ.get("NEMOTRON_MODEL","Athena"),"max_tokens":mt,"messages":[{"role":"user","content":content}],"chat_template_kwargs":{"enable_thinking":False}}
+    body={"model":os.environ.get("PROBE_MODEL") or os.environ.get("NEMOTRON_MODEL","thor-vision"),"max_tokens":mt,"messages":[{"role":"user","content":content}],"chat_template_kwargs":{"enable_thinking":False}}
     if extra: body.update(extra)
     t=time.time()
     try:

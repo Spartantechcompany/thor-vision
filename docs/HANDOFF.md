@@ -7,7 +7,7 @@ Para quien continúe el desarrollo. Complementa `README.md` (qué es), `INTEGRAT
 1. **Captura** (`app/capture/`): un hilo RTSP por cámara con GStreamer + NVDEC (fallback FFmpeg), resolución nativa, buffer circular y *pre-roll* de 6 s en memoria. El movimiento lo informa la propia cámara por SUNAPI (Hanwha).
 2. **Visión** (`app/vision/worker.py`, `app/pipeline/vision_processor.py`): YOLOv8s detecta personas y objetos (autos, motos, perros, bolsas…) y InsightFace los rostros, a 0.5 fps, 2 fps con movimiento y 4 fps buscando un rostro.
 3. **Visitas e identidad** (`app/vision/visits.py`): cada persona seguida en una cámara es una visita; los rostros se agrupan en *sujetos*. Cada sujeto tiene una categoría: `revisar` (por defecto), `empleado` o `invitado`.
-4. **Semántica** (`app/vision/vlm_worker.py`, `vlm_analyzer.py`, `scenes.py`): un modelo de visión-lenguaje (Athena vía gateway) describe la escena con un prompt por cámara (`config/scenes.yml`) y su resultado se valida y sanea. Alertas, horarios, mascotas y personas conocidas se definen ahí.
+4. **Semántica** (`app/vision/vlm_worker.py`, `vlm_analyzer.py`, `scenes.py`): un modelo de visión-lenguaje (Qwen vía gateway) describe la escena con un prompt por cámara (`config/scenes.yml`) y su resultado se valida y sanea. Alertas, horarios, mascotas y personas conocidas se definen ahí.
 5. **Almacenamiento** (`app/storage/`): SQLite `data/events.db` más JPEG en disco; retención automática (`rotate()`).
 6. **Salida**: FastAPI (dashboard, API, WebSocket) y el **Vision Agent** (Morphic auto-hospedado) que consulta esos mismos datos con DeepSeek.
 

@@ -2,6 +2,14 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.24.5 — Vuelta a Qwen, entradas Tuya sin falsos y créditos (2026-10-11)
+
+El modelo de visión vuelve a llamarse Qwen (Athena se retira mientras el backend siga caído); el movimiento de una cámara Tuya sin persona ya no genera 'entrada sin captura' (tiene su propia alerta); los avisos de puertas nombran las cámaras revisadas; y el README incluye a Oswaldo A. Pérez Castillo y la asistencia de Claude Code.
+
+- **Modelo · Qwen de nuevo**: NEMOTRON_MODEL=thor-vision y los textos del panel vuelven a Qwen.
+- **Alertas · Entrada sin captura solo para sensores**: Garage, Recepción y Comedor; las cámaras Tuya ya no (generaban 10 al día por mascotas y sombras). El texto lista las cámaras revisadas en vez de solo la primera.
+- **Proyecto · Créditos**: Autores del README actualizados.
+
 ## v2.24.4 — El modelo de visión ahora es Athena (2026-10-10)
 
 El modelo de visión pasa a llamarse Athena: NEMOTRON_MODEL=Athena en docker-compose.yml (el alias anterior thor-vision dejó de aceptar imágenes en el gateway: 'capability_mismatch'), y el panel, la animación, las reglas y la documentación dicen Athena en lugar de Qwen.

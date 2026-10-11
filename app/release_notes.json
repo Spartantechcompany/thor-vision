@@ -1,5 +1,28 @@
 [
   {
+    "version": "2.24.5",
+    "date": "2026-10-11",
+    "name": "Vuelta a Qwen, entradas Tuya sin falsos y créditos",
+    "summary": "El modelo de visión vuelve a llamarse Qwen (Athena se retira mientras el backend siga caído); el movimiento de una cámara Tuya sin persona ya no genera 'entrada sin captura' (tiene su propia alerta); los avisos de puertas nombran las cámaras revisadas; y el README incluye a Oswaldo A. Pérez Castillo y la asistencia de Claude Code.",
+    "highlights": [
+      {
+        "area": "Modelo",
+        "title": "Qwen de nuevo",
+        "text": "NEMOTRON_MODEL=thor-vision y los textos del panel vuelven a Qwen."
+      },
+      {
+        "area": "Alertas",
+        "title": "Entrada sin captura solo para sensores",
+        "text": "Garage, Recepción y Comedor; las cámaras Tuya ya no (generaban 10 al día por mascotas y sombras). El texto lista las cámaras revisadas en vez de solo la primera."
+      },
+      {
+        "area": "Proyecto",
+        "title": "Créditos",
+        "text": "Autores del README actualizados."
+      }
+    ]
+  },
+  {
     "version": "2.24.4",
     "date": "2026-10-10",
     "name": "El modelo de visión ahora es Athena",

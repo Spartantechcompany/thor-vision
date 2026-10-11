@@ -78,7 +78,7 @@ class VLMWorker(threading.Thread):
         context_cam_id: Optional[str] = None,
         event_type: str = "nemotron",
         # Movimiento nativo de la camara (CameraMotionMonitor). Si esta
-        # disponible y el detector esta encendido en la camara, Athena se
+        # disponible y el detector esta encendido en la camara, Qwen se
         # dispara por ese evento y el heartbeat pasa a idle_heartbeat_s;
         # si no, se conserva el comportamiento anterior (frame-diff + 120s).
         motion_source=None,
@@ -125,7 +125,7 @@ class VLMWorker(threading.Thread):
         return sum(1 for ts in list(self._skip_log) if ts >= cutoff)
 
     def _person_gate(self, st: dict) -> bool:
-        """Con movimiento nativo: Athena solo si YOLO vio personas (<8s) o el
+        """Con movimiento nativo: Qwen solo si YOLO vio personas (<8s) o el
         movimiento se sostiene (vehiculo/animal/fuego, no un destello)."""
         if not self.require_person:
             return True
@@ -185,7 +185,7 @@ class VLMWorker(threading.Thread):
                       and self.motion_source.usable())
 
             if native:
-                # Movimiento nativo de la camara: Athena solo entra cuando la
+                # Movimiento nativo de la camara: Qwen solo entra cuando la
                 # camara detecta movimiento (o en el heartbeat largo idle).
                 if elapsed >= self.idle_heartbeat_s:
                     should_analyze = True

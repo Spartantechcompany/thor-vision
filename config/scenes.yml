@@ -1,4 +1,4 @@
-# Contexto de escena por camara para el VLM (Athena). Se inyecta en el prompt.
+# Contexto de escena por camara para el VLM (Qwen). Se inyecta en el prompt.
 # Editable sin tocar cameras.yml; se relee al reiniciar thor-vision.
 #
 # Campos por camara:

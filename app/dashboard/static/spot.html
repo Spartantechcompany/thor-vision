@@ -357,7 +357,7 @@ function drawIdent(lt,c){
 }
 
 function drawSem(lt,c){
-  head(lt,'05 · SEMÁNTICA','Entiende la escena.','Athena VLM describe lo que pasa, solo cuando importa.',c);
+  head(lt,'05 · SEMÁNTICA','Entiende la escena.','Qwen VLM describe lo que pasa, solo cuando importa.',c);
   const e1=eo(p(lt,.1,.4)),e2=eo(p(lt,.2,.5));
   ctx.save();ctx.globalAlpha*=e1;ctx.save();rr(70,216,256,144,12);ctx.clip();camScene(70,216,256,144);person(222,246,.52);ctx.restore();
   ctx.strokeStyle='rgba(255,255,255,.12)';ctx.lineWidth=1;rr(70.5,216.5,255,143,12);ctx.stroke();
@@ -383,7 +383,7 @@ function drawSem(lt,c){
     g=ctx.createRadialGradient(ox-R*.3,oy-R*.4,2,ox,oy,R);g.addColorStop(0,'#123a45');g.addColorStop(1,'#050608');dot(ox,oy,R,g);
     if(ctx.createConicGradient){const cg=ctx.createConicGradient(lt*3,ox,oy);cg.addColorStop(0,c);cg.addColorStop(.33,'#5e5ce6');cg.addColorStop(.66,'#bf5af2');cg.addColorStop(1,c);ctx.strokeStyle=cg;}else ctx.strokeStyle=c;
     ctx.lineWidth=4;ctx.beginPath();ctx.arc(ox,oy,R,0,Math.PI*2);ctx.stroke();
-    txt('Athena',ox,oy+4,{s:17,w:700,al:'center'});txt('VLM',ox,oy+21,{s:9,w:600,f:MONO,c:C.dim,al:'center',ls:2});
+    txt('Qwen',ox,oy+4,{s:17,w:700,al:'center'});txt('VLM',ox,oy+21,{s:9,w:600,f:MONO,c:C.dim,al:'center',ls:2});
     ctx.restore();
     txt('vía gateway remoto',ox,oy+84,{s:10,f:MONO,c:C.dim,al:'center',a:clamp(oe)});
   }

@@ -139,7 +139,7 @@ async def lifespan(app: FastAPI):
     app.state.vision_models = vision_models
     vision_models.faces_only = {c.id for c in config.cameras if getattr(c, "mode", "full") == "faces"}
 
-    # ── Movimiento nativo de las camaras (SUNAPI) como disparador de Athena ──
+    # ── Movimiento nativo de las camaras (SUNAPI) como disparador de Qwen ──
     motion_monitors = {}
     if os.environ.get("NATIVE_MOTION_ENABLED", "true").lower() == "true":
         from app.capture.camera_motion import CameraMotionMonitor
@@ -263,6 +263,7 @@ async def lifespan(app: FastAPI):
         app.state.iot.start()
         from app.vision.journeys import JourneyLinker
         app.state.journeys = JourneyLinker(db, snapshots)
+        app.state.journeys.cam_names = {c.id: c.name for c in config.cameras}
         app.state.journeys.start()
 
         def _tuya_motion(alias, ts, _j=app.state.journeys, _vq=vision_queue):

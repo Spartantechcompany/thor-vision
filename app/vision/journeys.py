@@ -146,8 +146,11 @@ class JourneyLinker:
                     self.db._conn.execute("UPDATE tuya_entries SET state='orphan' WHERE id=?", (tid,))
                     self.db._conn.commit()
                 self.stats["tuya_orphan"] += 1
+                if str(alias).startswith("tuya-"):
+                    continue                     # el movimiento de una camara Tuya ya tiene su propia alerta (y suele ser una mascota o una sombra): sin persona no es una entrada sin captura
+                nombres = ", ".join(self.cam_names.get(c) or c for c in cams) if getattr(self, "cam_names", None) else ", ".join(cams)
                 payload = {"schema": 2, "source": "journeys", "people": 0, "persons": [], "vehicles": 0,
-                           "activity": f"Aviso de {alias} sin persona en la camara de entrada ({cam}): entrada probable sin captura",
+                           "activity": f"Aviso de {alias} sin persona en ninguna de las camaras asociadas ({nombres}): entrada probable sin captura",
                            "scene": "", "relevant": True, "alerts": [f"Entrada probable sin captura ({alias})"], "alert_types": ["entrada_sin_captura"],
                            "severity": "low", "confidence": "low", "tuya_entry_ts": ts}
                 try:
