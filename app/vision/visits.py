@@ -114,14 +114,22 @@ def face_yaw(kps) -> float:
         return 1.0
 
 
-def _scene_with_box(frame: np.ndarray, box: tuple, width: int = 960) -> Optional[bytes]:
-    """Cuadro completo reducido con el recuadro de la persona dibujado (para ver donde estaba y no solo su miniatura)."""
+_BOX_GREEN = (0, 185, 118)          # BGR de #76B900 (verde del panel)
+_BOX_GREEN_DIM = (0, 120, 76)       # las demas personas del cuadro, mas apagado para que destaque la de esta visita
+
+
+def _scene_with_box(frame: np.ndarray, box: tuple, others=(), width: int = 960) -> Optional[bytes]:
+    """Cuadro completo reducido con el recuadro de la persona dibujado (para ver donde estaba y no solo su miniatura).
+    `others` = cajas de las demas personas del mismo cuadro: se dibujan apagadas, asi una escena con dos personas muestra a las dos."""
     try:
         h, w = frame.shape[:2]
         k = min(1.0, width / w)
         small = cv2.resize(frame, (int(w * k), int(h * k)), interpolation=cv2.INTER_AREA) if k < 1.0 else frame.copy()
+        for ob in others:
+            ox1, oy1, ox2, oy2 = (int(v * k) for v in ob)
+            cv2.rectangle(small, (ox1, oy1), (ox2, oy2), _BOX_GREEN_DIM, 1, cv2.LINE_AA)
         x1, y1, x2, y2 = (int(v * k) for v in box)
-        cv2.rectangle(small, (x1, y1), (x2, y2), (118, 185, 0), 2)
+        cv2.rectangle(small, (x1, y1), (x2, y2), _BOX_GREEN, 1, cv2.LINE_AA)
         ok, buf = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 70])
         return buf.tobytes() if ok else None
     except cv2.error:
@@ -137,6 +145,7 @@ class Track:
     def __init__(self, tid: int, bbox: tuple, now: float):
         self.id = tid
         self.bbox = bbox
+        self.max_h = bbox[3] - bbox[1]                # el alto mas grande que tuvo (el ultimo cuadro puede ser una persona que ya se aleja)
         self.anchor, self.anchor_ts = bbox, now
         self.first_ts = self.last_ts = now
         self.hits = 0
@@ -181,6 +190,7 @@ class Track:
 
     def observe(self, bbox: tuple, now: float) -> None:
         self.bbox = bbox
+        self.max_h = max(self.max_h, bbox[3] - bbox[1])
         self.last_ts = max(self.last_ts, now)
         self.first_ts = min(self.first_ts, now)
         self.hits += 1
@@ -278,7 +288,7 @@ class VisitManager:
                 else:
                     tr.live_bbox = pb
                 if frame is not None:
-                    self._body_candidate(tr, frame, pb)
+                    self._body_candidate(tr, frame, pb, [o for o in persons if o is not pb])
                     if src != "pre":
                         self._maybe_snapshot(cam_id, tr, pb, frame, now)
             for face in (result.faces or []):
@@ -356,7 +366,7 @@ class VisitManager:
 
     # ── mejores capturas ───────────────────────────────────────────────
     @staticmethod
-    def _body_candidate(tr: Track, frame, pb) -> None:
+    def _body_candidate(tr: Track, frame, pb, others=()) -> None:
         if tr.static and tr.body:
             return
         h, w = frame.shape[:2]
@@ -375,7 +385,7 @@ class VisitManager:
         jpg = _jpeg(crop, 288, 75)
         if jpg:
             tr.body, tr.body_q, tr.dirty = jpg, q, True
-            tr.scene = _scene_with_box(frame, (x1, y1, x2, y2))
+            tr.scene = _scene_with_box(frame, (x1, y1, x2, y2), others)
 
     def _maybe_snapshot(self, cam_id, tr: Track, pb, frame, now: float) -> None:
         g = self._grabbers.get(cam_id)
@@ -496,8 +506,8 @@ class VisitManager:
             return self._still_ghost(cam_id, tr)          # interior: solo detecciones breves e inmoviles (una planta, una bolsa); una persona sentada dura mas
         if tr.hits <= 3:
             return True                  # 1-3 detecciones sueltas (aunque duren segundos): parpadeo de YOLO, no alguien que paso
-        if tr.dims[1] and (tr.bbox[3] - tr.bbox[1]) < TINY_H_FRAC * tr.dims[1]:
-            return True                  # caja minuscula al fondo de la escena (poste, reflejo, auto lejano): no hay forma de verificarla
+        if tr.dims[1] and tr.max_h < TINY_H_FRAC * tr.dims[1]:
+            return True                  # caja minuscula en toda su vida, al fondo de la escena (poste, reflejo, auto lejano): no hay forma de verificarla
         spot = tr.still_spot()
         if spot is None:
             return False

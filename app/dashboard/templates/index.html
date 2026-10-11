@@ -3102,7 +3102,10 @@ function initPets(){
   async function more(){
     const g = document.getElementById('pet-grid');
     try {
-      const d = await (await fetch(`/api/pets/crops?unlabeled=1&limit=12&order=${sortBy}`)).json();
+      const rs = await fetch(`/api/pets/crops?unlabeled=1&limit=12&order=${sortBy}`);
+      if (!rs.ok) throw new Error(rs.status);
+      const d = await rs.json();
+      document.getElementById('pet-msg').textContent = '';
       if (!d.crops.length){ g.innerHTML = '<p class="pet-help">No quedan recortes por etiquetar. Se siguen recolectando conforme aparecen perros.</p>'; return; }
       g.innerHTML = d.crops.map(c => {
         const sug = c.pred ? `<div class="pet-sug">Sugerido: <b>${_escapeHtml(NAME[c.pred] || c.pred)}</b> ${Math.round((c.pred_conf || 0) * 100)}%</div>` : '';

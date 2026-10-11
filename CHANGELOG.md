@@ -2,6 +2,15 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.24.6 — Recuadro verde fino, cajas lejanas y repo oficial (2026-10-11)
+
+Las capturas de visita dibujan el recuadro con el verde del panel y 1 px, y ahora muestran a todas las personas del cuadro (la de la visita resaltada); una persona que se aleja ya no se descarta como 'caja minúscula' por el tamaño de su último cuadro; el mensaje de error de mascotas se limpia solo; y se fija Oxm-Tech como repositorio oficial con el fork como respaldo.
+
+- **Capturas · Recuadro #76B900 de 1 px**: Antes salía turquesa por tener los canales BGR al revés y de 2 px. Las demás personas del cuadro se dibujan apagadas, así una escena con dos personas muestra a las dos.
+- **Tracker · Caja minúscula = toda la vida del track**: El filtro de cajas diminutas en exteriores usaba la última caja: peatones reales que se alejan (hasta 120 detecciones) quedaban marcados como falsos. Ahora cuenta el alto máximo que tuvo.
+- **Mascotas · Error de carga**: El aviso 'Error al cargar recortes' se quedaba pegado tras un fallo pasajero; ahora se limpia al cargar bien.
+- **Proyecto · Repo oficial**: Oxm-Tech/thor-vision es el oficial; Spartantechcompany/thor-vision queda como copia de respaldo. README con el enlace al perfil del autor.
+
 ## v2.24.5 — Vuelta a Qwen, entradas Tuya sin falsos y créditos (2026-10-11)
 
 El modelo de visión vuelve a llamarse Qwen (Athena se retira mientras el backend siga caído); el movimiento de una cámara Tuya sin persona ya no genera 'entrada sin captura' (tiene su propia alerta); los avisos de puertas nombran las cámaras revisadas; y el README incluye a Oswaldo A. Pérez Castillo y la asistencia de Claude Code.

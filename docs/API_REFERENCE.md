@@ -34,6 +34,12 @@ La documentacion interactiva esta en `/docs`. Guia de uso y significado de los d
 |---|---|---|---|---|
 | GET | `/api/attendance.csv` | Attendance Csv | `date` |  |
 
+## buscar
+
+| Metodo | Ruta | Resumen | Parametros | Cuerpo |
+|---|---|---|---|---|
+| GET | `/buscar` | Search Page |  |  |
+
 ## camara
 
 | Metodo | Ruta | Resumen | Parametros | Cuerpo |
@@ -309,6 +315,13 @@ La documentacion interactiva esta en `/docs`. Guia de uso y significado de los d
 | GET | `/api/rules` | Rules | `days` |  |
 | GET | `/api/rules/analyses` | Analyses | `type`, `limit` |  |
 | POST | `/api/rules/analyze` | Analyze |  | AnalyzeBody |
+
+## search
+
+| Metodo | Ruta | Resumen | Parametros | Cuerpo |
+|---|---|---|---|---|
+| GET | `/api/search/semantic` | Semantic | `q`*, `kind`, `hours`, `k`, `mode` |  |
+| GET | `/api/search/status` | Status |  |  |
 
 ## searxng
 
