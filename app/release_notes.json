@@ -1,5 +1,28 @@
 [
   {
+    "version": "2.29.0",
+    "date": "2026-10-12",
+    "name": "Modo sin VLM: alertas por reglas sobre visitas confirmadas",
+    "summary": "Cuando el modelo de visión lleva más de 5 minutos sin responder, persona nocturna y merodeo se generan con reglas sobre las visitas que el tracker ya confirmó (YOLO + Clef), con captura y la marca 'modo sin VLM'. Se apaga solo cuando el VLM vuelve.",
+    "highlights": [
+      {
+        "area": "Alertas",
+        "title": "Persona nocturna sin VLM",
+        "text": "De noche, en cámaras con night_person: alert (scenes.yml), una persona que no es personal conocido ni empleado genera alerta con su captura y la ropa detectada. En calle solo si se queda 30 s."
+      },
+      {
+        "area": "Alertas",
+        "title": "Merodeo en calle",
+        "text": "Una persona que permanece 150 s o más en Exterior 1 o 2. Enfriamiento de 120 s por cámara y tipo."
+      },
+      {
+        "area": "Validación",
+        "title": "Simulación de 24 h",
+        "text": "Sobre las visitas reales de un día habría dado ~50 alertas (38 de merodeo en calle y 12 nocturnas en interiores). GET /api/yolo-rules muestra si está activo, por qué y cuántas lleva. YOLO_RULES=always|off lo fuerza."
+      }
+    ]
+  },
+  {
     "version": "2.28.0",
     "date": "2026-10-12",
     "name": "Clips de video en las alertas",

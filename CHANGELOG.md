@@ -2,6 +2,14 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.29.0 — Modo sin VLM: alertas por reglas sobre visitas confirmadas (2026-10-12)
+
+Cuando el modelo de visión lleva más de 5 minutos sin responder, persona nocturna y merodeo se generan con reglas sobre las visitas que el tracker ya confirmó (YOLO + Clef), con captura y la marca 'modo sin VLM'. Se apaga solo cuando el VLM vuelve.
+
+- **Alertas · Persona nocturna sin VLM**: De noche, en cámaras con night_person: alert (scenes.yml), una persona que no es personal conocido ni empleado genera alerta con su captura y la ropa detectada. En calle solo si se queda 30 s.
+- **Alertas · Merodeo en calle**: Una persona que permanece 150 s o más en Exterior 1 o 2. Enfriamiento de 120 s por cámara y tipo.
+- **Validación · Simulación de 24 h**: Sobre las visitas reales de un día habría dado ~50 alertas (38 de merodeo en calle y 12 nocturnas en interiores). GET /api/yolo-rules muestra si está activo, por qué y cuántas lleva. YOLO_RULES=always|off lo fuerza.
+
 ## v2.28.0 — Clips de video en las alertas (2026-10-12)
 
 Las alertas de merodeo en la puerta peatonal y de apertura del portón del garage guardan un clip MP4 (6 s antes y 6 s después, de las cámaras de la zona) además de la captura. El historial muestra un botón ▶ junto al evento.

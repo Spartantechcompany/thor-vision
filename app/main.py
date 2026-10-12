@@ -229,6 +229,12 @@ async def lifespan(app: FastAPI):
     _door_cams = [c.strip() for c in os.environ.get("DOORBELL_CAMS", "cam-vto").split(",") if c.strip()]
     def _armed_alert(cam_id, v, _snap=snapshots, _db=db, _names={c.id: c.name for c in config.cameras}):
         """Armado absoluto: cada visita que cierra es una alerta con su captura (escena, cuerpo o cara)."""
+        _yr = getattr(app.state, "yolo_rules", None)
+        if _yr is not None:
+            try:
+                _yr.on_visit(cam_id, v)                      # modo sin VLM: persona nocturna y merodeo por reglas sobre la visita confirmada
+            except Exception as exc:                         # noqa: BLE001 - una regla con error no debe frenar el armado ni los viajes
+                logger.warning("yolo_rules: %s", exc)
         _tr = getattr(app.state, "trips", None)
         if _tr is not None and cam_id == "cam-vto":
             _tr.start("vto-visita", v["first_ts"])          # alguien llego al videoportero: se sigue su recorrido hacia adentro
@@ -252,6 +258,10 @@ async def lifespan(app: FastAPI):
                 logger.warning("armado: no se pudo guardar la captura: %s", exc)
     if visit_manager is not None:
         visit_manager.any_cb = _armed_alert
+        from app.vision.scenes import Scenes as _Scenes
+        from app.vision.yolo_rules import YoloRules
+        app.state.yolo_rules = YoloRules(db, snapshots, _Scenes(), {c.id: c.name for c in config.cameras}, visit_manager.zones,
+                                         lambda: getattr(getattr(app.state, "vlm_analyzer", None), "last_ok_ts", 0.0))
 
         def _door_loiter(cam_id, v, _snap=snapshots, _db=db, _names={c.id: c.name for c in config.cameras}):
             """Merodeo frente a la puerta peatonal (zona dibujada): alerta con captura; el personal conocido no alerta."""

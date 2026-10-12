@@ -262,3 +262,14 @@ def clip_now(request: Request, cam: str):
         raise HTTPException(404, "camara sin pre-roll o clips apagados")
     cs.request(0, [cam])
     return {"ok": True, "espera_s": 6}
+
+
+@router.get("/api/yolo-rules")
+def yolo_rules_status(request: Request):
+    """Modo sin VLM: si esta activo, por que y cuantas alertas ha generado."""
+    yr = getattr(request.app.state, "yolo_rules", None)
+    if yr is None:
+        return {"enabled": False}
+    last = yr.vlm_last_ok() or 0.0
+    return {"enabled": True, "mode": __import__("app.vision.yolo_rules", fromlist=["MODE"]).MODE, "active": yr.active(), "vlm_last_ok_age_s": round(time.time() - last) if last else None,
+            **yr.stats}

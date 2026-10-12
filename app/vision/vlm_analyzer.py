@@ -137,6 +137,7 @@ class VLMAnalyzer:
         # Modelo que de verdad responde. `self.model` es lo que se PIDE
         # (hoy un alias del gateway); esto es lo que el backend REPORTA.
         self.last_model = None
+        self.last_ok_ts = 0.0               # ultima respuesta valida del modelo (el modo sin VLM la usa)
         logger.info("VLMAnalyzer init — endpoint=%s model=%s auth=%s",
                     self.endpoint, self.model, "bearer" if api_key else "none")
 
@@ -451,6 +452,7 @@ class VLMAnalyzer:
             result = json.loads(text)
             result["_ms"] = round((time.monotonic() - t0) * 1000)
             result["_ts"] = time.time()
+            self.last_ok_ts = result["_ts"]
             served = data.get("model")
             if served:
                 self.last_model = served

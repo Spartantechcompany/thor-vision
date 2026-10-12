@@ -68,6 +68,14 @@ La documentacion interactiva esta en `/docs`. Guia de uso y significado de los d
 |---|---|---|---|---|
 | GET | `/api/clef` | Clef Status |  |  |
 
+## clips
+
+| Metodo | Ruta | Resumen | Parametros | Cuerpo |
+|---|---|---|---|---|
+| GET | `/api/clips/file/{cid}` | Clip File | `cid`* |  |
+| POST | `/api/clips/now` | Clip Now | `cam`* |  |
+| GET | `/api/clips/recent` | Clips Recent | `hours` |  |
+
 ## connections
 
 | Metodo | Ruta | Resumen | Parametros | Cuerpo |
