@@ -2,6 +2,12 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.31.1 — Snapshot SUNAPI con perfil MJPEG en las cámaras de 5 MP (2026-10-12)
+
+Las QNO-8010R (Exterior 1 y 2) responden error 604 al pedir snapshot porque no tienen ningún perfil MJPEG. El lector de snapshots ahora busca un perfil MJPEG y, si existe, lo usa con Profile=N; si no, lo registra una sola vez en el log.
+
+- **Captura · Snapshot a resolución completa**: En cuanto se cree un perfil MJPEG en la cámara (por ejemplo el perfil 3, que no se usa), la búsqueda de rostros en la calle podrá pedir cuadros de 5 MP en vez de depender del stream.
+
 ## v2.31.0 — Alerta por cruce de la línea virtual de la cámara (2026-10-12)
 
 El cruce de la línea virtual IVA de las cámaras Hanwha (evento VideoAnalytics.Passing por SUNAPI) genera la alerta cruce_linea cuando YOLO confirma una persona, con captura y clip.
