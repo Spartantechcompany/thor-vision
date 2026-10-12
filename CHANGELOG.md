@@ -2,11 +2,17 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.30.1 — Garage frontal cuenta como salida de las mascotas (2026-10-12)
+
+Garage frontal pasa a contar como 'fuera de la casa' para la presencia de mascotas, junto a Exterior 1, Exterior 2 y el videoportero.
+
+- **Mascotas · Garage frontal = salida**: Una mascota vista en Garage frontal tras haber estado dentro genera mascota_salida; al volver a una cámara interna, mascota_regreso.
+
 ## v2.30.0 — Presencia de mascotas, empleados e invitados (2026-10-12)
 
 Nuevo tablero /presencia con quién está ahora: empleados (cámara o WiFi), invitados del día y mascotas (en casa o fuera, con última cámara y hora). Las mascotas conocidas generan aviso al salir de la casa y al regresar.
 
-- **Mascotas · En casa / fuera**: Cada perro que ve YOLO se identifica con el clasificador de recortes (Akamaru, Gigi, Mojo-jojo, confianza mínima 0.7). Exterior 1, Exterior 2 y el videoportero cuentan como 'fuera'. Alertas mascota_salida y mascota_regreso con la foto; GET /api/pets/presence.
+- **Mascotas · En casa / fuera**: Cada perro que ve YOLO se identifica con el clasificador de recortes (Akamaru, Gigi, Mojo-jojo, confianza mínima 0.7). Exterior 1, Exterior 2, Garage frontal y el videoportero cuentan como fuera.. Alertas mascota_salida y mascota_regreso con la foto; GET /api/pets/presence.
 - **Presencia · Tablero /presencia**: GET /api/presence/now junta empleados (cámara + WiFi), invitados y mascotas; se actualiza cada 20 s. Un empleado cuenta como 'en oficina' si lo ve una cámara interna o su dispositivo está en el WiFi.
 
 ## v2.29.0 — Modo sin VLM: alertas por reglas sobre visitas confirmadas (2026-10-12)

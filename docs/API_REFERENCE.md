@@ -286,6 +286,7 @@ La documentacion interactiva esta en `/docs`. Guia de uso y significado de los d
 | GET | `/api/pets/crops/{cid}/image` | Pets Image | `cid`* |  |
 | POST | `/api/pets/crops/{cid}/label` | Pets Label | `cid`* | PetLabel |
 | GET | `/api/pets/model` | Pets Model |  |  |
+| GET | `/api/pets/presence` | Pets Presence |  |  |
 | GET | `/api/pets/stats` | Pets Stats |  |  |
 | POST | `/api/pets/suggest` | Pets Suggest |  |  |
 
@@ -301,7 +302,14 @@ La documentacion interactiva esta en `/docs`. Guia de uso y significado de los d
 |---|---|---|---|---|
 | POST | `/api/presence/backfill` | Backfill | `hours` |  |
 | GET | `/api/presence/capture-quality` | Capture Quality | `hours`, `grid_x`, `grid_y` |  |
+| GET | `/api/presence/now` | Presence Now |  |  |
 | GET | `/api/presence/stats` | Stats | `hours` |  |
+
+## presencia
+
+| Metodo | Ruta | Resumen | Parametros | Cuerpo |
+|---|---|---|---|---|
+| GET | `/presencia` | Presence Page |  |  |
 
 ## reglas
 

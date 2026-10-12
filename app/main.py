@@ -137,7 +137,7 @@ async def lifespan(app: FastAPI):
                 logger.warning("mascotas: sin captura: %s", exc)
     from app.vision.pet_presence import PetPresence
     _street = set((app.state.journeys.topo.get("street") if getattr(app.state, "journeys", None) else None) or ["cam-189", "cam-191", "cam-vto"])
-    app.state.pet_presence = PetPresence(db, _street | {"cam-189", "cam-191"}, {c.id: c.name for c in config.cameras}, _pet_event)
+    app.state.pet_presence = PetPresence(db, _street | {"cam-189", "cam-191", "cam-228"}, {c.id: c.name for c in config.cameras}, _pet_event)
     app.state.pets.presence = app.state.pet_presence
     if os.environ.get("EVAL_TRACK_LOG", "true").lower() == "true":
         from app.api.routes_eval import make_track_recorder

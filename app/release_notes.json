@@ -1,5 +1,18 @@
 [
   {
+    "version": "2.30.1",
+    "date": "2026-10-12",
+    "name": "Garage frontal cuenta como salida de las mascotas",
+    "summary": "Garage frontal pasa a contar como 'fuera de la casa' para la presencia de mascotas, junto a Exterior 1, Exterior 2 y el videoportero.",
+    "highlights": [
+      {
+        "area": "Mascotas",
+        "title": "Garage frontal = salida",
+        "text": "Una mascota vista en Garage frontal tras haber estado dentro genera mascota_salida; al volver a una cámara interna, mascota_regreso."
+      }
+    ]
+  },
+  {
     "version": "2.30.0",
     "date": "2026-10-12",
     "name": "Presencia de mascotas, empleados e invitados",
@@ -8,7 +21,7 @@
       {
         "area": "Mascotas",
         "title": "En casa / fuera",
-        "text": "Cada perro que ve YOLO se identifica con el clasificador de recortes (Akamaru, Gigi, Mojo-jojo, confianza mínima 0.7). Exterior 1, Exterior 2 y el videoportero cuentan como 'fuera'. Alertas mascota_salida y mascota_regreso con la foto; GET /api/pets/presence."
+        "text": "Cada perro que ve YOLO se identifica con el clasificador de recortes (Akamaru, Gigi, Mojo-jojo, confianza mínima 0.7). Exterior 1, Exterior 2, Garage frontal y el videoportero cuentan como fuera.. Alertas mascota_salida y mascota_regreso con la foto; GET /api/pets/presence."
       },
       {
         "area": "Presencia",
