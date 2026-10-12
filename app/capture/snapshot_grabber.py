@@ -56,6 +56,7 @@ class SnapshotGrabber:
             self._off_until = time.time() + COOLDOWN_S
             self._fails = 0
             self._base = None
+            self._profile_checked = False            # tras la pausa se vuelve a buscar un perfil MJPEG (puede haberse creado en la camara)
             logger.info("Snapshot cam=%s: sin soporte/acceso (%s); pausa %.0f min",
                         self.cam_id, why, COOLDOWN_S / 60)
 
