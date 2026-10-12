@@ -64,7 +64,8 @@ class SnapshotGrabber:
         self._profile_checked = True
         try:
             t = self._sess.get(base + _PROFILES, timeout=6).text
-        except Exception:
+        except requests.RequestException as exc:
+            logger.debug("Snapshot cam=%s: no se pudieron leer los perfiles: %s", self.cam_id, exc)
             return None
         enc = {int(m.group(1)): m.group(2).strip() for m in re.finditer(r"Channel\.0\.Profile\.(\d+)\.EncodingType=(\S+)", t)}
         found = sorted(k for k, v in enc.items() if v.upper() == "MJPEG")
