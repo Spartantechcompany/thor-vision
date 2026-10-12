@@ -100,6 +100,11 @@ async def lifespan(app: FastAPI):
             logger.warning("BodyID apagado: %s", exc)
         visit_manager.zones = {c.id: c.zone for c in config.cameras}
     app.state.visits = visit_manager
+    app.state.clef = None
+    if visit_manager is not None and os.environ.get("CLEF_ENABLED", "true").lower() == "true":
+        from app.vision.clef_client import ClefClient
+        app.state.clef = ClefClient()
+        visit_manager.set_verifier(app.state.clef)
 
     vision_queue = VisionQueue(
         store    = detection_store,

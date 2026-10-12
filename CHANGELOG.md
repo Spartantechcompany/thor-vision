@@ -2,6 +2,14 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.25.0 — Clef-flash: verificador de personas (2026-10-12)
+
+Clef-flash (Cloudflare, 9B, Apache-2.0) corre local en Thor como servidor de decisiones y confirma que cada visita sin cara es una persona real; los árboles, postes y sombras que YOLO tomaba por persona se descartan antes de generar alertas.
+
+- **Tracker · Verificación de persona con Clef**: Cada visita sin cara se confirma en segundo plano con el mejor recorte de cuerpo (~0.4 s). Probabilidad de persona < 0.20 = falso (CLEF_PERSON_MIN_P). En una muestra de 48 visitas de Exterior 1 y 2 los árboles quedaron entre 0.03 y 0.19 y las personas desde 0.56.
+- **Infra · Servidor Clef aparte**: Contenedor thor-clef (deploy/docker-compose.clef.yml) con la misma imagen, solo en 127.0.0.1:20140; carga en 20 s. Si no responde, el tracker sigue con sus reglas (pausa automática tras 3 fallos). Estado en GET /api/clef.
+- **Identidad · Clef como árbitro de 'misma persona'**: Medido con 18 sujetos nombrados: AUC 0.76 (embedding de cuerpo 0.71, combinados 0.80). Útil para confirmar fusiones sugeridas, no para fusionar solo.
+
 ## v2.24.6 — Recuadro verde fino, cajas lejanas y repo oficial (2026-10-11)
 
 Las capturas de visita dibujan el recuadro con el verde del panel y 1 px, y ahora muestran a todas las personas del cuadro (la de la visita resaltada); una persona que se aleja ya no se descarta como 'caja minúscula' por el tamaño de su último cuadro; el mensaje de error de mascotas se limpia solo; y se fija Oxm-Tech como repositorio oficial con el fork como respaldo.

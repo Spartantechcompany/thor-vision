@@ -62,6 +62,12 @@ La documentacion interactiva esta en `/docs`. Guia de uso y significado de los d
 | GET | `/api/chat/history` | Chat History | `session_id`*, `limit` |  |
 | POST | `/api/chat/stream` | Chat Stream | `x-session-id` | StreamRequest |
 
+## clef
+
+| Metodo | Ruta | Resumen | Parametros | Cuerpo |
+|---|---|---|---|---|
+| GET | `/api/clef` | Clef Status |  |  |
+
 ## connections
 
 | Metodo | Ruta | Resumen | Parametros | Cuerpo |

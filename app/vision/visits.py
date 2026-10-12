@@ -178,6 +178,9 @@ class Track:
         self.pre_n = 0
         self.face_src = None
         self.ghost = False
+        self.person_p: Optional[float] = None        # Clef: probabilidad de que el recorte sea una persona real
+        self.ver_q = 0.0                              # calidad del cuerpo con el que se verifico
+        self.ver_pending = False
 
     def still_spot(self):
         """(cx, cy, tam) si el track casi no se movio en toda su vida (arbol, poste, sombra); si no, None."""
@@ -211,6 +214,8 @@ TINY_H_FRAC = float(os.environ.get("TINY_H_FRAC", "0.07"))              # alto d
 INDOOR_GHOST_S = float(os.environ.get("INDOOR_GHOST_S", "15"))        # en interiores solo se descartan quietos de menos de esto
 GHOST_MIN = int(os.environ.get("GHOST_MIN", "3"))                 # tantos tracks inmoviles sin cara en el mismo punto = objeto fijo (arbol)
 GHOST_WINDOW_S = float(os.environ.get("GHOST_WINDOW_S", "21600"))
+VERIFY_MIN_P = float(os.environ.get("CLEF_PERSON_MIN_P", "0.20"))       # Clef: por debajo de esta probabilidad de "persona real" la visita es un falso (arbol, poste, sombra)
+VERIFY_MIN_HITS = int(os.environ.get("CLEF_VERIFY_MIN_HITS", "4"))
 
 
 class VisitManager:
@@ -235,6 +240,8 @@ class VisitManager:
                       "pre_bursts": 0, "pre_frames": 0, "best_pre": 0, "best_snap": 0, "best_stream": 0}
         self.any_cb = None      # callable(cam_id, dict): toda visita cerrada (armado absoluto)
         self.burst_cb = None    # callable(cam_id, reason): pide analisis retroactivo del pre-roll
+        self.verifier = None    # ClefClient: confirma que el recorte de una visita sin cara es una persona real
+        self._ver_q: queue.Queue = queue.Queue(maxsize=40)
         self._models = None
         self._face_db = None
         self._grabbers: dict = {}
@@ -250,6 +257,38 @@ class VisitManager:
         if self._analyzer is None:
             threading.Thread(target=self._vlm_loop, daemon=True, name="visit-vlm").start()
         self._analyzer = analyzer
+
+    def set_verifier(self, client) -> None:
+        if self.verifier is None:
+            threading.Thread(target=self._ver_loop, daemon=True, name="visit-clef").start()
+        self.verifier = client
+
+    def _maybe_verify(self, cam_id, tr: Track) -> None:
+        """Pide a Clef confirmar (en segundo plano) que el recorte es una persona; las visitas con cara ya estan confirmadas."""
+        if (self.verifier is None or not tr.body or tr.n_face >= 1 or tr.hits < VERIFY_MIN_HITS or tr.ver_pending or cam_id == "cam-vto"
+                or (tr.person_p is not None and tr.body_q <= tr.ver_q * 1.6)):
+            return
+        try:
+            self._ver_q.put_nowait((cam_id, tr, tr.body, tr.body_q))
+            tr.ver_pending = True
+        except queue.Full:
+            pass
+
+    def _ver_loop(self) -> None:
+        names = {}
+        while True:
+            cam_id, tr, body, q = self._ver_q.get()
+            try:
+                res = self.verifier.verify_person(body, names.get(cam_id, cam_id)) if self.verifier is not None else None
+                if res is not None:
+                    tr.person_p, tr.ver_q = res["p_person"], q
+                    self.stats["clef_checked"] = self.stats.get("clef_checked", 0) + 1
+                    logger.info("CLEF_VERIFY cam=%s track=%s hits=%d p_person=%.3f what=%s(%.2f) ms=%s", cam_id, tr.id, tr.hits,
+                                res["p_person"], res.get("what"), res.get("p_what", 0.0), res.get("ms"))
+            except Exception as exc:        # noqa: BLE001 - la verificacion es opcional: nunca debe tumbar el tracker
+                logger.warning("verificacion Clef: %s", exc)
+            finally:
+                tr.ver_pending = False
 
     def set_models(self, models, face_db, cam_urls: dict) -> None:
         if not SNAP_ENABLED:
@@ -289,6 +328,7 @@ class VisitManager:
                     tr.live_bbox = pb
                 if frame is not None:
                     self._body_candidate(tr, frame, pb, [o for o in persons if o is not pb])
+                    self._maybe_verify(cam_id, tr)
                     if src != "pre":
                         self._maybe_snapshot(cam_id, tr, pb, frame, now)
             for face in (result.faces or []):
@@ -533,6 +573,9 @@ class VisitManager:
 
     def _close_visit(self, cam_id, tr: Track) -> None:
         tr.ghost = self._is_ghost(cam_id, tr)
+        if not tr.ghost and tr.person_p is not None and tr.person_p < VERIFY_MIN_P and tr.n_face == 0:
+            tr.ghost = True
+            self.stats["clef_rejected"] = self.stats.get("clef_rejected", 0) + 1
         if tr.ghost:
             self.stats["ghost_visits"] = self.stats.get("ghost_visits", 0) + 1
         if tr.face_src:

@@ -1,0 +1,23 @@
+# Servidor local de Clef-flash (modelo de decision de Cloudflare). Va junto al compose de thor-vision en Thor:
+#   docker compose -f docker-compose.clef.yml up -d
+# Pesos (19 GB): huggingface-cli download Cloudflare/clef-flash --local-dir data/models/clef-flash
+services:
+  thor-clef:
+    image: thor-vision:latest
+    container_name: thor-clef
+    restart: unless-stopped
+    network_mode: host
+    runtime: nvidia
+    working_dir: /app
+    command: ["python3", "/app/app/vision/clef_server.py"]
+    volumes:
+      - ./app:/app/app:ro
+      - ./data:/app/data:rw
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - PYTHONPATH=/app/data/pylibs-emb          # transformers 5.x (la imagen principal no lo trae)
+      - HF_HUB_OFFLINE=1
+      - CLEF_MODEL_DIR=/app/data/models/clef-flash
+      - CLEF_PORT=20140
+      - TZ=America/Mexico_City

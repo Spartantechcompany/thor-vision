@@ -194,3 +194,19 @@ def pets_label(cid: int, body: PetLabel, request: Request):
     if not cur.rowcount:
         raise HTTPException(404)
     return {"ok": True}
+
+
+@router.get("/api/clef")
+def clef_status(request: Request):
+    """Estado del modelo de decision Clef-flash (servidor local) y lo que ha decidido el tracker con el."""
+    import json as _json
+    import urllib.request as _rq
+    cl, vm = getattr(request.app.state, "clef", None), getattr(request.app.state, "visits", None)
+    out = {"enabled": cl is not None, "client": cl.stats if cl else None,
+           "tracker": {k: v for k, v in (vm.stats.items() if vm else []) if k.startswith("clef_")}}
+    try:
+        with _rq.urlopen((cl.url if cl else "http://127.0.0.1:20140") + "/health", timeout=3) as r:
+            out["server"] = _json.loads(r.read())
+    except (OSError, ValueError):
+        out["server"] = None
+    return out
