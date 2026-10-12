@@ -161,3 +161,29 @@ def presence(request: Request, date: Optional[str] = None):
     return {"date": datetime.date.fromtimestamp(t0).isoformat(), "employees": [
         {"subject_id": sid, "name": names.get(sid), "first": v["first"], "last": v["last"], "minutes": v["minutes"], "devices": v["devices"]}
         for sid, v in sorted(res.items(), key=lambda kv: names.get(kv[0]) or "")]}
+
+
+@router.get("/api/presence/now")
+def presence_now(request: Request):
+    """Quien esta ahora: empleados (camara o WiFi), invitados del dia y mascotas, para el tablero /presencia."""
+    from app.api.routes_people_admin import build_attendance
+    db = _db(request)
+    now = time.time()
+    att = build_attendance(request, None)
+    with db._lock:
+        online = {r[0] for r in db._conn.execute(
+            "SELECT DISTINCT subject_id FROM wifi_devices WHERE subject_id IS NOT NULL AND ignore=0 AND last_seen>=?", (now - GAP_S,)).fetchall()}
+    emps = []
+    for e in att["employees"]:
+        wifi_on = e["id"] in online
+        cam_on = bool(e["present"])
+        status = "en oficina" if (cam_on or wifi_on) else ("salió" if e.get("left") else ("sin ver hoy" if not e.get("attended_any") else "fuera"))
+        emps.append({"id": e["id"], "name": e["name"], "status": status, "by_camera": cam_on, "by_wifi": wifi_on, "first_ts": e.get("first_ts") or e.get("wifi_first_ts"),
+                     "last_ts": e.get("last_ts") or e.get("wifi_last_ts"), "minutes": max(e.get("minutes") or 0, e.get("wifi_minutes") or 0), "cams": e.get("cams", []),
+                     "usual_in": e.get("usual_in"), "alert": e.get("status")})
+    emps.sort(key=lambda x: (x["status"] != "en oficina", x["name"] or ""))
+    guests = [{**g, "now": now - (g["last_ts"] or 0) < 900} for g in att["guests"]["people"]]
+    pp = getattr(request.app.state, "pet_presence", None)
+    return {"ts": now, "employees": emps, "guests": guests, "pets": pp.status(now) if pp else [],
+            "counts": {"in_office": sum(1 for e in emps if e["status"] == "en oficina"), "employees": len(emps), "guests_now": sum(1 for g in guests if g["now"]),
+                       "pets_home": sum(1 for p in (pp.status(now) if pp else []) if p["status"] == "en casa")}}

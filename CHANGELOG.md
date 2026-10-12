@@ -2,6 +2,13 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.30.0 — Presencia de mascotas, empleados e invitados (2026-10-12)
+
+Nuevo tablero /presencia con quién está ahora: empleados (cámara o WiFi), invitados del día y mascotas (en casa o fuera, con última cámara y hora). Las mascotas conocidas generan aviso al salir de la casa y al regresar.
+
+- **Mascotas · En casa / fuera**: Cada perro que ve YOLO se identifica con el clasificador de recortes (Akamaru, Gigi, Mojo-jojo, confianza mínima 0.7). Exterior 1, Exterior 2 y el videoportero cuentan como 'fuera'. Alertas mascota_salida y mascota_regreso con la foto; GET /api/pets/presence.
+- **Presencia · Tablero /presencia**: GET /api/presence/now junta empleados (cámara + WiFi), invitados y mascotas; se actualiza cada 20 s. Un empleado cuenta como 'en oficina' si lo ve una cámara interna o su dispositivo está en el WiFi.
+
 ## v2.29.0 — Modo sin VLM: alertas por reglas sobre visitas confirmadas (2026-10-12)
 
 Cuando el modelo de visión lleva más de 5 minutos sin responder, persona nocturna y merodeo se generan con reglas sobre las visitas que el tracker ya confirmó (YOLO + Clef), con captura y la marca 'modo sin VLM'. Se apaga solo cuando el VLM vuelve.

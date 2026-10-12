@@ -456,6 +456,12 @@ La documentacion interactiva esta en `/docs`. Guia de uso y significado de los d
 | GET | `/api/wifi/presence` | Presence | `date` |  |
 | GET | `/wifi` | Wifi Page |  |  |
 
+## yolo-rules
+
+| Metodo | Ruta | Resumen | Parametros | Cuerpo |
+|---|---|---|---|---|
+| GET | `/api/yolo-rules` | Yolo Rules Status |  |  |
+
 ## zonas
 
 | Metodo | Ruta | Resumen | Parametros | Cuerpo |

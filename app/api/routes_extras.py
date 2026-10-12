@@ -273,3 +273,10 @@ def yolo_rules_status(request: Request):
     last = yr.vlm_last_ok() or 0.0
     return {"enabled": True, "mode": __import__("app.vision.yolo_rules", fromlist=["MODE"]).MODE, "active": yr.active(), "vlm_last_ok_age_s": round(time.time() - last) if last else None,
             **yr.stats}
+
+
+@router.get("/api/pets/presence")
+def pets_presence(request: Request):
+    """Estado de cada mascota conocida: en casa / fuera / sin datos, con su ultima camara y hora."""
+    pp = getattr(request.app.state, "pet_presence", None)
+    return {"pets": pp.status() if pp else []}

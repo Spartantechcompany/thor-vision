@@ -119,6 +119,26 @@ async def lifespan(app: FastAPI):
     app.state.parked.cam_names = {c.id: c.name for c in config.cameras}
     app.state.pets = PetCollector(db)
     vision_queue.hooks = [app.state.parked.update, app.state.pets.update]
+
+    def _pet_event(kind, pet, cam_id, conf, crop, _db=db, _names={c.id: c.name for c in config.cameras}):
+        """Una mascota conocida salio de la casa o regreso: alerta informativa con la foto del recorte."""
+        import cv2
+        from app.vision.pet_presence import KNOWN
+        cam = _names.get(cam_id, cam_id)
+        txt = f"{KNOWN[pet]} {'salió de la casa' if kind == 'salida' else 'regresó a la casa'} (visto en {cam})"
+        eid = _db.insert_event("nemotron", cam_id, {"schema": 2, "source": "mascotas", "people": 0, "persons": [], "vehicles": 0, "activity": txt, "scene": "",
+                                                    "relevant": True, "alerts": [txt], "alert_types": ["mascota_" + kind], "severity": "low", "confidence": "medium",
+                                                    "pet": {"name": KNOWN[pet], "kind": kind, "conf": round(conf, 2)}}, people=0, has_alert=True)
+        snaps = getattr(app.state, "snapshots", None)
+        if crop is not None and snaps is not None:
+            try:
+                snaps.save(cam_id, crop, "mascota", event_id=eid)
+            except (OSError, ValueError, cv2.error) as exc:
+                logger.warning("mascotas: sin captura: %s", exc)
+    from app.vision.pet_presence import PetPresence
+    _street = set((app.state.journeys.topo.get("street") if getattr(app.state, "journeys", None) else None) or ["cam-189", "cam-191", "cam-vto"])
+    app.state.pet_presence = PetPresence(db, _street | {"cam-189", "cam-191"}, {c.id: c.name for c in config.cameras}, _pet_event)
+    app.state.pets.presence = app.state.pet_presence
     if os.environ.get("EVAL_TRACK_LOG", "true").lower() == "true":
         from app.api.routes_eval import make_track_recorder
         vision_queue.hooks.append(make_track_recorder())          # cajas de persona con su tiempo, para comparar trackers fuera de linea
@@ -548,6 +568,11 @@ async def onvif_page(request: Request):
 @app.get("/zonas", response_class=HTMLResponse)
 async def zones_page(request: Request):
     return templates.TemplateResponse("zones.html", {"request": request})
+
+
+@app.get("/presencia", response_class=HTMLResponse)
+async def presence_page(request: Request):
+    return templates.TemplateResponse("presence.html", {"request": request})
 
 
 @app.get("/wifi", response_class=HTMLResponse)

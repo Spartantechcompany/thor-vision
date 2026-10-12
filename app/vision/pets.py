@@ -42,6 +42,7 @@ class PetCollector:
     def __init__(self, db):
         self.db = db
         self._last: dict = {}
+        self.presence = None             # PetPresence: estado en casa / fuera de cada mascota conocida
         self._seen: dict = {}            # cam_id -> (ts, [(etiqueta, prob)]) de los perros/gatos vistos por ultima vez
         self._model = None
         self._model_ts = 0.0
@@ -136,7 +137,10 @@ class PetCollector:
                                       (rel, cam_id, now, o["c"], o["conf"], x2 - x1, y2 - y1))
                 self.db._conn.commit()
             saved += 1
-            labs.append(self._classify(crop))
+            lab = self._classify(crop)
+            labs.append(lab)
+            if self.presence is not None and lab[0]:
+                self.presence.seen(lab[0], cam_id, lab[1], now, crop)
         if labs:
             self._seen[cam_id] = (now, labs)
         if saved:
