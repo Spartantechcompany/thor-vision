@@ -437,6 +437,17 @@ La documentacion interactiva esta en `/docs`. Guia de uso y significado de los d
 |---|---|---|---|---|
 | GET | `/api/vlm` | Vlm Health |  |  |
 
+## wifi
+
+| Metodo | Ruta | Resumen | Parametros | Cuerpo |
+|---|---|---|---|---|
+| POST | `/api/wifi/clients` | Post Clients |  |  |
+| GET | `/api/wifi/devices` | Devices |  |  |
+| PUT | `/api/wifi/devices/{mac}` | Assign | `mac`* | Assign |
+| GET | `/api/wifi/employees` | Employees |  |  |
+| GET | `/api/wifi/presence` | Presence | `date` |  |
+| GET | `/wifi` | Wifi Page |  |  |
+
 ## zonas
 
 | Metodo | Ruta | Resumen | Parametros | Cuerpo |

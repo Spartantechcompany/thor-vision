@@ -2140,6 +2140,22 @@ function _nearestSnapshotBefore(camIndex, camId, ts){
   return ans;
 }
 
+let _clipMap = {}, _clipTs = 0;
+async function _loadClips(){
+  if (Date.now() - _clipTs < 20000) return false;
+  _clipTs = Date.now();
+  try { _clipMap = (await (await fetch('/api/clips/recent?hours=96')).json()).clips || {}; return true; } catch (e) { return false; }
+}
+function _decorateClips(box){
+  box.querySelectorAll('.hist-ev[data-eid]').forEach(row => {
+    const cl = _clipMap[row.dataset.eid];
+    if (!cl || row.querySelector('.hist-ev-clip')) return;
+    const holder = document.createElement('span');
+    holder.className = 'hist-ev-clip';
+    holder.innerHTML = cl.map(c => `<a href="/api/clips/file/${c.id}" target="_blank" rel="noopener" class="hev-btn" title="Clip de ${c.secs} s · ${_escapeHtml(c.cam)}">▶ ${cl.length > 1 ? _escapeHtml(c.cam) : 'clip'}</a>`).join(' ');
+    row.querySelector('.hist-ev-a').appendChild(holder);
+  });
+}
 function renderHistEvents(events, snapMap, boxId = 'hist-events', camIndex = null){
   const box = document.getElementById(boxId);
   if (boxId === 'hist-events') {
@@ -2170,7 +2186,7 @@ function renderHistEvents(events, snapMap, boxId = 'hist-events', camIndex = nul
       if (fb){ snapId = fb.id; approx = true; }
     }
     const rl = e.review_label;
-    return `<div class="hist-ev${e.has_alert ? ' alert' : ''}">
+    return `<div class="hist-ev${e.has_alert ? ' alert' : ''}" data-eid="${e.id}">
       <span class="hist-ev-t" title="${new Date(e.ts * 1000).toLocaleString('es-MX')}">${new Date(e.ts * 1000).toLocaleString('es-MX', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', hour12:false })} · hace ${_fmtAgo(now - e.ts)}</span>
       <span class="hist-ev-c">${_escapeHtml(_camName(e.cam_id))}</span>
       <span class="hist-ev-p">${e.people || 0}p</span>
@@ -2189,6 +2205,8 @@ function renderHistEvents(events, snapMap, boxId = 'hist-events', camIndex = nul
     </div>`;
   }).join('');
   _wireEventReview(box);
+  _decorateClips(box);
+  _loadClips().then(changed => { if (changed) _decorateClips(box); });
   box.querySelectorAll('.hist-ev-snap').forEach(a => a.addEventListener('click', ev => {
     ev.preventDefault();
     const row = a.closest('.hist-ev');

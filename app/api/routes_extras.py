@@ -1,6 +1,7 @@
 """Rutas de vehiculos estacionados, etiquetado de mascotas y version/notas de cada release."""
 import json
 import os
+import sqlite3
 import re
 import time
 from typing import Optional
@@ -221,3 +222,43 @@ def trips_list(request: Request, limit: int = 30):
                                 (min(max(limit, 1), 200),)).fetchall()
     keys = ("id", "start_ts", "end_ts", "alias", "label", "direction", "n_visits", "journey_id", "event_id", "status")
     return {"trips": [dict(zip(keys, r)) for r in rows]}
+
+
+@router.get("/api/clips/recent")
+def clips_recent(request: Request, hours: float = 48.0):
+    """event_id -> clips de video de ese evento (para el boton ▶ del historial)."""
+    db = _db(request)
+    with db._lock:
+        try:
+            rows = db._conn.execute("SELECT id, event_id, cam_id, secs FROM clips WHERE ts>? ORDER BY ts DESC LIMIT 500", (time.time() - min(hours, 720) * 3600,)).fetchall()
+        except sqlite3.OperationalError:
+            rows = []
+    names = {c.id: c.name for c in request.app.state.config.cameras}
+    out: dict = {}
+    for cid, eid, cam, secs in rows:
+        out.setdefault(str(eid), []).append({"id": cid, "cam": names.get(cam, cam), "secs": round(secs or 0)})
+    return {"clips": out}
+
+
+@router.get("/api/clips/file/{cid}")
+def clip_file(cid: int, request: Request):
+    db = _db(request)
+    cs = getattr(request.app.state, "clips", None)
+    with db._lock:
+        row = db._conn.execute("SELECT path FROM clips WHERE id=?", (cid,)).fetchone()
+    if not row or cs is None:
+        raise HTTPException(404)
+    path = os.path.realpath(os.path.join(cs.root, row[0]))
+    if not path.startswith(os.path.realpath(cs.root) + os.sep) or not os.path.exists(path):
+        raise HTTPException(404)
+    return FileResponse(path, media_type="video/mp4", headers={"Cache-Control": "max-age=86400"})
+
+
+@router.post("/api/clips/now")
+def clip_now(request: Request, cam: str):
+    """Graba un clip de una camara ahora mismo (6 s previos + 6 s despues), sin alerta asociada; util para probar y para guardar un momento."""
+    cs = getattr(request.app.state, "clips", None)
+    if cs is None or cam not in cs.preroll:
+        raise HTTPException(404, "camara sin pre-roll o clips apagados")
+    cs.request(0, [cam])
+    return {"ok": True, "espera_s": 6}

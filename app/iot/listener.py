@@ -69,6 +69,7 @@ class IotListener:
         self._recent: dict = {}          # (device, codigo, valor) -> ts: el mismo mensaje llega duplicado desde la nube
         self._last_motion: dict = {}     # device_id -> ts de la ultima alerta de movimiento/ruido
         self.detections = None           # DetectionStore (lo fija main.py): sirve para elegir la camara que de verdad ve a la persona
+        self.clip_cb = None              # callable(event_id, cam_ids): pide un clip de video de las camaras de la zona
         self.on_light = None             # callable(dev, ts): alguien movio un interruptor; pide captura a las camaras de esa zona
         self.on_motion = None            # callable(alias, ts): aviso de movimiento de una camara Tuya (viajes y rafaga en la camara de entrada)
         self._stop = threading.Event()
@@ -298,6 +299,11 @@ class IotListener:
                                                           "cam_confirmed": bool(dev.get("confirmed"))})
         self._alerted_open[dev_id] = ts
         self._snapshot_zone(eid, dev, "puerta")
+        if self.clip_cb is not None:
+            try:
+                self.clip_cb(eid, self._zone_cams(dev))
+            except (TypeError, ValueError, OSError) as exc:
+                logger.warning("iot: clip: %s", exc)
         if self.on_motion is not None and dev.get("alias"):
             try:
                 self.on_motion(dev["alias"], ts)         # la apertura anticipa una entrada en la camara asociada (viajes)

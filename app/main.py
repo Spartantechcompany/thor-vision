@@ -136,6 +136,10 @@ async def lifespan(app: FastAPI):
                 _pr.start()
                 vision_queue.preroll[cam.id] = _pr
         logger.info("Pre-roll: %d camaras", len(vision_queue.preroll))
+        if vision_queue.preroll and os.environ.get("CLIPS_ENABLED", "true").lower() == "true":
+            from app.storage.clips import ClipStore
+            app.state.clips = ClipStore(db, os.environ.get("CLIPS_DIR", "/app/data/clips"), vision_queue.preroll)
+            app.state.clips_stop = app.state.clips.start_purger()
 
     app.state.face_db       = face_db
     if visit_manager is not None:
@@ -264,6 +268,9 @@ async def lifespan(app: FastAPI):
                                                         "confidence": "high", "visit": {"visit_id": v.get("visit_id"), "subject_id": v.get("subject_id")}}, people=1, has_alert=True)
             img = v.get("scene") or v.get("body") or v.get("face")
             frame = cv2.imdecode(np.frombuffer(img, np.uint8), cv2.IMREAD_COLOR) if isinstance(img, (bytes, bytearray)) else img
+            _cl = getattr(app.state, "clips", None)
+            if _cl is not None:
+                _cl.request(eid, [cam_id])                    # el clip trae los 6 s previos y 6 s despues
             if frame is not None and _snap is not None:
                 try:
                     _snap.save(cam_id, frame, "merodeo", event_id=eid)
@@ -290,6 +297,7 @@ async def lifespan(app: FastAPI):
         from app.iot.listener import IotListener
         app.state.iot = IotListener(db, snapshots, manager._buffers, {c.id: c.name for c in config.cameras})
         app.state.iot.detections = detection_store
+        app.state.iot.clip_cb = lambda eid, cams: getattr(app.state, "clips", None) and app.state.clips.request(eid, cams)
         app.state.iot.start()
         from app.vision.journeys import JourneyLinker
         app.state.journeys = JourneyLinker(db, snapshots)

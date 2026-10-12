@@ -1,5 +1,23 @@
 [
   {
+    "version": "2.28.0",
+    "date": "2026-10-12",
+    "name": "Clips de video en las alertas",
+    "summary": "Las alertas de merodeo en la puerta peatonal y de apertura del portón del garage guardan un clip MP4 (6 s antes y 6 s después, de las cámaras de la zona) además de la captura. El historial muestra un botón ▶ junto al evento.",
+    "highlights": [
+      {
+        "area": "Alertas",
+        "title": "Clip por alerta",
+        "text": "Se arma con el anillo de pre-roll que ya existía (4 cuadros por segundo, resolución nativa reducida a 1280 px), codificado en H.264; no agrega decodificación. Hasta 3 cámaras por evento, 2 codificaciones a la vez."
+      },
+      {
+        "area": "API",
+        "title": "Rutas de clips",
+        "text": "GET /api/clips/recent, GET /api/clips/file/{id} y POST /api/clips/now?cam=... para grabar un clip a demanda. CLIP_TTL_DAYS (90 por defecto) borra los viejos cada hora; CLIPS_ENABLED=false lo apaga."
+      }
+    ]
+  },
+  {
     "version": "2.27.0",
     "date": "2026-10-12",
     "name": "Merodeo en la puerta peatonal y presencia por WiFi",

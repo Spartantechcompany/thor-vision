@@ -2,6 +2,13 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.28.0 — Clips de video en las alertas (2026-10-12)
+
+Las alertas de merodeo en la puerta peatonal y de apertura del portón del garage guardan un clip MP4 (6 s antes y 6 s después, de las cámaras de la zona) además de la captura. El historial muestra un botón ▶ junto al evento.
+
+- **Alertas · Clip por alerta**: Se arma con el anillo de pre-roll que ya existía (4 cuadros por segundo, resolución nativa reducida a 1280 px), codificado en H.264; no agrega decodificación. Hasta 3 cámaras por evento, 2 codificaciones a la vez.
+- **API · Rutas de clips**: GET /api/clips/recent, GET /api/clips/file/{id} y POST /api/clips/now?cam=... para grabar un clip a demanda. CLIP_TTL_DAYS (90 por defecto) borra los viejos cada hora; CLIPS_ENABLED=false lo apaga.
+
 ## v2.27.0 — Merodeo en la puerta peatonal y presencia por WiFi (2026-10-12)
 
 Nueva zona 'puerta_peatonal' que se dibuja en /zonas: una persona real (confirmada por Clef) que se queda 20 s o más frente a la puerta genera una alerta de merodeo con captura. La asistencia suma la presencia WiFi de cada empleado (UniFi, solo lectura) y se conservan solo las mejores fotos por empleado y cámara.
