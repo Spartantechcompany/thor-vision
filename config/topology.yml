@@ -26,8 +26,8 @@ tuya_window_s: 60                      # tras un movimiento de la Tuya se espera
 trips:                                 # viajes disparados por un evento: se registra TODO el recorrido (entrada: calle > garage > escaleras/Site; salida: al reves)
   window_s: 300
   triggers:
-    garage-abre:                       # puerta peatonal del garage (abre-puertas): alguien entra o sale
-      label: "Se abrió la puerta del garage"
+    garage-abre:                       # portón completo del garage (Tuya): entra o sale un vehículo o alguien con él. La puerta peatonal café la abre SALTO KS (pendiente de integrar)
+      label: "Se abrió el portón del garage"
       cams: [cam-189, cam-191, cam-228, cam-118, cam-236, cam-113, cam-120]
       inner: [cam-228, cam-118, cam-236, cam-113, cam-120]
       window_s: 420
