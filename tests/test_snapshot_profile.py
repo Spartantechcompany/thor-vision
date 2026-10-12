@@ -38,6 +38,12 @@ def test_con_perfil_mjpeg_reintenta_y_lo_recuerda():
     assert g.grab() is not None and len(g._sess.calls) == n + 1 and "Profile=3" in g._sess.calls[-1]      # ya no vuelve a descubrir
 
 
+def test_elige_el_mjpeg_de_mayor_resolucion():
+    g = grabber("Channel.0.Profile.1.EncodingType=MJPEG\nChannel.0.Profile.1.Resolution=800x448\n"
+                "Channel.0.Profile.3.EncodingType=MJPEG\nChannel.0.Profile.3.Resolution=1920x1080\nChannel.0.Profile.2.EncodingType=H264\n")
+    assert g.grab() is not None and g._profile == 3 and "Profile=3" in g._sess.calls[-1]
+
+
 def test_sin_perfil_mjpeg_falla_como_antes_y_no_insiste():
     g = grabber("Channel.0.Profile.1.EncodingType=H265\nChannel.0.Profile.2.EncodingType=H264\n")
     assert g.grab() is None and g._profile is None

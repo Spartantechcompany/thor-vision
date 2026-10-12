@@ -1,5 +1,18 @@
 [
   {
+    "version": "2.31.2",
+    "date": "2026-10-12",
+    "name": "Snapshots con el perfil MJPEG de mayor resolución",
+    "summary": "El lector de snapshots descubre al primer uso el perfil MJPEG de mayor resolución de cada cámara y lo pide de forma explícita (Profile=N), sin depender del predeterminado. En las cámaras se borraron los perfiles de 800x448 y las dos exteriores quedaron con el mismo MJPEG de 1 fps y 4096 kbps.",
+    "highlights": [
+      {
+        "area": "Captura",
+        "title": "Perfiles de las cámaras",
+        "text": "Streams de Thor: H.264 a 30 fps en las 10 cámaras (1920x1080 en las 8 internas y de garage, 2592x1944 en las exteriores). Snapshots: MJPEG de la misma resolución. Respaldos de lo borrado en data/profiles-800x448-backup-20261012.json."
+      }
+    ]
+  },
+  {
     "version": "2.31.1",
     "date": "2026-10-12",
     "name": "Snapshot SUNAPI con perfil MJPEG en las cámaras de 5 MP",

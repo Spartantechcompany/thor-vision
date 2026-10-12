@@ -2,6 +2,12 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.31.2 — Snapshots con el perfil MJPEG de mayor resolución (2026-10-12)
+
+El lector de snapshots descubre al primer uso el perfil MJPEG de mayor resolución de cada cámara y lo pide de forma explícita (Profile=N), sin depender del predeterminado. En las cámaras se borraron los perfiles de 800x448 y las dos exteriores quedaron con el mismo MJPEG de 1 fps y 4096 kbps.
+
+- **Captura · Perfiles de las cámaras**: Streams de Thor: H.264 a 30 fps en las 10 cámaras (1920x1080 en las 8 internas y de garage, 2592x1944 en las exteriores). Snapshots: MJPEG de la misma resolución. Respaldos de lo borrado en data/profiles-800x448-backup-20261012.json.
+
 ## v2.31.1 — Snapshot SUNAPI con perfil MJPEG en las cámaras de 5 MP (2026-10-12)
 
 Las QNO-8010R (Exterior 1 y 2) responden error 604 al pedir snapshot porque no tienen ningún perfil MJPEG. El lector de snapshots ahora busca un perfil MJPEG y, si existe, lo usa con Profile=N; si no, lo registra una sola vez en el log.

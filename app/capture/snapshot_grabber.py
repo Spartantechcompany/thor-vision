@@ -69,9 +69,14 @@ class SnapshotGrabber:
             logger.debug("Snapshot cam=%s: no se pudieron leer los perfiles: %s", self.cam_id, exc)
             return None
         enc = {int(m.group(1)): m.group(2).strip() for m in re.finditer(r"Channel\.0\.Profile\.(\d+)\.EncodingType=(\S+)", t)}
-        found = sorted(k for k, v in enc.items() if v.upper() == "MJPEG")
+        res = {int(m.group(1)): m.group(2).strip() for m in re.finditer(r"Channel\.0\.Profile\.(\d+)\.Resolution=(\S+)", t)}
+
+        def area(k: int) -> int:
+            w, _, h = res.get(k, "0x0").partition("x")
+            return int(w or 0) * int(h or 0) if w.isdigit() and h.isdigit() else 0
+        found = sorted((k for k, v in enc.items() if v.upper() == "MJPEG"), key=lambda k: (-area(k), k))      # el MJPEG de mayor resolucion; a igualdad, el de menor numero
         if found:
-            logger.info("Snapshot cam=%s: usando el perfil MJPEG %d", self.cam_id, found[0])
+            logger.info("Snapshot cam=%s: usando el perfil MJPEG %d (%s)", self.cam_id, found[0], res.get(found[0], "?"))
             return found[0]
         logger.info("Snapshot cam=%s: sin perfil MJPEG (perfiles %s); crea uno en la camara para tener snapshots a resolucion completa", self.cam_id, enc)
         return None
@@ -82,6 +87,8 @@ class SnapshotGrabber:
         with self._lock:
             t0 = time.monotonic()
             bases = [self._base] if self._base else [f"http://{self.host}", f"https://{self.host}"]
+            if not self._profile_checked:                       # perfil MJPEG explicito desde el primer snapshot: asi no depende de cual sea el predeterminado
+                self._profile = self._find_mjpeg_profile(bases[0])
             for base in bases:
                 try:
                     r = self._sess.get(base + _PATH + (f"&Profile={self._profile}" if self._profile else ""), timeout=6)
