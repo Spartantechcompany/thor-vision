@@ -2,6 +2,12 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.32.0 — Video en vivo en el panel (go2rtc, WebRTC) (2026-10-12)
+
+Las tarjetas de cámara muestran video real por WebRTC desde go2rtc en vez de una foto cada 200 ms. Si una cámara no conecta en 8 s o se corta, vuelve sola a las fotos y reintenta a los 15 s. Sin audio ni controles de volumen.
+
+- **Panel · Video en vivo**: Botón 'Video en vivo' sobre la cuadrícula (se recuerda por navegador); ?video=0 lo apaga y ?video=1 lo fuerza. Se pausa con la pestaña oculta. Las 11 fuentes (incluidos videoportero y exteriores a 5 MP) pasan por go2rtc, que solo se conecta a la cámara cuando alguien mira.
+
 ## v2.31.2 — Snapshots con el perfil MJPEG de mayor resolución (2026-10-12)
 
 El lector de snapshots descubre al primer uso el perfil MJPEG de mayor resolución de cada cámara y lo pide de forma explícita (Profile=N), sin depender del predeterminado. En las cámaras se borraron los perfiles de 800x448 y las dos exteriores quedaron con el mismo MJPEG de 1 fps y 4096 kbps.

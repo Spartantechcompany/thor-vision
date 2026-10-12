@@ -192,6 +192,11 @@ main {
 
 .cam-video-wrap { position:relative; width:100%; aspect-ratio:16/9; background:#0a0c10; overflow:hidden; }
 .cam-video-wrap img { width:100%; height:100%; object-fit:contain; display:block; }
+.cam-video-wrap video { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#0a0c10; display:none; pointer-events:none; }
+.cam-card.live .cam-video-wrap video { display:block; }
+.cam-card.live .cam-video-wrap img { visibility:hidden; }
+#live-toggle { margin:0 0 8px; padding:4px 10px; font-size:.74rem; color:var(--text-secondary); background:transparent; border:1px solid var(--border); border-radius:6px; cursor:pointer; }
+#live-toggle.on { color:var(--oxm-blue); border-color:var(--oxm-blue); }
 
 .cam-overlay {
   position:absolute; inset:0;
@@ -1286,6 +1291,7 @@ function initGrid(cameras) {
       </div>
       <div class="cam-video-wrap">
         <img id="img-${cam.id}" alt="${cam.name}" draggable="false">
+        <video id="vid-${cam.id}" muted playsinline autoplay disablepictureinpicture></video>
         <div class="cam-overlay" id="overlay-${cam.id}">
           <span class="overlay-icon">↺</span>
           <span class="overlay-text">Reconectando...</span>
@@ -1318,6 +1324,7 @@ function initGrid(cameras) {
   if (typeof refreshPayloads    === 'function') refreshPayloads();
   // Iniciar polling de snapshots para cada cámara (después de DOM listo)
   cameras.forEach(cam => startSnapshotPolling(cam.id));
+  _initLiveVideo(cameras);
   // Pipeline de detalle de pantallas (experimento, opt-in en el backend
   // vía COWORK_DETAIL_ENABLED) — solo si la cámara existe en este grid.
   initialized = true;
@@ -1367,7 +1374,7 @@ function updateCard(cam) {
     overlay.classList.add('visible');
   }
   // Si vuelve a streaming, reiniciar polling si estaba detenido
-  if (state === 'streaming' && (!_pollers[cam.id] || !_pollers[cam.id].running)) {
+  if (state === 'streaming' && (!_pollers[cam.id] || !_pollers[cam.id].running) && !(_live[cam.id] && _live[cam.id].on)) {
     startSnapshotPolling(cam.id);
   }
 }
@@ -1385,6 +1392,78 @@ const POLL_INTERVAL_MS = LITE ? 1000 : 200;   // 5 fps por cámara — suficient
 const _pollers = {};            // cam_id → { running, errors }
 const _offscreen = new Set();   // tarjetas fuera de la ventana visible (no se les pide imagen)
 const _visObs = ('IntersectionObserver' in window) ? new IntersectionObserver(es => es.forEach(e => { const id = e.target.dataset.camId; if (!id) return; e.isIntersecting ? _offscreen.delete(id) : _offscreen.add(id); }), { rootMargin: '150px' }) : null;
+
+// ══════════════════════════════════════════════════════════════
+// VIDEO EN VIVO (go2rtc, WebRTC): reemplaza las fotos cada 200 ms; si falla una camara vuelve sola a las fotos y reintenta.
+// Sin audio ni controles de volumen (las camaras no tienen). ?video=0 lo apaga, ?video=1 lo fuerza; el boton lo recuerda por navegador.
+// ══════════════════════════════════════════════════════════════
+const GO2RTC = `${location.protocol}//${location.hostname}:1984`;
+let LIVE_ON = !LITE && (localStorage.getItem('thor_live_video') ?? '1') === '1';
+if (/[?&]video=0/.test(location.search)) LIVE_ON = false;
+if (/[?&]video=1/.test(location.search)) LIVE_ON = true;
+const _live = {};      // camId -> { pc, on, timer }
+
+function _setLive(camId, on){
+  const card = document.getElementById(`img-${camId}`)?.closest('.cam-card');
+  if (card) card.classList.toggle('live', on);
+}
+async function startLive(camId){
+  stopLive(camId, false);
+  const v = document.getElementById(`vid-${camId}`);
+  if (!v || !window.RTCPeerConnection) return;
+  const st = _live[camId] = { pc: null, on: false, timer: null };
+  try {
+    const pc = new RTCPeerConnection({ iceServers: [] });
+    st.pc = pc;
+    pc.addTransceiver('video', { direction: 'recvonly' });
+    pc.ontrack = e => { v.srcObject = (e.streams && e.streams[0]) || new MediaStream([e.track]); };
+    pc.onconnectionstatechange = () => { if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) liveFail(camId); };
+    await pc.setLocalDescription(await pc.createOffer());
+    await new Promise(res => {
+      if (pc.iceGatheringState === 'complete') return res();
+      const t = setTimeout(res, 1500);
+      pc.onicegatheringstatechange = () => { if (pc.iceGatheringState === 'complete'){ clearTimeout(t); res(); } };
+    });
+    const r = await fetch(`${GO2RTC}/api/webrtc?src=${encodeURIComponent(camId)}`, { method: 'POST', headers: { 'Content-Type': 'application/sdp' }, body: pc.localDescription.sdp });
+    if (!r.ok) throw new Error('go2rtc ' + r.status);
+    await pc.setRemoteDescription({ type: 'answer', sdp: await r.text() });
+    v.onplaying = () => { st.on = true; _setLive(camId, true); stopSnapshotPolling(camId); };
+    st.timer = setTimeout(() => { if (!st.on) liveFail(camId); }, 8000);
+  } catch (e) { liveFail(camId); }
+}
+function stopLive(camId, resume = true){
+  const st = _live[camId];
+  if (!st) return;
+  clearTimeout(st.timer);
+  try { st.pc && st.pc.close(); } catch (e) {}
+  _setLive(camId, false);
+  delete _live[camId];
+  const v = document.getElementById(`vid-${camId}`);
+  if (v) v.srcObject = null;
+  if (resume && (!_pollers[camId] || !_pollers[camId].running)) startSnapshotPolling(camId);
+}
+function liveFail(camId){
+  if (!_live[camId]) return;
+  stopLive(camId, true);                                   // vuelve a las fotos
+  setTimeout(() => { if (LIVE_ON && !document.hidden && !_live[camId]) startLive(camId); }, 15000);
+}
+function _initLiveVideo(cameras){
+  if (!document.getElementById('live-toggle')){
+    const b = document.createElement('button');
+    b.id = 'live-toggle'; b.type = 'button';
+    const paint = () => { b.textContent = LIVE_ON ? 'Video en vivo: sí' : 'Video en vivo: no'; b.classList.toggle('on', LIVE_ON); };
+    b.addEventListener('click', () => {
+      LIVE_ON = !LIVE_ON;
+      try { localStorage.setItem('thor_live_video', LIVE_ON ? '1' : '0'); } catch (e) {}
+      paint();
+      cameras.forEach(c => LIVE_ON ? startLive(c.id) : stopLive(c.id, true));
+    });
+    paint();
+    document.getElementById('cam-grid').before(b);
+    document.addEventListener('visibilitychange', () => cameras.forEach(c => (document.hidden || !LIVE_ON) ? stopLive(c.id, !document.hidden ? true : false) : startLive(c.id)));
+  }
+  if (LIVE_ON) cameras.forEach(c => startLive(c.id));
+}
 
 function startSnapshotPolling(camId) {
   if (_pollers[camId]) _pollers[camId].running = false;
