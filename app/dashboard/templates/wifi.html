@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Presencia WiFi</title>
+<style>
+:root{--bg:#0e1117;--card:#161b22;--line:#2a3140;--tx:#e8edf3;--mut:#8b96a8;--g:#76B900}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px system-ui,sans-serif;padding:16px}
+h1{font-size:18px;margin:0 0 4px}p{color:var(--mut);margin:0 0 14px;max-width:760px}
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left}th{color:var(--mut);font-weight:500}
+select,button{background:#0e1117;color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+button:hover{border-color:var(--g)}.on{color:var(--g)}.off{color:var(--mut)}.row-assigned td:first-child{border-left:3px solid var(--g)}
+</style></head><body>
+<h1>Presencia WiFi de empleados</h1>
+<p>Dispositivos conectados al WiFi (datos de UniFi, solo lectura). Asigna cada celular o laptop a su dueño de la base de empleados: la asistencia suma esa presencia a la de las cámaras.
+Marca como "ignorar" lo que no sea de una persona (TV, impresoras, invitados). Solo asigna equipos de personal que ya firmó el aviso de privacidad.</p>
+<table><thead><tr><th>Dispositivo</th><th>MAC</th><th>Estado</th><th>Empleado</th><th></th></tr></thead><tbody id="b"></tbody></table>
+<script>
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let emps = [];
+async function load(){
+  emps = (await (await fetch('/api/wifi/employees')).json()).employees;
+  const d = (await (await fetch('/api/wifi/devices')).json()).devices;
+  document.getElementById('b').innerHTML = d.map(x => `<tr class="${x.subject_id ? 'row-assigned' : ''}" data-mac="${esc(x.mac)}">
+    <td>${esc(x.name) || '(sin nombre)'}<br><span class="off">${esc(x.ip)}</span></td><td>${esc(x.mac)}</td>
+    <td class="${x.online ? 'on' : 'off'}">${x.online ? 'conectado' : 'fuera'}</td>
+    <td><select ${x.ignore ? 'disabled' : ''}><option value="">—</option>${emps.map(e => `<option value="${e.id}" ${e.id === x.subject_id ? 'selected' : ''}>${esc(e.name)}</option>`).join('')}</select></td>
+    <td><button data-a="ign">${x.ignore ? 'Dejar de ignorar' : 'Ignorar'}</button></td></tr>`).join('');
+}
+document.getElementById('b').addEventListener('change', async e => {
+  const tr = e.target.closest('tr'); if (!e.target.matches('select')) return;
+  await fetch('/api/wifi/devices/' + tr.dataset.mac, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({subject_id: e.target.value ? +e.target.value : null})});
+  load();
+});
+document.getElementById('b').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-a=ign]'); if (!b) return;
+  const tr = b.closest('tr'), now = b.textContent.trim() === 'Ignorar';
+  await fetch('/api/wifi/devices/' + tr.dataset.mac, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ignore: now, subject_id: null})});
+  load();
+});
+load();
+</script></body></html>

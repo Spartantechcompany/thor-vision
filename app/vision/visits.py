@@ -18,6 +18,8 @@ from typing import Optional
 import cv2
 import numpy as np
 
+from app.vision import zones as zones_mod
+
 logger = logging.getLogger(__name__)
 
 
@@ -181,6 +183,8 @@ class Track:
         self.person_p: Optional[float] = None        # Clef: probabilidad de que el recorte sea una persona real
         self.ver_q = 0.0                              # calidad del cuerpo con el que se verifico
         self.ver_pending = False
+        self.door_first = self.door_last = None      # primera y ultima vez que su punto base cayo en una zona 'puerta_peatonal'
+        self.door_alerted = False
 
     def still_spot(self):
         """(cx, cy, tam) si el track casi no se movio en toda su vida (arbol, poste, sombra); si no, None."""
@@ -215,6 +219,7 @@ INDOOR_GHOST_S = float(os.environ.get("INDOOR_GHOST_S", "15"))        # en inter
 GHOST_MIN = int(os.environ.get("GHOST_MIN", "3"))                 # tantos tracks inmoviles sin cara en el mismo punto = objeto fijo (arbol)
 GHOST_WINDOW_S = float(os.environ.get("GHOST_WINDOW_S", "21600"))
 VERIFY_MIN_P = float(os.environ.get("CLEF_PERSON_MIN_P", "0.20"))       # Clef: por debajo de esta probabilidad de "persona real" la visita es un falso (arbol, poste, sombra)
+DOOR_DWELL_S = float(os.environ.get("DOOR_DWELL_S", "20"))              # segundos frente a la puerta peatonal para contar como merodeo
 VERIFY_MIN_HITS = int(os.environ.get("CLEF_VERIFY_MIN_HITS", "4"))
 
 
@@ -240,6 +245,7 @@ class VisitManager:
                       "pre_bursts": 0, "pre_frames": 0, "best_pre": 0, "best_snap": 0, "best_stream": 0}
         self.any_cb = None      # callable(cam_id, dict): toda visita cerrada (armado absoluto)
         self.burst_cb = None    # callable(cam_id, reason): pide analisis retroactivo del pre-roll
+        self.zone_cb = None     # callable(cam_id, dict): persona que merodea frente a la puerta peatonal
         self.trips_attend = None    # callable(cam_id) -> bool: un viaje abierto sigue esta camara (sube el fps de YOLO)
         self.verifier = None    # ClefClient: confirma que el recorte de una visita sin cara es una persona real
         self._ver_q: queue.Queue = queue.Queue(maxsize=40)
@@ -274,6 +280,28 @@ class VisitManager:
             tr.ver_pending = True
         except queue.Full:
             pass
+
+    def _door_dwell(self, cam_id, tr: Track, pb, frame, persons, ts, result) -> None:
+        """Persona real cuyo punto base esta en la zona de la puerta peatonal DOOR_DWELL_S segundos o mas: merodeo (una alerta por track)."""
+        if self.zone_cb is None or tr.door_alerted or tr.static:
+            return
+        fw, fh = getattr(result, "frame_w", 0) or 0, getattr(result, "frame_h", 0) or 0
+        if not fw or not fh or not zones_mod.contains(cam_id, ("puerta_peatonal",), pb, fw, fh):
+            return
+        tr.door_first = ts if tr.door_first is None else tr.door_first
+        tr.door_last = ts
+        if tr.door_last - tr.door_first < DOOR_DWELL_S or tr.hits < MIN_HITS:
+            return
+        if self.verifier is not None and (tr.person_p is None or tr.person_p < 0.5) and tr.n_face == 0:
+            return                                   # Clef aun no confirmo que sea una persona (o dijo que no): un arbol junto a la pared no merodea
+        tr.door_alerted = True
+        name, _ = self._known_name(tr)
+        info = {"visit_id": tr.visit_id, "subject_id": tr.subject_id, "name": name, "dwell_s": int(tr.door_last - tr.door_first), "first_ts": tr.first_ts,
+                "scene": _scene_with_box(frame, tuple(pb), [o for o in persons if o is not pb]) if frame is not None else tr.scene, "face": tr.face, "body": tr.body}
+        try:
+            self.zone_cb(cam_id, info)
+        except (KeyError, TypeError, ValueError, OSError) as exc:
+            logger.warning("zone_cb: %s", exc)
 
     def _ver_loop(self) -> None:
         names = {}
@@ -332,6 +360,8 @@ class VisitManager:
                 if frame is not None:
                     self._body_candidate(tr, frame, pb, [o for o in persons if o is not pb])
                     self._maybe_verify(cam_id, tr)
+                    if src != "pre":
+                        self._door_dwell(cam_id, tr, pb, frame, persons, ots, result)
                     if src != "pre":
                         self._maybe_snapshot(cam_id, tr, pb, frame, now)
             for face in (result.faces or []):

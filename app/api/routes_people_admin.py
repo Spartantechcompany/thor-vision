@@ -336,6 +336,9 @@ def build_attendance(request: Request, date: Optional[str]) -> dict:
         pend = db._conn.execute(
             "SELECT COUNT(DISTINCT v.subject_id) FROM person_visits v JOIN subjects s ON s.id=v.subject_id WHERE s.category='revisar' "
             "AND v.fp=0 AND v.static=0 AND v.start_ts>=? AND v.start_ts<?", (t0, t1)).fetchone()[0]
+    from app.api import routes_wifi
+    routes_wifi._db(request)                                       # crea las tablas de WiFi si aun no existen
+    wifi = routes_wifi.presence_by_employee(db, t0, t1)
     by: dict = {}
     for sid, cam, a, b in vis:
         by.setdefault(sid, []).append((a, b, cam))
@@ -361,7 +364,11 @@ def build_attendance(request: Request, date: Optional[str]) -> dict:
                 status = "deberia estar"
             elif inside and sec > usual["out"] + 3600:
                 status = "se quedo"
-        rows.append({"id": sid, "name": name, "usual_in": _hm(usual["in"]) if usual else None, "usual_out": _hm(usual["out"]) if usual else None,
+        wf = [wifi[x] for x, _ in members if x in wifi]
+        rows.append({"wifi_first_ts": min((w["first"] for w in wf), default=None), "wifi_last_ts": max((w["last"] for w in wf), default=None),
+                     "wifi_minutes": max((w["minutes"] for w in wf), default=0), "wifi_devices": sorted({d for w in wf for d in w["devices"]}),
+                     "attended_any": bool(v) or bool(wf),
+                     "id": sid, "name": name, "usual_in": _hm(usual["in"]) if usual else None, "usual_out": _hm(usual["out"]) if usual else None,
                      "usual_days": usual["days"] if usual else 0, "status": status,
                      "present": inside, "attended": bool(v), "left": left, "exit_ts": last_out if left else None,
                      "first_ts": min((a for a, _, _ in v), default=None),
@@ -386,10 +393,10 @@ def attendance_csv(request: Request, date: Optional[str] = None):
     d = build_attendance(request, date)
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["fecha", "empleado", "presente", "primera_vez", "ultima_vez", "minutos_en_oficina", "camaras"])
+    w.writerow(["fecha", "empleado", "presente", "primera_vez", "ultima_vez", "minutos_en_oficina", "camaras", "wifi_primera", "wifi_ultima", "wifi_minutos"])
     hm = lambda ts: time.strftime("%H:%M", time.localtime(ts)) if ts else ""
     for e in d["employees"]:
-        w.writerow([d["date"], e["name"], "si" if e["present"] else "no", hm(e["first_ts"]), hm(e["last_ts"]), e["minutes"], "; ".join(e["cams"])])
+        w.writerow([d["date"], e["name"], "si" if e["present"] else "no", hm(e["first_ts"]), hm(e["last_ts"]), e["minutes"], "; ".join(e["cams"]), hm(e.get("wifi_first_ts")), hm(e.get("wifi_last_ts")), e.get("wifi_minutes", 0)])
     return Response(buf.getvalue(), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="asistencia_{d["date"]}.csv"'})
 

@@ -4,6 +4,7 @@ Tipos:
   ignorar_objetos  YOLO descarta autos/perros/bolsas... cuyo punto base cae dentro (falsos positivos fijos: una palmera, una sombra)
   ignorar_todo     igual, pero tambien personas
   estacionamiento  solo se registran vehiculos estacionados dentro de estas zonas (si la camara tiene alguna)
+  puerta_peatonal  frente a la puerta peatonal: una persona real que se queda ahi DOOR_DWELL_S segundos es merodeo (alerta con captura)
   nota             texto fijo para el VLM: "esto siempre esta ahi, no lo describas ni alertes por ello"
 
 Se guardan en data/zones.json (se relee solo cuando cambia el archivo).
@@ -17,7 +18,7 @@ import time
 logger = logging.getLogger(__name__)
 
 PATH = os.environ.get("ZONES_PATH", "/app/data/zones.json")
-TYPES = ("ignorar_objetos", "ignorar_todo", "estacionamiento", "nota")
+TYPES = ("ignorar_objetos", "ignorar_todo", "estacionamiento", "nota", "puerta_peatonal")
 MAX_ZONES_PER_CAM = 30
 MAX_POINTS = 60
 

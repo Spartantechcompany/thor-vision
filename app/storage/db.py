@@ -140,6 +140,17 @@ CREATE INDEX IF NOT EXISTS idx_pv_cam     ON person_visits(cam_id, start_ts);
 """
 
 
+def prune_employee_images(conn, cutoff: float, keep: int = 5) -> int:
+    """Para cada empleado y camara conserva las `keep` mejores visitas con imagen (cara primero, luego cuerpo) y borra face/body/scene de las
+    demas visitas anteriores a `cutoff`. Las mejores nunca caducan; las filas (hora, camara, embeddings) se conservan para asistencia e identidad."""
+    return conn.execute(
+        "UPDATE person_visits SET face=NULL, body=NULL, scene=NULL WHERE start_ts < ? AND (face IS NOT NULL OR body IS NOT NULL OR scene IS NOT NULL) "
+        "AND subject_id IN (SELECT id FROM subjects WHERE category='empleado') AND id NOT IN ("
+        " SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY subject_id, cam_id ORDER BY (face IS NOT NULL) DESC, COALESCE(face_score,0) DESC, "
+        "COALESCE(body_score,0) DESC) AS rn FROM person_visits WHERE (face IS NOT NULL OR body IS NOT NULL) AND subject_id IN "
+        "(SELECT id FROM subjects WHERE category='empleado')) WHERE rn <= ?)", (cutoff, keep)).rowcount
+
+
 class EventDB:
     """SQLite event store thread-safe."""
 
@@ -861,6 +872,13 @@ class EventDB:
                     result["captures_purged"] = c3
                 if c1 or c2:
                     result["ttl_deleted"] = {"person_visits": c1, "face_sightings": c2}
+
+            # 7) empleados: solo las mejores fotos por camara para entrenar; el resto de imagenes viejas se descarta (la fila queda para la asistencia)
+            keep_best = int(os.environ.get("EMPLOYEE_KEEP_BEST", "5"))
+            if keep_best > 0:
+                pruned = prune_employee_images(self._conn, time.time() - float(os.environ.get("EMPLOYEE_PRUNE_DAYS", "7")) * 86400, keep_best)
+                if pruned:
+                    result["employee_images_pruned"] = pruned
 
             try:
                 self._conn.execute("DELETE FROM ev_fts WHERE rowid < COALESCE((SELECT MIN(id) FROM events), 0)")

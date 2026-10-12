@@ -248,6 +248,28 @@ async def lifespan(app: FastAPI):
                 logger.warning("armado: no se pudo guardar la captura: %s", exc)
     if visit_manager is not None:
         visit_manager.any_cb = _armed_alert
+
+        def _door_loiter(cam_id, v, _snap=snapshots, _db=db, _names={c.id: c.name for c in config.cameras}):
+            """Merodeo frente a la puerta peatonal (zona dibujada): alerta con captura; el personal conocido no alerta."""
+            if v.get("name"):
+                return
+            import cv2
+            import time
+            import numpy as np
+            h = time.localtime().tm_hour
+            night = h >= 22 or h < 6
+            txt = f"Merodeo frente a la puerta peatonal ({_names.get(cam_id, cam_id)}): persona {v['dwell_s']} s en la zona"
+            eid = _db.insert_event("nemotron", cam_id, {"schema": 2, "source": "zona", "people": 1, "persons": [], "vehicles": 0, "activity": txt, "scene": "",
+                                                        "relevant": True, "alerts": [txt], "alert_types": ["merodeo_puerta"], "severity": "high" if night else "medium",
+                                                        "confidence": "high", "visit": {"visit_id": v.get("visit_id"), "subject_id": v.get("subject_id")}}, people=1, has_alert=True)
+            img = v.get("scene") or v.get("body") or v.get("face")
+            frame = cv2.imdecode(np.frombuffer(img, np.uint8), cv2.IMREAD_COLOR) if isinstance(img, (bytes, bytearray)) else img
+            if frame is not None and _snap is not None:
+                try:
+                    _snap.save(cam_id, frame, "merodeo", event_id=eid)
+                except (OSError, ValueError, cv2.error) as exc:
+                    logger.warning("merodeo puerta: sin captura: %s", exc)
+        visit_manager.zone_cb = _door_loiter
     app.state.doorbell = None
     for _dc in _door_cams:
         _cfg = next((c for c in config.cameras if c.id == _dc), None)
@@ -444,6 +466,8 @@ app.include_router(extras_router)
 from app.api.routes_people_admin import router as people_admin_router  # noqa: E402
 app.include_router(people_admin_router)
 from app.api.routes_zones import router as zones_router
+from app.api.routes_wifi import router as wifi_router
+app.include_router(wifi_router)
 app.include_router(zones_router)
 from app.api.routes_onvif import router as onvif_router
 app.include_router(onvif_router)
@@ -506,6 +530,11 @@ async def onvif_page(request: Request):
 @app.get("/zonas", response_class=HTMLResponse)
 async def zones_page(request: Request):
     return templates.TemplateResponse("zones.html", {"request": request})
+
+
+@app.get("/wifi", response_class=HTMLResponse)
+async def wifi_page(request: Request):
+    return templates.TemplateResponse("wifi.html", {"request": request})
 
 
 @app.get("/tv", response_class=HTMLResponse)

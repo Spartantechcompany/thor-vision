@@ -2,6 +2,14 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.27.0 — Merodeo en la puerta peatonal y presencia por WiFi (2026-10-12)
+
+Nueva zona 'puerta_peatonal' que se dibuja en /zonas: una persona real (confirmada por Clef) que se queda 20 s o más frente a la puerta genera una alerta de merodeo con captura. La asistencia suma la presencia WiFi de cada empleado (UniFi, solo lectura) y se conservan solo las mejores fotos por empleado y cámara.
+
+- **Alertas · Merodeo en la puerta**: Alerta merodeo_puerta (alta de noche). No alertan los empleados conocidos ni lo que Clef no confirma como persona (árboles junto a la pared). DOOR_DWELL_S ajusta los segundos.
+- **Asistencia · Presencia WiFi**: El lector de UniFi en oapc-devops envía cada 3 min los clientes WiFi a /api/wifi/clients; en /wifi se asigna cada dispositivo a un empleado. /api/attendance y el CSV traen wifi_primera, wifi_ultima y wifi_minutos aunque la cámara no vea a la persona.
+- **Privacidad · Fotos de empleados**: Se conservan las 5 mejores (cara primero) por empleado y cámara; las imágenes de visitas con más de 7 días se descartan (EMPLOYEE_KEEP_BEST, EMPLOYEE_PRUNE_DAYS). Las filas quedan para asistencia e identidad.
+
 ## v2.26.0 — Viajes disparados por la puerta del garage y el videoportero (2026-10-12)
 
 Cuando se abre la puerta peatonal del garage o llega alguien al videoportero se abre un viaje: las cámaras del recorrido suben a más fps, se reanalizan los segundos previos y, al vencer la ventana, queda una alerta con la dirección (entra o sale), la cadena de cámaras y un mosaico.
