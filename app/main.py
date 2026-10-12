@@ -180,6 +180,33 @@ async def lifespan(app: FastAPI):
             motion_monitors[cam.id] = m
     app.state.motion_monitors = motion_monitors
 
+    def _line_cross(cam_id, _names={c.id: c.name for c in config.cameras}):
+        """La linea virtual IVA de la camara se cruzo: si YOLO ve una persona en los segundos siguientes, alerta con captura y clip."""
+        import cv2
+        import time
+        time.sleep(3.0)                                         # YOLO sube a 2 fps con el movimiento; se le da tiempo de confirmar
+        det = detection_store.get(cam_id)
+        if det is None or not (det.yolo_persons and time.time() - (det.yolo_ts or 0) < 8):
+            return
+        h = time.localtime().tm_hour
+        txt = f"Cruce de la línea virtual en {_names.get(cam_id, cam_id)}: {det.yolo_persons} persona(s)"
+        eid = db.insert_event("nemotron", cam_id, {"schema": 2, "source": "iva", "people": det.yolo_persons, "persons": [], "vehicles": 0, "activity": txt, "scene": "",
+                                                    "relevant": True, "alerts": [txt], "alert_types": ["cruce_linea"], "severity": "medium" if (h >= 22 or h < 6) else "low",
+                                                    "confidence": "medium"}, people=det.yolo_persons, has_alert=True)
+        buf = manager._buffers.get(cam_id)
+        fe = buf.peek_latest() if buf is not None else None
+        frame = getattr(fe, "frame", fe)
+        if frame is not None:
+            try:
+                snapshots.save(cam_id, frame, "linea", event_id=eid)
+            except (OSError, ValueError, cv2.error) as exc:
+                logger.warning("cruce de linea: sin captura: %s", exc)
+        _cl = getattr(app.state, "clips", None)
+        if _cl is not None:
+            _cl.request(eid, [cam_id])
+    for _m in motion_monitors.values():
+        _m.cross_cb = _line_cross
+
     yolo_workers = []
     for cam in config.enabled_cameras:
         buf = manager._buffers.get(cam.id)

@@ -41,6 +41,7 @@ DEFS = {
     "timbre_videoportero": "alguien tocó el timbre del videoportero (con captura del visitante cercano)",
     "entrada_sin_captura": "un aviso de entrada (Tuya o sensor) sin persona vista en la cámara que debía verla",
     "merodeo_puerta": "persona real (verificada) que permanece 20 s o más en la zona 'puerta_peatonal' dibujada en /zonas; el personal conocido no alerta",
+    "cruce_linea": "la línea virtual IVA de la cámara (Hanwha, VideoAnalytics.Passing) se cruzó y YOLO confirma una persona; con captura y clip",
     "viaje_puerta": "recorrido completo tras abrirse la puerta del garage o llegar alguien al videoportero: cámaras, dirección (entra o sale) y mosaico",
     "movimiento_tuya": "movimiento detectado por una cámara Tuya (una alerta por cámara cada 120 s)",
     "ruido_tuya": "ruido fuerte detectado por una cámara Tuya",

@@ -2,6 +2,12 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.31.0 — Alerta por cruce de la línea virtual de la cámara (2026-10-12)
+
+El cruce de la línea virtual IVA de las cámaras Hanwha (evento VideoAnalytics.Passing por SUNAPI) genera la alerta cruce_linea cuando YOLO confirma una persona, con captura y clip.
+
+- **Alertas · cruce_linea**: Flanco de subida del evento de cruce con enfriamiento de 15 s; 3 s después se revisa que YOLO vea una persona (los autos y hojas no alertan). Severidad media de noche. Hoy la línea está en Exterior 1 (a lo largo del muro, ambas direcciones).
+
 ## v2.30.1 — Garage frontal cuenta como salida de las mascotas (2026-10-12)
 
 Garage frontal pasa a contar como 'fuera de la casa' para la presencia de mascotas, junto a Exterior 1, Exterior 2 y el videoportero.

@@ -61,6 +61,9 @@ class CameraMotionMonitor(threading.Thread):
         self._last_rise_ts = 0.0
         self._last_end_ts = 0.0
         self._rises: deque = deque(maxlen=2000)
+        self.cross_cb = None              # callable(cam_id): flanco de subida de VideoAnalytics.Passing (cruce de la linea virtual IVA)
+        self._passing = False
+        self._cross_ts = 0.0
 
     def _get(self, path: str, timeout: float = 4.0) -> str:
         r = self._sess.get(f"{self._base}/stw-cgi/{path}", timeout=timeout)
@@ -96,6 +99,11 @@ class CameraMotionMonitor(threading.Thread):
         active = "Channel.0.MotionDetection=True" in t or any(
             f"{k}=True" in t for k in _VA_KEYS
         )
+        passing = "Channel.0.VideoAnalytics.Passing=True" in t
+        if passing and not self._passing and self.cross_cb is not None and now - self._cross_ts > 15.0:
+            self._cross_ts = now
+            threading.Thread(target=self._fire_cross, daemon=True, name=f"cross-{self.cam_id}").start()
+        self._passing = passing
         with self._lock:
             if active and not self._active:
                 self._since = now
@@ -106,6 +114,12 @@ class CameraMotionMonitor(threading.Thread):
             self._active = active
             self._reachable = True
             self._last_ok_t = now
+
+    def _fire_cross(self) -> None:
+        try:
+            self.cross_cb(self.cam_id)
+        except Exception as exc:          # noqa: BLE001 - un fallo del aviso no debe frenar el sondeo
+            logger.warning("CameraMotion cam=%s: cruce de linea: %s", self.cam_id, exc)
 
     def run(self) -> None:
         last_cfg = 0.0
