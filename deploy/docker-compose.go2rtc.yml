@@ -1,0 +1,11 @@
+# Piloto de go2rtc: re-emite el RTSP H.264 de una camara a WebRTC/MSE/HLS para el navegador, sin transcodificar.
+# Config (con las credenciales de la camara) en data/go2rtc/go2rtc.yaml, permisos 600, NO va al repositorio.
+#   docker compose -f docker-compose.go2rtc.yml up -d      ->  http://192.168.0.10:1984
+services:
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: thor-go2rtc
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./data/go2rtc:/config
