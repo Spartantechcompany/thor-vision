@@ -1402,6 +1402,7 @@ let LIVE_ON = !LITE && (localStorage.getItem('thor_live_video') ?? '1') === '1';
 if (/[?&]video=0/.test(location.search)) LIVE_ON = false;
 if (/[?&]video=1/.test(location.search)) LIVE_ON = true;
 const _live = {};      // camId -> { pc, on, timer }
+const LIVE_SKIP = new Set(['cam-vto']);   // el videoportero solo admite una sesion RTSP: se queda con las fotos
 
 function _setLive(camId, on){
   const card = document.getElementById(`img-${camId}`)?.closest('.cam-card');
@@ -1410,7 +1411,7 @@ function _setLive(camId, on){
 async function startLive(camId){
   stopLive(camId, false);
   const v = document.getElementById(`vid-${camId}`);
-  if (!v || !window.RTCPeerConnection) return;
+  if (!v || !window.RTCPeerConnection || LIVE_SKIP.has(camId)) return;
   const st = _live[camId] = { pc: null, on: false, timer: null };
   try {
     const pc = new RTCPeerConnection({ iceServers: [] });
