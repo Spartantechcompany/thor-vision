@@ -240,6 +240,7 @@ class VisitManager:
                       "pre_bursts": 0, "pre_frames": 0, "best_pre": 0, "best_snap": 0, "best_stream": 0}
         self.any_cb = None      # callable(cam_id, dict): toda visita cerrada (armado absoluto)
         self.burst_cb = None    # callable(cam_id, reason): pide analisis retroactivo del pre-roll
+        self.trips_attend = None    # callable(cam_id) -> bool: un viaje abierto sigue esta camara (sube el fps de YOLO)
         self.verifier = None    # ClefClient: confirma que el recorte de una visita sin cara es una persona real
         self._ver_q: queue.Queue = queue.Queue(maxsize=40)
         self._models = None
@@ -301,8 +302,10 @@ class VisitManager:
                     len(self._grabbers), SNAP_MIN_INTERVAL_S, SNAP_MAX_PER_VISIT, FACE_MAX_YAW)
 
     def needs_faces(self, cam_id: str) -> bool:
-        """True si hay una persona reciente en la camara sin un buen rostro todavia (sube el fps de YOLO)."""
+        """True si hay una persona reciente en la camara sin un buen rostro todavia (sube el fps de YOLO), o un viaje abierto la sigue."""
         now = time.time()
+        if self.trips_attend is not None and self.trips_attend(cam_id):
+            return True
         for tr in list(self._tracks.get(cam_id, ())):
             if (not tr.good_face and not tr.static and now - tr.last_ts < 6.0
                     and now - tr.first_ts < HUNT_MAX_S):

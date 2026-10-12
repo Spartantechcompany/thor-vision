@@ -210,3 +210,14 @@ def clef_status(request: Request):
     except (OSError, ValueError):
         out["server"] = None
     return out
+
+
+@router.get("/api/trips")
+def trips_list(request: Request, limit: int = 30):
+    """Viajes disparados por eventos (puerta del garage, videoportero): direccion, visitas y alerta asociada."""
+    db = _db(request)
+    with db._lock:
+        rows = db._conn.execute("SELECT id, start_ts, end_ts, alias, label, direction, n_visits, journey_id, event_id, status FROM trips ORDER BY id DESC LIMIT ?",
+                                (min(max(limit, 1), 200),)).fetchall()
+    keys = ("id", "start_ts", "end_ts", "alias", "label", "direction", "n_visits", "journey_id", "event_id", "status")
+    return {"trips": [dict(zip(keys, r)) for r in rows]}

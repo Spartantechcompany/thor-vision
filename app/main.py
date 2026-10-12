@@ -225,6 +225,9 @@ async def lifespan(app: FastAPI):
     _door_cams = [c.strip() for c in os.environ.get("DOORBELL_CAMS", "cam-vto").split(",") if c.strip()]
     def _armed_alert(cam_id, v, _snap=snapshots, _db=db, _names={c.id: c.name for c in config.cameras}):
         """Armado absoluto: cada visita que cierra es una alerta con su captura (escena, cuerpo o cara)."""
+        _tr = getattr(app.state, "trips", None)
+        if _tr is not None and cam_id == "cam-vto":
+            _tr.start("vto-visita", v["first_ts"])          # alguien llego al videoportero: se sigue su recorrido hacia adentro
         from app.vision import arming
         if not arming.is_absolute():
             return
@@ -275,6 +278,24 @@ async def lifespan(app: FastAPI):
             _j.tuya_event(alias, ts)
             for cam in _j._entry_cams(alias):
                 _vq.submit_burst(cam, "tuya")          # reanaliza el pre-roll de las camaras de entrada: la persona puede estar entrando
+        app.state.trips = None
+        if os.environ.get("TRIPS_ENABLED", "true").lower() == "true":
+            from app.vision.trips import Trips
+            app.state.trips = Trips(db, snapshots, app.state.journeys.topo, app.state.journeys.cam_names)
+            app.state.trips_stop = app.state.trips.start_sweeper()
+            if visit_manager is not None:
+                visit_manager.trips_attend = app.state.trips.attending
+
+        def _trip_trigger(alias, ts, _tr=lambda: app.state.trips, _vq=vision_queue):
+            tr = _tr()
+            if tr is not None and tr.start(alias, ts) is not None:
+                for cam in tr.cams_for(alias):
+                    _vq.submit_burst(cam, "viaje")          # el recorrido puede haber empezado ya: se reanalizan los ultimos segundos
+        _motion_only = _tuya_motion
+
+        def _tuya_motion(alias, ts, _m=_motion_only):
+            _m(alias, ts)
+            _trip_trigger(alias, ts)
         app.state.iot.on_motion = _tuya_motion
 
         def _light_moved(dev, ts, _vq=vision_queue):

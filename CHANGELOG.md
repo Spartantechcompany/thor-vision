@@ -2,6 +2,14 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.26.0 — Viajes disparados por la puerta del garage y el videoportero (2026-10-12)
+
+Cuando se abre la puerta peatonal del garage o llega alguien al videoportero se abre un viaje: las cámaras del recorrido suben a más fps, se reanalizan los segundos previos y, al vencer la ventana, queda una alerta con la dirección (entra o sale), la cadena de cámaras y un mosaico.
+
+- **Viajes · Recorrido por evento**: config/topology.yml > trips define, por disparador, las cámaras que lo siguen y cuáles son 'de adentro'. Entrada = calle > garage > escaleras/Site; salida = al revés. Alerta 'viaje_puerta' y GET /api/trips.
+- **Viajes · Personas separadas**: Se respetan los viajes por persona que ya enlaza el sistema: dos personas a la vez no se funden. Primero las entradas/salidas; el movimiento interno se cuenta aparte. El timbre sin nadie que entre no genera alerta.
+- **Validación · Repetición con datos reales**: La apertura del garage del 11-oct 15:30 se reproduce como 'entrada: Exterior 1 > Exterior 2 > Exterior 1 > Garage frontal' más 24 movimientos internos.
+
 ## v2.25.0 — Clef-flash: verificador de personas (2026-10-12)
 
 Clef-flash (Cloudflare, 9B, Apache-2.0) corre local en Thor como servidor de decisiones y confirma que cada visita sin cara es una persona real; los árboles, postes y sombras que YOLO tomaba por persona se descartan antes de generar alertas.

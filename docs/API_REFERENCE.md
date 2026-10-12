@@ -397,6 +397,12 @@ La documentacion interactiva esta en `/docs`. Guia de uso y significado de los d
 |---|---|---|---|---|
 | GET | `/api/timeline` | Timeline | `since`, `until`, `cam_id` |  |
 
+## trips
+
+| Metodo | Ruta | Resumen | Parametros | Cuerpo |
+|---|---|---|---|---|
+| GET | `/api/trips` | Trips List | `limit` |  |
+
 ## tv
 
 | Metodo | Ruta | Resumen | Parametros | Cuerpo |

@@ -40,6 +40,7 @@ DEFS = {
     "visita_videoportero": "persona que se detiene frente al videoportero 15 s o mas, o con timbre, o ya identificada",
     "timbre_videoportero": "alguien tocó el timbre del videoportero (con captura del visitante cercano)",
     "entrada_sin_captura": "un aviso de entrada (Tuya o sensor) sin persona vista en la cámara que debía verla",
+    "viaje_puerta": "recorrido completo tras abrirse la puerta del garage o llegar alguien al videoportero: cámaras, dirección (entra o sale) y mosaico",
     "movimiento_tuya": "movimiento detectado por una cámara Tuya (una alerta por cámara cada 120 s)",
     "ruido_tuya": "ruido fuerte detectado por una cámara Tuya",
     "actividad_armado": "toda persona vista mientras el armado absoluto esta activo, con su captura; sin excepciones por empleados conocidos",
