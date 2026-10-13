@@ -24,3 +24,16 @@ cameras:
     priority: normal
 
   # Agrega más cámaras siguiendo el mismo patrón
+
+# Mascara de privacidad (opcional): poligonos [x, y] normalizados 0-1 sobre el cuadro
+# final. Se rellenan de negro ANTES de entrar al buffer, asi ningun consumidor (YOLO,
+# caras, VLM, snapshots, stream) ve esos pixeles. Usar para zonas que no deben
+# procesarse, por ejemplo el interior de un bano visible desde una camara.
+#  - id: cam-03
+#    name: "Sala"
+#    rtsp_url: "rtsp://usuario:contraseña@192.168.X.X:554/profile2/media.smp"
+#    enabled: true
+#    zone: "interior"
+#    priority: normal
+#    privacy_mask:
+#      - [[0.93, 0.57], [1.0, 0.57], [1.0, 1.0], [0.93, 1.0]]
