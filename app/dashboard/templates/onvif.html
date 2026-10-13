@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ONVIF · THOR Vision</title>
+<style>
+:root{--bg:#0e1117;--panel:#161b24;--panel2:#1c2130;--line:#252c3a;--text:#e8edf3;--muted:#8b949e;--accent:#76B900;--bad:#ef5350;--warn:#d29922}
+:root{color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+header{display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);z-index:5}
+header a{color:var(--muted);text-decoration:none;font-size:13px}header a:hover{color:var(--accent)}h1{font-size:18px;margin:0}
+main{max-width:1320px;margin:0 auto;padding:16px 20px 60px}
+.tools{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.btn{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font:inherit;cursor:pointer}.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#0d1400;font-weight:600}.btn.sm{padding:3px 9px;font-size:12px}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:500;font-size:12px}
+tr.det td{background:var(--panel2)}small,.muted{color:var(--muted)}
+.b{display:inline-block;border-radius:999px;padding:1px 9px;font-size:12px;border:1px solid var(--line)}
+.ok{color:var(--accent);border-color:var(--accent)}.bad{color:var(--bad);border-color:var(--bad)}.warn{color:var(--warn);border-color:var(--warn)}
+code{font-size:12px;background:var(--panel2);padding:1px 5px;border-radius:5px;word-break:break-all}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:18px;min-width:340px}dialog::backdrop{background:#0009}
+dialog input,dialog select{display:block;width:100%;margin:6px 0 10px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:inherit}
+dialog label{font-size:12.5px;color:var(--muted)}.err{color:var(--bad);min-height:1.2em;font-size:12.5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+h3{margin:14px 0 6px;font-size:14px}.ev{font-size:12.5px;padding:3px 0;border-bottom:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header><a href="/">← Dashboard</a><h1>Operador ONVIF</h1><a href="/zonas" style="margin-left:auto">Zonas →</a><a href="/identidades">Identidades →</a></header>
+<main>
+  <div class="tools"><button class="btn pri" id="all">Probar todos</button><button class="btn" id="add">Agregar equipo</button><span class="muted" id="note"></span></div>
+  <table><thead><tr><th>Equipo</th><th>Estado</th><th>Modelo / firmware</th><th>Hora</th><th>Video</th><th>Eventos</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+  <h3 style="margin-top:22px">Eventos recientes <select id="evsel" class="btn sm"></select></h3>
+  <div id="events" class="muted">Sin eventos.</div>
+</main>
+<dialog id="dlgAuth"><form method="dialog" id="fAuth"><b id="aT">Usuario ONVIF</b>
+  <label>Usuario</label><input id="aU" autocomplete="off"><label>Clave</label><input id="aP" type="password" autocomplete="new-password">
+  <div class="err" id="aE"></div><div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" value="x" type="button" id="aX">Cancelar</button><button class="btn pri" id="aOk" type="button">Guardar</button></div></form></dialog>
+<dialog id="dlgAdd"><form method="dialog"><b>Agregar equipo ONVIF</b>
+  <label>Id (letras, números, guion)</label><input id="nI" placeholder="vto"><label>Nombre</label><input id="nN" placeholder="Videoportero">
+  <label>Dirección IP</label><input id="nH" placeholder="192.168.0.3"><label>Puerto</label><input id="nP" value="80"><label>Tipo</label><select id="nK"><option value="vto">Videoportero</option><option value="device">Otro</option></select>
+  <label><input type="checkbox" id="nL" checked style="display:inline;width:auto;margin:0 6px 0 0">Escuchar eventos de forma continua</label>
+  <div class="err" id="nE"></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px"><button class="btn" type="button" id="nX">Cancelar</button><button class="btn pri" type="button" id="nOk">Agregar</button></div></form></dialog>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const J = async (u, o) => { const r = await fetch(u, o); const t = await r.text(); let d; try { d = JSON.parse(t); } catch (e) { d = {detail: t}; } if (!r.ok) throw new Error(d.detail || t.slice(0, 160)); return d; };
+const send = (u, m, b) => J(u, {method: m, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b || {})});
+const when = ts => new Date(ts * 1000).toLocaleString('es-MX', {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false});
+let eps = [], open = new Set(), authFor = null;
+
+function badge(e){
+  const p = e.probe || {};
+  if (!p.ts) return '<span class="b">sin sondear</span>';
+  if (!p.reachable) return `<span class="b bad">sin respuesta</span><br><small>${esc(p.error)}</small>`;
+  if (p.authenticated) return '<span class="b ok">conectado</span>';
+  return `<span class="b warn">${e.has_user ? 'usuario rechazado' : 'sin usuario ONVIF'}</span>` + (p.error && e.has_user ? `<br><small>${esc(p.error)}</small>` : '');
+}
+function video(p){ const v = (p.profiles || []).map(x => x.video && x.video.width ? `${x.video.width}×${x.video.height} ${x.video.encoding} ${Math.round(x.video.fps)}fps` : '').filter(Boolean); return v.length ? v.join('<br>') : '<span class="muted">–</span>'; }
+function skew(p){ const d = p.datetime; if (!d) return '<span class="muted">–</span>'; const s = Math.abs(d.skew_s); return `<span class="${s > 5 ? 'warn' : ''}">${d.skew_s > 0 ? '+' : ''}${d.skew_s} s</span><br><small>${esc(d.ntp || '')}</small>`; }
+function listener(e){ if (e.kind === 'camera') return '<span class="muted">–</span>'; const l = e.listener || {}; return e.listen ? (l.listening ? '<span class="b ok">escuchando</span>' : `<span class="b warn">${esc(l.error || 'iniciando')}</span>`) : '<span class="b">apagado</span>'; }
+function detail(e){
+  const p = e.probe || {};
+  const profs = (p.profiles || []).map(x => `<div><b>${esc(x.name)}</b> <small>${esc(x.token)}</small><br><code>${esc(x.uri || '')}</code></div>`).join('') || '<small>Sin perfiles.</small>';
+  const users = (p.users || []).map(u => `${esc(u.name)} <small>(${esc(u.level)})</small>`).join(' · ') || '–';
+  return `<div class="grid2"><div><h3>Perfiles de video y stream</h3>${profs}</div><div><h3>Servicios</h3>${(p.services || []).map(s => `<span class="b">${esc(s)}</span>`).join(' ') || '–'}<h3>Usuarios ONVIF del equipo</h3>${users}<h3>Serie</h3>${esc(p.info?.serial || '–')}</div></div>`;
+}
+function render(){
+  $('#rows').innerHTML = eps.map(e => {
+    const p = e.probe || {}, inf = p.info || {};
+    const row = `<tr data-id="${esc(e.id)}"><td><b>${esc(e.name)}</b><br><small>${esc(e.id)} · ${esc(e.host)}:${e.port}${e.kind !== 'camera' ? ' · ' + esc(e.kind) : ''}</small></td>
+      <td>${badge(e)}</td><td>${inf.model ? esc(inf.manufacturer + ' ' + inf.model) + '<br><small>' + esc(inf.firmware) + '</small>' : '<span class="muted">–</span>'}</td>
+      <td>${skew(p)}</td><td>${video(p)}</td><td>${listener(e)}</td>
+      <td style="white-space:nowrap"><button class="btn sm" data-a="probe">Probar</button> <button class="btn sm" data-a="auth">Usuario ONVIF</button>${e.has_user ? ' <button class="btn sm" data-a="live">Escuchar 12 s</button>' : ''}${p.ok ? ' <button class="btn sm" data-a="det">Detalle</button>' : ''}${e.kind !== 'camera' ? ' <button class="btn sm" data-a="listen">' + (e.listen ? 'Dejar de escuchar' : 'Escuchar siempre') + '</button> <button class="btn sm" data-a="del">Quitar</button>' : ''}</td></tr>`;
+    return row + (open.has(e.id) && p.ok ? `<tr class="det"><td colspan="7">${detail(e)}</td></tr>` : '') + `<tr class="det" id="live-${esc(e.id)}" hidden><td colspan="7"></td></tr>`;
+  }).join('');
+  const sel = $('#evsel'), cur = sel.value;
+  sel.innerHTML = '<option value="">Todos</option>' + eps.filter(e => e.kind !== 'camera' || (e.probe && e.probe.authenticated)).map(e => `<option value="${esc(e.id)}">${esc(e.name)}</option>`).join('');
+  sel.value = cur;
+}
+async function load(){ try { eps = (await J('/api/onvif/endpoints')).endpoints; render(); } catch (e) { $('#note').textContent = e.message; } }
+async function loadEvents(){
+  try {
+    const d = await J('/api/onvif/events?limit=60' + ($('#evsel').value ? '&endpoint=' + encodeURIComponent($('#evsel').value) : ''));
+    $('#events').innerHTML = d.events.length ? d.events.map(e => `<div class="ev"><span class="muted">${when(e.ts)}</span> · <b>${esc(e.endpoint)}</b> · ${esc(e.topic.replace('tns1:', ''))} ${e.state ? '<span class="b ' + (e.state === 'true' ? 'ok' : '') + '">' + esc(e.state) + '</span>' : ''} <small>${esc(Object.entries(e.data).filter(([k]) => !['State','IsMotion','LogicalState'].includes(k)).map(([k, v]) => k + '=' + v).join(' '))}</small></div>`).join('') : 'Sin eventos guardados todavía.';
+  } catch (e) {}
+}
+document.addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-a]'); if (!b) return; const id = b.closest('tr').dataset.id, a = b.dataset.a;
+  if (a === 'probe'){ b.disabled = true; try { await send(`/api/onvif/endpoints/${id}/probe`, 'POST'); } catch (e) { $('#note').textContent = e.message; } await load(); }
+  if (a === 'det'){ open.has(id) ? open.delete(id) : open.add(id); render(); }
+  if (a === 'auth'){ authFor = id; $('#aU').value = ''; $('#aP').value = ''; $('#aE').textContent = ''; $('#aT').textContent = 'Usuario ONVIF · ' + id; $('#dlgAuth').showModal(); }
+  if (a === 'live'){ const row = $(`#live-${CSS.escape(id)}`); row.hidden = false; row.firstElementChild.innerHTML = 'Escuchando 12 s… (pulsa el timbre o abre la puerta)'; b.disabled = true;
+    try { const d = await J(`/api/onvif/endpoints/${id}/live?seconds=12`); row.firstElementChild.innerHTML = d.events.length ? d.events.map(e => `<div class="ev"><b>${esc(e.topic.replace('tns1:', ''))}</b> <small>${esc(JSON.stringify(e.data))}</small></div>`).join('') : 'Sin eventos en esa ventana.'; } catch (e) { row.firstElementChild.textContent = e.message; } b.disabled = false; }
+  if (a === 'listen'){ const e = eps.find(x => x.id === id); await send(`/api/onvif/endpoints/${id}/listen`, 'PUT', {listen: !e.listen}); load(); }
+  if (a === 'del'){ if (confirm('¿Quitar este equipo?')) { await J(`/api/onvif/endpoints/${id}`, {method: 'DELETE'}); load(); } }
+});
+$('#aX').onclick = () => $('#dlgAuth').close();
+$('#aOk').onclick = async () => { try { await send(`/api/onvif/endpoints/${authFor}/auth`, 'PUT', {user: $('#aU').value, password: $('#aP').value}); $('#dlgAuth').close(); $('#aP').value = ''; await send(`/api/onvif/endpoints/${authFor}/probe`, 'POST'); load(); } catch (e) { $('#aE').textContent = e.message; } };
+$('#add').onclick = () => { $('#nE').textContent = ''; $('#dlgAdd').showModal(); };
+$('#nX').onclick = () => $('#dlgAdd').close();
+$('#nOk').onclick = async () => { try { await send('/api/onvif/endpoints', 'POST', {id: $('#nI').value.trim(), name: $('#nN').value.trim(), host: $('#nH').value.trim(), port: +$('#nP').value || 80, kind: $('#nK').value, listen: $('#nL').checked}); $('#dlgAdd').close(); load(); } catch (e) { $('#nE').textContent = e.message; } };
+$('#all').onclick = async () => { $('#all').disabled = true; for (const e of eps) { $('#note').textContent = 'Sondeando ' + e.name + '…'; try { await send(`/api/onvif/endpoints/${e.id}/probe`, 'POST'); } catch (x) {} await load(); } $('#note').textContent = ''; $('#all').disabled = false; };
+$('#evsel').onchange = loadEvents;
+load(); loadEvents(); setInterval(() => { load(); loadEvents(); }, 5000);
+</script>
+</body>
+</html>

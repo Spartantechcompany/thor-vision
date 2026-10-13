@@ -15,6 +15,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gstreamer1.0-plugins-bad \
     gstreamer1.0-plugins-ugly \
     gstreamer1.0-libav \
+    libtesseract5 libwebpdemux2 libtbb12 \
+    # ^ libs que opencv-contrib-python-rolling (mas abajo) necesita al importar
+    # y que ubuntu:24.04 no trae por default (confirmado con ldd sobre el .so
+    # real, no supuesto): tesseract (modulo text de contrib), webp demux, TBB.
     curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -24,7 +28,27 @@ ENV PATH="/opt/venv/bin:$PATH"
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt --extra-index-url https://pypi.jetson-ai-lab.io/sbsa/cu130
+
+# opencv-python-headless (PyPI) no trae GStreamer compilado — este wheel del
+# mismo indice que ya usa onnxruntime-gpu si lo trae (GStreamer+NVDEC+cuDNN).
+# Paso separado + --force-reinstall --no-deps: ultralytics/insightface jalan
+# su propio opencv-python transitivo durante el pip install de arriba, y si
+# no se reinstala despues, ese wheel generico pisa este en silencio (mismo
+# namespace cv2/, sin ningun error).
+RUN pip install --force-reinstall --no-deps \
+    opencv-contrib-python-rolling==4.13.0 \
+    --extra-index-url https://pypi.jetson-ai-lab.io/sbsa/cu130
+# NO hacer `pip uninstall opencv-python` despues de esto: su RECORD lista los
+# mismos archivos cv2/ que --force-reinstall acaba de escribir (mismo
+# namespace de paquete) — desinstalarlo borraria el binario bueno que
+# acabamos de instalar. Queda un residuo cosmetico en `pip show opencv-python`
+# (parece instalado aunque ya no manda) — inofensivo, se documenta y ya.
+
+# El wheel de arriba necesita libcudnn.so.9 en tiempo de import; ya se instala
+# transitivamente (torch/onnxruntime-gpu -> nvidia-cudnn-cu13), solo falta
+# apuntar LD_LIBRARY_PATH a su ruta dentro del venv.
+ENV LD_LIBRARY_PATH=/opt/venv/lib/python3.12/site-packages/nvidia/cudnn/lib:${LD_LIBRARY_PATH}
 
 COPY app/ ./app/
 COPY config/ ./config/

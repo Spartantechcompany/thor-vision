@@ -1,0 +1,59 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compilar
+        run: python -m compileall -q app
+      - name: "Ruff (imports faltantes y nombres indefinidos)"
+        run: |
+          pip install ruff
+          ruff check app --select F,E9 --ignore F401,F841
+      - name: "Fiabilidad: trinquete de excepciones (ruff) y reglas ast-grep"
+        run: |
+          pip install ast-grep-cli
+          python scripts/ruff_ratchet.py
+          ast-grep scan
+      - name: Plantillas Jinja validas
+        run: |
+          pip install jinja2
+          python - <<'PY'
+          import jinja2, pathlib
+          env = jinja2.Environment()
+          for p in pathlib.Path("app/dashboard/templates").glob("*.html"):
+              env.parse(p.read_text())
+          PY
+
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Pruebas de contrato
+        run: |
+          pip install -r requirements-dev.txt
+          python -m pytest -q tests
+      - name: Versión y CHANGELOG sincronizados
+        run: python scripts/release.py check
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks (binario libre, sin licencia de organizacion)
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar xz gitleaks
+          ./gitleaks detect --source . --redact --no-banner

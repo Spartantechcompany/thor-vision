@@ -1,0 +1,24 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: El tag debe coincidir con la version y el CHANGELOG
+        run: python scripts/release.py check --tag "${GITHUB_REF_NAME}"
+      - name: Publicar GitHub Release con las notas de la version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/release.py notes "${GITHUB_REF_NAME}" > notes.md
+          gh release create "${GITHUB_REF_NAME}" --title "THOR Vision ${GITHUB_REF_NAME}" --notes-file notes.md

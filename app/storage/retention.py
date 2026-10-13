@@ -19,6 +19,7 @@ def start_retention_thread(
     max_chat_per_session: int  = 1_000,
     max_snapshot_bytes: int    = 50 * 1024 * 1024 * 1024,
     max_age_days: int          = 30,
+    max_face_sightings: int    = 100_000,
 ) -> threading.Event:
     """
     Arranca un thread daemon que corre retention cada `interval_s` segundos.
@@ -35,6 +36,7 @@ def start_retention_thread(
                 db_res   = db.rotate(
                     max_events           = max_events,
                     max_chat_per_session = max_chat_per_session,
+                    max_face_sightings   = max_face_sightings,
                 )
                 snap_res = snapshots.rotate(
                     max_bytes    = max_snapshot_bytes,

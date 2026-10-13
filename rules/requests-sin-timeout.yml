@@ -1,0 +1,17 @@
+id: requests-sin-timeout
+language: python
+severity: error
+message: "Llamada HTTP sin timeout."
+rule:
+  any:
+    - pattern: requests.get($$$ARGS)
+    - pattern: requests.post($$$ARGS)
+    - pattern: httpx.get($$$ARGS)
+    - pattern: httpx.post($$$ARGS)
+  not:
+    has:
+      stopBy: end
+      kind: keyword_argument
+      has:
+        field: name
+        regex: "^timeout$"

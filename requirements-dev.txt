@@ -1,0 +1,8 @@
+pytest>=8
+pyyaml
+numpy
+opencv-python-headless
+fastapi
+pydantic
+httpx
+requests

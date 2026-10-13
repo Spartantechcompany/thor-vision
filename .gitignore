@@ -39,3 +39,4 @@ docker-compose.yml
 # Logs
 *.log
 logs/
+app/build_info.json

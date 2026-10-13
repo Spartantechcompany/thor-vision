@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dispositivos · THOR Vision</title>
+<style>
+:root{--bg:#0e1117;--panel:#161b24;--panel2:#1c2130;--line:#252c3a;--text:#e8edf3;--muted:#8b949e;--accent:#76B900;--bad:#ef5350;--warn:#d29922}
+:root{color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+header{display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);z-index:5}
+header a{color:var(--muted);text-decoration:none;font-size:13px}header a:hover{color:var(--accent)}h1{font-size:18px;margin:0}
+main{max-width:1400px;margin:0 auto;padding:16px 20px 60px;display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.list{display:flex;flex-direction:column;gap:6px}
+.dev{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer}.dev.on{border-color:var(--accent)}
+.dev small{color:var(--muted);display:block}.b{display:inline-block;border-radius:999px;padding:0 8px;font-size:11.5px;border:1px solid var(--line);margin-left:4px}
+.ok{color:var(--accent);border-color:var(--accent)}.bad{color:var(--bad);border-color:var(--bad)}.warn{color:var(--warn);border-color:var(--warn)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.btn{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:5px 12px;font:inherit;cursor:pointer}.btn:hover{border-color:var(--accent)}.btn.on{border-color:var(--accent);color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#0d1400;font-weight:600}.btn.danger{border-color:var(--bad);color:var(--bad)}.btn.sm{padding:2px 8px;font-size:12px}
+table{width:100%;border-collapse:collapse}th,td{padding:5px 8px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;font-size:13px}th{color:var(--muted);font-weight:500}
+code{font-size:12px;background:var(--panel2);padding:1px 5px;border-radius:5px;word-break:break-all}
+input,select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font:inherit;max-width:100%}
+.grid{display:grid;grid-template-columns:230px minmax(0,1fr);gap:14px}@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.tree{max-height:560px;overflow:auto;font-size:13px}.tree details{margin-bottom:2px}.tree summary{cursor:pointer;color:var(--muted)}
+.tree a{display:block;padding:1px 8px;cursor:pointer;border-radius:6px}.tree a:hover,.tree a.on{background:var(--panel2);color:var(--accent)}
+.muted{color:var(--muted)}.msg{margin-top:8px;font-size:13px}.msg.err{color:var(--bad)}.msg.ok{color:var(--accent)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0}label.f{display:grid;grid-template-columns:200px minmax(0,1fr);gap:8px;align-items:center;margin:4px 0;font-size:13px}
+.warnbox{border:1px solid var(--warn);color:var(--warn);border-radius:8px;padding:6px 10px;margin:8px 0;font-size:12.5px}
+</style>
+</head>
+<body>
+<header><a href="/">← Dashboard</a><h1>Gestión de dispositivos</h1><a href="/onvif" style="margin-left:auto">ONVIF y eventos →</a><a href="/zonas">Zonas →</a></header>
+<main>
+  <div><div class="list" id="list"></div></div>
+  <div class="panel" id="detail"><span class="muted">Elige un equipo.</span></div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const J = async (u, o) => { const r = await fetch(u, o); const t = await r.text(); let d; try { d = JSON.parse(t); } catch (e) { d = {detail: t}; } if (!r.ok) throw new Error(d.detail || t.slice(0, 200)); return d; };
+const post = (u, b) => J(u, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)});
+const put = (u, b) => J(u, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)});
+let devs = [], cur = null, tab = 'resumen', tree = null, sel = null, view = null, spec = null;
+const when = ts => new Date(ts * 1000).toLocaleString('es-MX', {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false});
+
+async function loadList(){
+  devs = (await J('/api/devices')).devices;
+  $('#list').innerHTML = devs.map(d => `<div class="dev ${cur === d.id ? 'on' : ''}" data-id="${esc(d.id)}"><b>${esc(d.name)}</b><span class="b ${d.reachable ? 'ok' : 'bad'}">${d.reachable ? 'en línea' : 'sin respuesta'}</span>${d.manage ? '<span class="b warn">gestión</span>' : ''}<small>${esc(d.brand)} · ${esc(d.model || '—')}</small><small>${esc(d.firmware || '')}</small></div>`).join('');
+}
+$('#list').addEventListener('click', e => { const d = e.target.closest('.dev'); if (d) { cur = d.dataset.id; tab = 'resumen'; tree = sel = view = spec = null; loadList(); render(); } });
+function dev(){ return devs.find(d => d.id === cur); }
+const TABNAME = {resumen: 'Resumen', gestion: 'Gestión', auditoria: 'Auditoría'};
+function tabs(){ return `<div class="tabs">${Object.keys(TABNAME).map(t => `<button class="btn ${tab === t ? 'on' : ''}" data-t="${t}">${TABNAME[t]}</button>`).join('')}</div>`; }
+async function render(){
+  const d = dev(); if (!d) return;
+  $('#detail').innerHTML = `<h3 style="margin:0 0 4px">${esc(d.name)} <span class="b">${esc(d.brand)}</span></h3><div class="muted">${esc(d.id)} · ${esc(d.host)}</div>` + tabs() + '<div id="body">Cargando…</div>';
+  if (tab === 'resumen') return summary(d);
+  if (tab === 'auditoria') return audit(d);
+  return d.brand === 'hanwha' ? hanwha(d) : onvifPanel(d);
+}
+document.addEventListener('click', async e => {
+  const t = e.target.closest('[data-t]'); if (t){ tab = t.dataset.t; return render(); }
+  const m = e.target.closest('#mg'); if (m){ await put(`/api/devices/${cur}/manage`, {enabled: !dev().manage}); await loadList(); return render(); }
+});
+async function summary(d){
+  const x = await J(`/api/devices/${encodeURIComponent(d.id)}?refresh=1`); const s = x.summary;
+  const age = (s.firmware || '').match(/(20\d\d)/);
+  const old = age && +age[1] <= 2021;
+  $('#body').innerHTML = `<table><tr><th>Modelo</th><td>${esc(s.model)}</td><th>Firmware</th><td>${esc(s.firmware)} ${old ? '<span class="b warn">antiguo: revisar actualización</span>' : ''}</td></tr>
+    <tr><th>Serie</th><td>${esc(s.serial)}</td><th>Hora del equipo</th><td>${esc(s.local_time || '—')} ${s.sync ? '<span class="b">' + esc(s.sync) + '</span>' : ''}</td></tr>
+    ${s.onvif_version ? `<tr><th>ONVIF</th><td>${esc(s.onvif_version)}</td><th>SUNAPI</th><td>${esc(s.cgi_version)}</td></tr>` : ''}</table>
+    <div class="row"><b>Modo gestión</b> <button class="btn ${d.manage ? 'danger' : ''}" id="mg">${d.manage ? 'Desactivar (solo lectura)' : 'Activar modo gestión'}</button>
+    <span class="muted">${d.manage ? 'Se pueden modificar parámetros, con confirmación y bitácora.' : 'Solo lectura: nada se puede modificar.'}</span></div>`;
+}
+async function audit(d){
+  const a = (await J('/api/devices/audit?device=' + encodeURIComponent(d.id))).actions;
+  $('#body').innerHTML = a.length ? `<table><tr><th>Cuándo</th><th>Acción</th><th>Parámetros</th><th>Resultado</th><th>Desde</th></tr>${a.map(r => `<tr><td>${when(r.ts)}</td><td><code>${esc(r.action)}</code> <span class="b">${esc(r.kind)}</span></td><td><small>${esc(JSON.stringify(r.params))}</small></td><td class="${r.ok ? 'ok' : 'bad'}">${r.ok ? 'ok' : esc(r.detail)}</td><td>${esc(r.actor)}</td></tr>`).join('')}</table>` : '<span class="muted">Sin acciones registradas.</span>';
+}
+// ---- Hanwha / SUNAPI
+async function hanwha(d){
+  try { if (!tree) tree = (await J(`/api/devices/${encodeURIComponent(d.id)}/sunapi/tree`)).tree; } catch (e) { $('#body').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; return; }
+  $('#body').innerHTML = `<div class="grid"><div class="tree" id="tree">${Object.entries(tree).map(([cgi, sms]) => `<details ${sel && sel.cgi === cgi ? 'open' : ''}><summary>${esc(cgi)}</summary>${Object.entries(sms).map(([sm, acts]) => `<a data-cgi="${esc(cgi)}" data-sm="${esc(sm)}" class="${sel && sel.sm === sm && sel.cgi === cgi ? 'on' : ''}">${esc(sm)}${acts.some(a => a.class !== 'read') ? ' ✎' : ''}</a>`).join('')}</details>`).join('')}</div><div id="sun">${sel ? '' : '<span class="muted">Elige una función del árbol. ✎ = tiene acciones de modificación.</span>'}</div></div>`;
+  if (sel) openSub(d);
+}
+document.addEventListener('click', e => { const a = e.target.closest('#tree a'); if (!a) return; sel = {cgi: a.dataset.cgi, sm: a.dataset.sm}; view = spec = null; hanwha(dev()); });
+async function openSub(d){
+  const acts = tree[sel.cgi][sel.sm]; const out = $('#sun');
+  let kv = {}, err = '';
+  if (acts.some(a => a.action === 'view')) { try { view = await J(`/api/devices/${encodeURIComponent(d.id)}/sunapi/view?cgi=${sel.cgi}&submenu=${sel.sm}`); kv = view.kv || {}; if (view.status !== 200) err = 'El equipo respondió HTTP ' + view.status + (view.raw ? ': ' + view.raw.slice(0, 120) : ''); } catch (e) { err = e.message; } }
+  const rows = Object.entries(kv);
+  const writes = acts.filter(a => a.class !== 'read');
+  out.innerHTML = `<h4 style="margin:0 0 6px">${esc(sel.cgi)}.${esc(sel.sm)}</h4>${err ? `<div class="msg err">${esc(err)}</div>` : ''}
+    ${rows.length ? `<table>${rows.map(([k, v]) => `<tr><th style="width:42%">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table>` : '<span class="muted">Sin datos de lectura.</span>'}
+    ${writes.length ? `<h4 style="margin:14px 0 4px">Modificar</h4><div class="row">${writes.map(a => `<button class="btn ${a.class === 'deny' ? '' : a.class === 'strong' ? 'danger' : ''} sm" data-act="${esc(a.action)}" ${a.class === 'deny' ? 'disabled title="No se permite desde aquí"' : ''}>${esc(a.action)}${a.class === 'strong' ? ' ⚠' : ''}</button>`).join('')}</div><div id="form"></div>` : ''}`;
+  out.dataset.kv = JSON.stringify(kv);
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b || !sel) return;
+  const d = dev(); const action = b.dataset.act;
+  const sp = await J(`/api/devices/${encodeURIComponent(d.id)}/sunapi/spec?cgi=${sel.cgi}&submenu=${sel.sm}&action=${encodeURIComponent(action)}`); spec = {...sp, action};
+  const kv = JSON.parse($('#sun').dataset.kv || '{}');
+  const pre = n => kv[n] ?? kv['Channel.0.' + n] ?? Object.entries(kv).find(([k]) => k.endsWith('.' + n))?.[1] ?? '';
+  const fields = sp.params.filter(p => p.request).map(p => {
+    const v = pre(p.name);
+    const inp = p.type === 'enum' ? `<select data-p="${esc(p.name)}" data-init="${esc(v)}"><option value=""></option>${p.options.map(o => `<option ${o === v ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`
+      : p.type === 'bool' ? `<select data-p="${esc(p.name)}" data-init="${esc(v)}"><option value=""></option><option ${v === p.true ? 'selected' : ''}>${esc(p.true)}</option><option ${v === p.false ? 'selected' : ''}>${esc(p.false)}</option></select>`
+      : `<input data-p="${esc(p.name)}" data-init="${esc(v)}" value="${esc(v)}" ${p.type === 'int' ? `type="number" min="${p.min}" max="${p.max}"` : ''}>`;
+    return `<label class="f"><span>${esc(p.name)}${p.type === 'int' ? ` <small class="muted">${p.min}–${p.max}</small>` : ''}</span>${inp}</label>`;
+  }).join('');
+  $('#form').innerHTML = `${sp.class === 'strong' ? '<div class="warnbox">Acción sensible: puede cortar el acceso al equipo o afectar la captura de Thor. Se pide escribir el id del equipo.</div>' : ''}
+    ${!d.manage ? '<div class="warnbox">El equipo está en modo solo lectura. Actívalo en Resumen para modificar.</div>' : ''}
+    <div class="muted">Se envían solo los campos que cambies.</div>${fields}
+    <div class="row">${sp.class === 'strong' ? `<input id="cf" placeholder="Escribe ${esc(d.id)} para confirmar">` : '<label><input type="checkbox" id="cf"> Confirmo</label>'}<button class="btn pri" id="go">Aplicar ${esc(action)}</button></div><div class="msg" id="res"></div>`;
+});
+document.addEventListener('click', async e => {
+  if (e.target.id !== 'go') return;
+  const d = dev(), cf = $('#cf'); const params = {};
+  document.querySelectorAll('#form [data-p]').forEach(el => { if (el.value !== '' && el.value !== el.dataset.init) params[el.dataset.p] = el.value; });
+  for (const p of spec.params.filter(p => p.request && ['Channel', 'Profile', 'Index', 'ID'].includes(p.name))) { const el = document.querySelector(`#form [data-p="${p.name}"]`); if (!(p.name in params)) params[p.name] = el && el.value !== '' ? el.value : (p.name === 'Channel' ? '0' : ''); if (params[p.name] === '') delete params[p.name]; }
+  const confirm = spec.class === 'strong' ? cf.value : (cf.checked ? 'si' : '');
+  const res = $('#res'); res.className = 'msg'; res.textContent = 'Aplicando…';
+  try { const r = await post(`/api/devices/${encodeURIComponent(d.id)}/sunapi/action`, {cgi: sel.cgi, submenu: sel.sm, action: spec.action, params, confirm}); res.className = 'msg ' + (r.status === 200 ? 'ok' : 'err'); res.textContent = r.status === 200 ? 'Aplicado' : 'El equipo respondió HTTP ' + r.status + ' ' + (r.raw || '').slice(0, 160); if (r.status === 200) openSub(d); }
+  catch (er) { res.className = 'msg err'; res.textContent = er.message; }
+});
+// ---- ONVIF (Dahua y otros)
+const OPNAME = {network: 'Red', dns: 'DNS', ntp: 'NTP', hostname: 'Nombre', scopes: 'Alcances', encoders: 'Perfiles de video', doors: 'Puertas', relays: 'Relés'};
+async function onvifPanel(d){
+  const x = await J(`/api/devices/${encodeURIComponent(d.id)}`); const ops = x.onvif_ops;
+  $('#body').innerHTML = `<div class="row">${ops.reads.map(r => `<button class="btn sm" data-read="${r}">${OPNAME[r] || r}</button>`).join('')}</div><div id="rd" class="muted">Elige una lectura.</div>
+    <h4 style="margin:16px 0 4px">Acciones</h4>${!d.manage ? '<div class="warnbox">Modo solo lectura: actívalo en Resumen para modificar.</div>' : ''}
+    <div class="row"><input id="ntp" placeholder="Servidor NTP (pool.ntp.org)"><button class="btn sm" data-op="set_ntp">Fijar NTP</button></div>
+    <div class="row"><input id="tok" placeholder="Token (perfil o puerta)"><input id="w" size="5" placeholder="ancho"><input id="h" size="5" placeholder="alto"><input id="fps" size="4" placeholder="fps"><input id="br" size="6" placeholder="kbps"><button class="btn danger sm" data-op="set_encoder">Cambiar perfil de video ⚠</button></div>
+    <div class="row"><button class="btn danger sm" data-op="door_unlock">Abrir puerta ⚠</button><button class="btn danger sm" data-op="reboot">Reiniciar ⚠</button><input id="cf2" placeholder="Para ⚠ escribe ${esc(d.id)}"></div><div class="msg" id="res"></div>`;
+}
+document.addEventListener('click', async e => {
+  const r = e.target.closest('[data-read]'); if (r){ const box = $('#rd'); box.textContent = 'Leyendo…'; try { const x = await J(`/api/devices/${encodeURIComponent(cur)}/onvif/${r.dataset.read}`); box.innerHTML = '<pre style="white-space:pre-wrap;font-size:12.5px;margin:6px 0">' + esc(JSON.stringify(x, null, 1)) + '</pre>'; } catch (er) { box.innerHTML = `<div class="msg err">${esc(er.message)}</div>`; } return; }
+  const o = e.target.closest('[data-op]'); if (!o) return; const op = o.dataset.op; const res = $('#res'); res.className = 'msg'; res.textContent = 'Aplicando…';
+  const params = op === 'set_ntp' ? {server: $('#ntp').value} : op === 'set_encoder' ? {token: $('#tok').value, width: $('#w').value, height: $('#h').value, fps: $('#fps').value, bitrate: $('#br').value} : op === 'door_unlock' ? {token: $('#tok').value} : {};
+  const strong = op !== 'set_ntp';
+  try { const x = await post(`/api/devices/${encodeURIComponent(cur)}/onvif-action`, {op, params, confirm: strong ? $('#cf2').value : 'si'}); res.className = 'msg ok'; res.textContent = 'Aplicado ' + JSON.stringify(x); } catch (er) { res.className = 'msg err'; res.textContent = er.message; }
+});
+loadList().then(() => { if (devs[0]) { cur = devs[0].id; loadList(); render(); } });
+</script>
+</body>
+</html>

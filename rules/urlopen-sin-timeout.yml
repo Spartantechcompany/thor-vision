@@ -1,0 +1,13 @@
+id: urlopen-sin-timeout
+language: python
+severity: error
+message: "urlopen sin timeout: una llamada al gateway sin tope puede colgar el hilo (ver reportes y chat)."
+rule:
+  pattern: urllib.request.urlopen($$$ARGS)
+  not:
+    has:
+      stopBy: end
+      kind: keyword_argument
+      has:
+        field: name
+        regex: "^timeout$"

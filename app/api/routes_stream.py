@@ -41,7 +41,7 @@ def _offline_frame(w: int = 1280, h: int = 720) -> bytes:
 
 def _draw_overlay(frame: np.ndarray, detection) -> np.ndarray:
     """
-    Dibuja overlay con datos de Nemotron:
+    Dibuja overlay con datos de VLM:
     - Conteo de personas (badge superior-izquierdo)
     - Actividad / descripción (barra inferior)
     - Alertas reales (esquina superior-derecha)
@@ -166,8 +166,20 @@ def stream(cam_id: str, request: Request):
     )
 
 
+def _stamp(frame: np.ndarray, name: str) -> np.ndarray:
+    """Nombre de la camara y fecha/hora (la captura HD de la camara no trae el rotulo del video)."""
+    out = frame.copy()
+    h, w = out.shape[:2]
+    sc = max(0.6, w / 1280 * 0.7)
+    txt = f"{name}  {time.strftime('%d-%m-%Y %H:%M:%S')}"
+    (tw, th), _ = cv2.getTextSize(txt, cv2.FONT_HERSHEY_SIMPLEX, sc, 2)
+    cv2.rectangle(out, (0, 0), (tw + 20, th + 18), (0, 0, 0), -1)
+    cv2.putText(out, txt, (10, th + 8), cv2.FONT_HERSHEY_SIMPLEX, sc, (255, 255, 255), 2, cv2.LINE_AA)
+    return out
+
+
 @router.get("/api/snapshot/{cam_id}")
-def snapshot(cam_id: str, request: Request):
+def snapshot(cam_id: str, request: Request, hd: int = 0, native: int = 0, w: int = 0):
     """
     Snapshot JPEG estático. Usado por el dashboard como polling
     (evita límite de 6 conexiones HTTP/1.1 concurrentes del navegador).
@@ -176,10 +188,25 @@ def snapshot(cam_id: str, request: Request):
     manager   = _get_manager(request)
     store     = _get_store(request)
     cfg       = request.app.state.config.global_cfg
-    max_w     = cfg.frame_width
-    quality   = min(cfg.jpeg_quality, 70)
+    big       = bool(hd or native)
+    max_w     = 2800 if big else cfg.frame_width       # nativa/HD: sin reducir (hasta 2800 px de ancho; las de 5 MP traen 2592)
+    quality   = 85 if big else min(cfg.jpeg_quality, 70)
+    if 160 <= w < max_w:                                 # miniatura ligera (modo TV)
+        max_w, quality = w, min(quality, 60)
 
     frame = manager.get_frame(cam_id)
+    if hd and not native:                           # captura a resolucion completa de la propia camara (SUNAPI), si la soporta
+        vm = getattr(request.app.state, "visits", None)
+        g = (getattr(vm, "_grabbers", None) or {}).get(cam_id)
+        full = g.grab() if g is not None else None
+        if full is not None:
+            h, w = full.shape[:2]
+            if w > 1920:
+                full = cv2.resize(full, (1920, int(h * 1920 / w)), interpolation=cv2.INTER_AREA)
+            if store is not None:
+                full = _draw_overlay(full, store.get(cam_id))
+
+            return Response(content=_jpeg_encode(full, 85), media_type="image/jpeg", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     if frame is None:
         return Response(
             content=_offline_frame(),

@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cámara · THOR Vision</title>
+<style>
+:root{--bg:#0e1117;--panel:#161b24;--panel2:#1c2130;--line:#252c3a;--text:#e8edf3;--muted:#8b949e;--accent:#76B900;--warn:#e6a700}
+:root{color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+header{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);z-index:5}
+header a{color:var(--muted);text-decoration:none;font-size:13px}header a:hover{color:var(--accent)}h1{font-size:17px;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+main{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(300px,1fr);gap:16px;padding:14px 16px 40px;max-width:1500px;margin:0 auto}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+.stage{background:#000;border:1px solid var(--line);border-radius:12px;overflow:hidden;line-height:0;position:relative}
+.stage img{width:100%;display:block;max-height:78vh;object-fit:contain;background:#000}
+.stage video{width:100%;display:none;max-height:78vh;object-fit:contain;background:#000}
+.stage.vid video{display:block}.stage.vid img{display:none}
+.stage .tag{position:absolute;left:8px;top:8px;background:rgba(0,0,0,.6);color:#fff;border-radius:6px;padding:2px 8px;font-size:12px;line-height:1.4}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;color:var(--muted);font-size:12.5px}.chips b{color:var(--text)}
+input[type=datetime-local]{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit}
+.btn,select{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font:inherit;cursor:pointer}.btn:hover{border-color:var(--accent)}
+.btn.on{border-color:var(--accent);color:var(--accent)}
+.bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.list{display:flex;flex-direction:column;gap:6px;max-height:80vh;overflow:auto}
+.it{display:grid;grid-template-columns:84px 1fr;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px;cursor:pointer;text-align:left;color:inherit;font:inherit}
+.it:hover,.it.cur{border-color:var(--accent)}.it .th{width:84px;height:56px;border-radius:6px;background:#000 center/cover;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px}
+.it b{font-size:12.5px}.it small{color:var(--muted);display:block}.it span.t{font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tlf{width:100%;height:430px;border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-top:10px}
+.strip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 8px 4px}.strip svg{width:100%;height:78px;display:block;cursor:pointer}
+.axis{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;margin-top:2px}
+.hint{color:var(--muted);font-size:12px;margin:0 0 6px}
+.empty{color:var(--muted);padding:20px;text-align:center}
+#vw{position:fixed;inset:0;background:rgba(0,0,0,.86);z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center;padding:12px;touch-action:pan-y}
+#vw.on{display:flex}#vw img{max-width:96vw;max-height:76vh;border-radius:10px;background:#000}
+#vw .cap{color:#dfe5ee;margin-top:10px;max-width:96vw;text-align:center;font-size:14px}
+#vw .nav{display:flex;gap:10px;margin-top:10px;align-items:center;color:#9aa4b2}
+#vw .nav button{background:#1c2130;color:#fff;border:1px solid #333c4f;border-radius:8px;padding:10px 18px;font-size:16px;cursor:pointer}
+#vw .x{position:absolute;top:10px;right:14px;background:none;border:0;color:#fff;font-size:26px;cursor:pointer}
+</style>
+{% if umami_src and umami_id %}<script defer src="{{ umami_src }}" data-website-id="{{ umami_id }}"></script>{% endif %}
+</head>
+<body>
+<header><a href="/">← Panel</a><h1 id="ttl">Cámara</h1><button class="btn" id="fs" title="Pantalla completa">⤢</button></header>
+<main>
+  <section>
+    <div class="stage"><video id="lv" muted playsinline autoplay disablepictureinpicture></video><img id="live" alt="en vivo"><span class="tag" id="tag">en vivo</span></div>
+    <div class="chips" id="chips"><button class="btn on" id="hd" title="Vista de alta resolución (1920 px); apágalo para una vista ligera">HD</button><button class="btn" id="m5" title="Resolución nativa completa (hasta 5 MP): más pesada y lenta en las exteriores">5 MP</button></div>
+    <iframe id="tlf" class="tlf" title="Línea de tiempo de esta cámara" loading="lazy"></iframe></div>
+  </section>
+  <section>
+    <p class="hint">La lista sigue a la línea de tiempo de la izquierda: el rango visible (o el que selecciones arrastrando) y las categorías activas.</p>
+    <div class="empty" id="cnt"></div>
+    <div class="list" id="list"></div>
+  </section>
+</main>
+<div id="vw" role="dialog" aria-modal="true"><button class="x" id="vx" aria-label="Cerrar">✕</button><img id="vi" alt=""><div class="cap" id="vc"></div>
+  <div class="nav"><button id="vp" aria-label="Anterior">‹</button><span id="vn"></span><button id="vnx" aria-label="Siguiente">›</button></div></div>
+<script>
+const $ = s => document.querySelector(s);
+const CAM = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || '');
+let win = [0, 1];
+const PAL = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767', '#4aa3a8', '#b07acc'];
+const col = t => { let h = 0; for (const ch of String(t)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return PAL[h % PAL.length]; };
+let listMax = 40, custom = null, hours = 24, items = [], shown = [], cur = -1, typ = '';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const lbl = t => (t || 'sin tipo').replace(/_/g, ' ');
+const fmt = ts => { const d = new Date(ts * 1000); return d.toLocaleDateString('es-MX', {day:'2-digit', month:'short'}) + ' ' + d.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit', hour12:false}); };
+
+// vista en vivo: una captura nueva apenas llega la anterior
+const live = $('#live'); let alive = true;
+$('#tlf').src = '/?tl=' + encodeURIComponent(CAM);
+let hd = true, full5 = false;       // vista de 1920 px por defecto; el boton 5 MP pide la resolucion nativa completa (mas pesada)
+function tick(){ if (!alive) return; live.src = `/api/snapshot/${encodeURIComponent(CAM)}?${!hd ? 'w=1280&' : full5 ? 'native=1&' : 'native=1&w=1920&'}t=${Date.now()}`; }
+$('#hd').onclick = () => { hd = !hd; $('#hd').classList.toggle('on', hd); };
+$('#m5').onclick = () => { full5 = !full5; if (full5) { hd = true; $('#hd').classList.add('on'); } $('#m5').classList.toggle('on', full5); };
+live.onload = () => setTimeout(tick, full5 ? 2500 : hd ? 1200 : 600); live.onerror = () => setTimeout(tick, 3000); tick();
+// video en vivo por WebRTC (go2rtc); si no conecta o se corta, vuelve a las capturas y reintenta
+const GO2RTC = `${location.protocol}//${location.hostname}:1984`, lv = $('#lv'), stage = document.querySelector('.stage');
+let pc = null, vtimer = null, wantVideo = !/[?&]video=0/.test(location.search) && !/Silk|AFT[A-Z]|Tizen|SMART-TV|Web0S|WebOS|HbbTV/i.test(navigator.userAgent);
+function stopVideo(){ clearTimeout(vtimer); try { pc && pc.close(); } catch (e) {} pc = null; lv.srcObject = null; stage.classList.remove('vid'); alive = !document.hidden; if (alive) tick(); }
+function videoFail(){ stopVideo(); $('#tag').textContent = 'en vivo'; if (wantVideo && !document.hidden) setTimeout(startVideo, 15000); }
+async function startVideo(){
+  if (!wantVideo || pc || !window.RTCPeerConnection) return;
+  try {
+    pc = new RTCPeerConnection({ iceServers: [] });
+    pc.addTransceiver('video', { direction: 'recvonly' });
+    pc.ontrack = e => { lv.srcObject = (e.streams && e.streams[0]) || new MediaStream([e.track]); };
+    pc.onconnectionstatechange = () => { if (['failed', 'disconnected', 'closed'].includes(pc && pc.connectionState)) videoFail(); };
+    await pc.setLocalDescription(await pc.createOffer());
+    await new Promise(res => { if (pc.iceGatheringState === 'complete') return res(); const t = setTimeout(res, 1500); pc.onicegatheringstatechange = () => { if (pc.iceGatheringState === 'complete'){ clearTimeout(t); res(); } }; });
+    const r = await fetch(`${GO2RTC}/api/webrtc?src=${encodeURIComponent(CAM)}`, { method: 'POST', headers: { 'Content-Type': 'application/sdp' }, body: pc.localDescription.sdp });
+    if (!r.ok) throw new Error(r.status);
+    await pc.setRemoteDescription({ type: 'answer', sdp: await r.text() });
+    lv.onplaying = () => { clearTimeout(vtimer); alive = false; stage.classList.add('vid'); $('#tag').textContent = 'en vivo · video'; };
+    vtimer = setTimeout(() => { if (!stage.classList.contains('vid')) videoFail(); }, 8000);
+  } catch (e) { videoFail(); }
+}
+lv.ondblclick = () => $('#fs').onclick();
+startVideo();
+document.addEventListener('visibilitychange', () => { if (document.hidden) { stopVideo(); alive = false; } else { alive = true; tick(); startVideo(); } });
+$('#fs').onclick = () => { const st = document.querySelector('.stage'); document.fullscreenElement ? document.exitFullscreen() : st.requestFullscreen?.(); };
+live.ondblclick = $('#fs').onclick;
+
+async function info(){
+  try {
+    const d = await (await fetch(`/api/detections/${encodeURIComponent(CAM)}`)).json();
+    const n = d.vlm || {};
+    $('#chips').innerHTML = `<span>Personas (YOLO): <b>${d.yolo_persons ?? d.person_count ?? 0}</b></span>`
+      + (n.activity ? `<span style="flex-basis:100%">Último análisis: <b>${esc(n.activity)}</b></span>` : '');
+  } catch (e) {}
+}
+setInterval(info, 5000); info();
+
+let view = {since: 0, until: 1e12, hidden: new Set()};
+async function load(){
+  $('#cnt').textContent = 'Cargando…';
+  const until = Date.now() / 1000;
+  try {
+    const d = await (await fetch(`/api/timeline?cam_id=${encodeURIComponent(CAM)}&since=${until - 7 * 86400}&until=${until}`)).json();
+    const c = d.cams.find(x => x.id === CAM); if (c){ $('#ttl').textContent = c.name; document.title = c.name + ' · THOR Vision'; }
+    items = d.events.filter(e => e.cam === CAM).sort((a, b) => b.ts - a.ts);
+    render();
+  } catch (e) { $('#cnt').textContent = 'No se pudieron cargar las alertas'; }
+}
+window.addEventListener('message', ev => {                 // la linea de tiempo incrustada manda el rango y las categorias activas
+  const m = ev.data && ev.data.tl; if (!m) return;
+  view = {since: m.since, until: m.until, hidden: new Set(m.hiddenTypes || [])}; cur = -1; render();
+});
+function render(){
+  shown = items.filter(e => e.ts >= view.since && e.ts <= view.until && !view.hidden.has(e.type));
+  $('#cnt').textContent = shown.length ? `${shown.length} alertas` : 'Sin alertas en este rango';
+  const thumb = u => u + (u.includes('?') ? '&' : '?') + 'w=160';
+  const lim = Math.min(shown.length, listMax);
+  $('#list').innerHTML = shown.slice(0, lim).map((e, i) => `<button class="it${i === cur ? ' cur' : ''}" data-i="${i}"><div class="th">${e.img ? `<img loading="lazy" decoding="async" alt="" src="${thumb(e.img)}" style="width:100%;height:100%;object-fit:cover;border-radius:6px">` : 'sin foto'}</div>`
+    + `<div><b>${esc(lbl(e.type))}</b><small>${fmt(e.ts)}${e.people ? ' · ' + e.people + ' pers.' : ''}</small><span class="t">${esc(e.text)}</span></div></button>`).join('')
+    + (shown.length > lim ? `<button class="btn" id="more">Ver más (${shown.length - lim})</button>` : '');
+}
+$('#list').addEventListener('click', e => { if (e.target.id === 'more') { listMax += 60; return render(); } const b = e.target.closest('.it'); if (b) open(+b.dataset.i); });
+
+// visor con navegacion: flechas del teclado, botones y deslizar con el dedo
+function open(i){
+  if (!shown.length) return;
+  cur = (i + shown.length) % shown.length;
+  const e = shown[cur];
+  $('#vi').style.display = e.img ? '' : 'none'; if (e.img) $('#vi').src = e.img;
+  $('#vc').textContent = `${fmt(e.ts)} · ${lbl(e.type)} — ${e.img ? '' : '(sin captura) '}${e.text}`;
+  $('#vn').textContent = `${cur + 1} / ${shown.length}`;
+  $('#vw').classList.add('on');
+  document.querySelectorAll('.it').forEach((x, k) => x.classList.toggle('cur', k === cur));
+  document.querySelector('.it.cur')?.scrollIntoView({block: 'nearest'});
+}
+const close = () => $('#vw').classList.remove('on');
+$('#vx').onclick = close; $('#vp').onclick = () => open(cur + 1); $('#vnx').onclick = () => open(cur - 1);   // la lista va de la más nueva a la más vieja
+$('#vw').addEventListener('click', e => { if (e.target.id === 'vw') close(); });
+document.addEventListener('keydown', e => {
+  if (!$('#vw').classList.contains('on')) return;
+  if (e.key === 'Escape') close();
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); open(cur - 1); }       // hacia lo más reciente
+  else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); open(cur + 1); }    // hacia lo más antiguo
+});
+let sx = null;
+$('#vw').addEventListener('touchstart', e => { sx = e.touches[0].clientX; }, {passive: true});
+$('#vw').addEventListener('touchend', e => { if (sx === null) return; const dx = e.changedTouches[0].clientX - sx; sx = null; if (Math.abs(dx) > 50) open(cur + (dx < 0 ? 1 : -1)); });
+(function(){   // misma identidad de dispositivo que el panel y evento de vista de camara
+  let id = null; try { id = localStorage.getItem('thor_device_id'); } catch (_) {}
+  let n = 0; const t = setInterval(() => { if (window.umami && window.umami.track) { if (id && window.umami.identify) window.umami.identify(id, {}); window.umami.track('camara_vista', { cam: CAM }); clearInterval(t); } else if (++n > 40) clearInterval(t); }, 250);
+})();
+load(); setInterval(() => { if (!$('#vw').classList.contains('on')) load(); }, 60000);
+</script>
+<script>
+// Banner de armado absoluto: visible en todas las pantallas mientras el modo esta activo
+(function(){
+  const bar = document.createElement('div');
+  bar.id = 'arm-banner'; bar.hidden = true; bar.setAttribute('role', 'status');
+  bar.style.cssText = 'position:sticky;top:0;z-index:9999;background:#ff3b30;color:#fff;font:700 13px/1 system-ui,sans-serif;letter-spacing:.06em;text-align:center;padding:9px 12px;box-shadow:0 2px 12px rgba(255,59,48,.5)';
+  document.body.prepend(bar);
+  const base = document.title.replace(/^🔴 ARMADO · /, '');
+  const paint = st => {
+    const on = st.mode === 'absoluto';
+    bar.hidden = !on;
+    document.title = on ? '🔴 ARMADO · ' + base : base;
+    if (on) bar.textContent = 'ARMADO ABSOLUTO ACTIVO · toda persona es alerta · desde ' + new Date(st.since * 1000).toLocaleString('es-MX', {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false});
+  };
+  const poll = () => fetch('/api/arming', {cache: 'no-store'}).then(r => r.json()).then(paint).catch(() => {});
+  poll(); setInterval(poll, 10000);
+})();
+</script>
+</body>
+</html>

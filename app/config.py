@@ -13,6 +13,16 @@ class CameraConfig:
     zone: str = "interior"
     priority: str = "normal"
     resolution: Optional[List[int]] = None
+    # Grados de rotacion CW a aplicar al frame ya capturado (0/90/180/270).
+    # Para camaras montadas rotadas o con stream nativo en vertical (ej.
+    # cam-113 "Escaleras entrada": nativo 1080x1920, ver CLAUDE.md).
+    rotate: int = 0
+    # Mascara de privacidad: lista de poligonos [[x,y],...] normalizados 0-1 sobre el
+    # frame final. Se rellenan de negro ANTES de entrar al buffer, asi ningun consumidor
+    # (YOLO, caras, VLM, snapshots, preroll, stream) ve esos pixeles.
+    privacy_mask: Optional[List] = None
+    # 'full' (default) o 'faces': solo rostros (videoportero) sin YOLO de objetos, VLM ni movimiento nativo.
+    mode: str = "full"
 
 
 @dataclass
@@ -65,6 +75,9 @@ def load_config(cameras_path: str = None, settings_path: str = None) -> AppConfi
             zone=c.get("zone", "interior"),
             priority=c.get("priority", "normal"),
             resolution=c.get("resolution"),
+            rotate=c.get("rotate", 0),
+            privacy_mask=c.get("privacy_mask"),
+            mode=c.get("mode", "full"),
         )
         for c in raw.get("cameras", [])
     ]

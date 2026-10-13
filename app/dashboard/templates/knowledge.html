@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Conocimiento · THOR Vision</title>
+<style>
+:root{--bg:#0e1117;--panel:#161b24;--panel2:#1c2130;--line:#252c3a;--text:#e8edf3;--muted:#8b949e;--accent:#76B900;--bad:#ef5350}
+:root{color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+header{display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid var(--line)}header a{color:var(--muted);text-decoration:none;font-size:13px}h1{font-size:18px;margin:0}
+main{max-width:1100px;margin:0 auto;padding:16px 20px 60px;display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:900px){main{grid-template-columns:1fr}}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}textarea{width:100%;min-height:420px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;font:13px/1.5 ui-monospace,Menlo,monospace}
+.btn{background:var(--accent);border:0;color:#0d1400;font-weight:600;border-radius:8px;padding:7px 14px;cursor:pointer}.muted{color:var(--muted)}.msg{margin-left:10px;font-size:13px}
+pre{white-space:pre-wrap;font:13px/1.5 ui-monospace,Menlo,monospace;margin:0}
+</style>
+</head>
+<body>
+<header><a href="/">← Dashboard</a><h1>Conocimiento de la casa</h1><span class="muted">Lo que el Vision Agent sabe y usa en cada búsqueda</span></header>
+<main>
+  <div class="box"><b>Texto editable</b><p class="muted" style="margin:4px 0 8px">Mascotas, personas y reglas. Se aplica de inmediato.</p><textarea id="md"></textarea><p><button class="btn" id="save">Guardar</button><span class="msg" id="msg"></span></p></div>
+  <div class="box"><b>Datos vivos</b><p class="muted" style="margin:4px 0 8px">Se agregan solos (cámaras y zonas); no se editan aquí.</p><pre id="live"></pre></div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+fetch('/api/knowledge').then(r => r.json()).then(d => { $('#md').value = d.markdown; $('#live').textContent = d.live; });
+$('#save').onclick = async () => {
+  const r = await fetch('/api/knowledge', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({markdown: $('#md').value})});
+  const t = await r.json(); $('#msg').textContent = r.ok ? 'Guardado' : (t.detail || 'Error'); $('#msg').style.color = r.ok ? 'var(--accent)' : 'var(--bad)';
+};
+</script>
+</body>
+</html>

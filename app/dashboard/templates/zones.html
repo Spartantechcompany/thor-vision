@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Zonas · THOR Vision</title>
+<style>
+:root{--bg:#0e1117;--panel:#161b24;--panel2:#1c2130;--line:#252c3a;--text:#e8edf3;--muted:#8b949e;--accent:#76B900;--bad:#ef5350}
+:root{color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+header{display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);z-index:5}
+header a{color:var(--muted);text-decoration:none;font-size:13px}header a:hover{color:var(--accent)}h1{font-size:18px;margin:0}
+main{max-width:1280px;margin:0 auto;padding:16px 20px 60px;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+select,input[type=text]{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:inherit;width:100%}
+.btn{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font:inherit;cursor:pointer}.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#0d1400;font-weight:600}.btn.sm{padding:3px 9px;font-size:12px}
+.stage{position:relative;background:#000;border:1px solid var(--line);border-radius:12px;overflow:hidden;line-height:0}
+.stage img{width:100%;display:block}.stage canvas{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair}
+.side{display:flex;flex-direction:column;gap:12px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+.box h3{margin:0 0 8px;font-size:14px}.row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.help{color:var(--muted);font-size:12.5px;margin:6px 0 0}
+.z{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}.z:last-child{border:0}
+.dot{width:12px;height:12px;border-radius:3px;flex:none}.z span.n{flex:1;min-width:0}.z small{color:var(--muted);display:block}
+.msg{min-height:1.2em;font-size:12.5px;color:var(--muted)}.msg.ok{color:var(--accent)}.msg.err{color:var(--bad)}
+.legend{display:grid;gap:4px;font-size:12.5px;color:var(--muted)}.legend b{color:var(--text)}
+</style>
+</head>
+<body>
+<header><a href="/">← Dashboard</a><h1>Zonas por cámara</h1><a href="/identidades" style="margin-left:auto">Identidades →</a></header>
+<main>
+  <section>
+    <div class="row" style="margin:0 0 10px"><select id="cam" style="max-width:320px"></select>
+      <button class="btn" id="refresh">Actualizar imagen</button></div>
+    <div class="stage" id="stage"><img id="img" alt="Cuadro de la cámara"><canvas id="cv"></canvas></div>
+    <p class="help" id="hint">Elige el tipo, pulsa “Dibujar zona” y haz clic en los vértices sobre la imagen. Cierra con doble clic o con “Cerrar zona”.</p>
+  </section>
+  <aside class="side">
+    <div class="box">
+      <h3>Nueva zona</h3>
+      <select id="type"></select>
+      <input type="text" id="name" placeholder="Nombre (ej. palmera de la escalera)" style="margin-top:8px">
+      <input type="text" id="text" placeholder="Descripción fija para el VLM (solo tipo Descripción fija)" style="margin-top:8px">
+      <div class="row"><button class="btn pri sm" id="draw">Dibujar zona</button><button class="btn sm" id="close" disabled>Cerrar zona</button><button class="btn sm" id="undo" disabled>Deshacer punto</button><button class="btn sm" id="cancel" disabled>Cancelar</button></div>
+    </div>
+    <div class="box"><h3>Zonas de esta cámara</h3><div id="list"><div class="help">Sin zonas.</div></div>
+      <div class="row"><button class="btn pri" id="save">Guardar</button><span class="msg" id="msg"></span></div>
+      <p class="help">Los cambios se aplican en segundos, sin reiniciar. Las detecciones ya guardadas no cambian.</p></div>
+    <div class="box legend"><h3>Tipos</h3>
+      <div><b style="color:#ef5350">Ignorar objetos</b>: YOLO descarta autos, perros, bolsas… cuyo punto base cae ahí (palmeras, sombras fijas). Las personas siguen detectándose.</div>
+      <div><b style="color:#ff8a65">Ignorar todo</b>: igual, pero también personas (reflejos, pantallas).</div>
+      <div><b style="color:#76B900">Estacionamiento</b>: solo se registran vehículos estacionados dentro (Exterior 1 y 2, donde se lee la placa). Sin zonas, se registra todo.</div>
+      <div><b style="color:#4aa3ff">Descripción fija</b>: texto que el VLM recibe como “esto siempre está ahí, no lo describas ni alertes por ello”.</div></div>
+  </aside>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const LABEL = {ignorar_objetos: 'Ignorar objetos', ignorar_todo: 'Ignorar todo', estacionamiento: 'Estacionamiento', nota: 'Descripción fija'};
+const COLOR = {ignorar_objetos: '#ef5350', ignorar_todo: '#ff8a65', estacionamiento: '#76B900', nota: '#4aa3ff'};
+let cams = [], zones = [], cur = [], drawing = false, dirty = false;
+const img = $('#img'), cv = $('#cv'), ctx = cv.getContext('2d');
+const J = async (u, o) => { const r = await fetch(u, o); if (!r.ok) throw new Error((await r.text()).slice(0, 200)); return r.json(); };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const msg = (t, k = '') => { const m = $('#msg'); m.textContent = t; m.className = 'msg ' + k; };
+
+async function init(){
+  const d = await J('/api/zones');
+  cams = d.cameras;
+  $('#type').innerHTML = d.types.map(t => `<option value="${t}">${LABEL[t] || t}</option>`).join('');
+  $('#cam').innerHTML = cams.map(c => `<option value="${c.id}">${esc(c.name)}${c.zones.length ? ' · ' + c.zones.length + ' zonas' : ''}</option>`).join('');
+  pick();
+}
+function pick(){
+  const c = cams.find(x => x.id === $('#cam').value);
+  zones = JSON.parse(JSON.stringify(c.zones)); cur = []; drawing = false; dirty = false; msg('');
+  reflect(); loadImg();
+}
+function loadImg(){ img.src = `/api/snapshot/${encodeURIComponent($('#cam').value)}?t=${Date.now()}`; }
+img.onload = () => { cv.width = img.clientWidth * devicePixelRatio; cv.height = img.clientHeight * devicePixelRatio; paint(); };
+window.addEventListener('resize', () => img.onload());
+function paint(){
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const W = cv.width, H = cv.height;
+  const poly = (pts, color, fill, close) => {
+    if (!pts.length) return;
+    ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0] * W, p[1] * H) : ctx.moveTo(p[0] * W, p[1] * H));
+    if (close) ctx.closePath();
+    ctx.lineWidth = 2 * devicePixelRatio; ctx.strokeStyle = color; ctx.stroke();
+    if (fill) { ctx.fillStyle = color + '40'; ctx.fill(); }
+    pts.forEach(p => { ctx.beginPath(); ctx.arc(p[0] * W, p[1] * H, 3.5 * devicePixelRatio, 0, 7); ctx.fillStyle = color; ctx.fill(); });
+  };
+  zones.forEach(z => poly(z.pts, COLOR[z.type], true, true));
+  if (cur.length) poly(cur, COLOR[$('#type').value], false, false);
+}
+function reflect(){
+  $('#list').innerHTML = zones.length ? zones.map((z, i) => `<div class="z"><span class="dot" style="background:${COLOR[z.type]}"></span><span class="n">${esc(z.name || LABEL[z.type])}<small>${LABEL[z.type]}${z.text ? ' · ' + esc(z.text) : ''}</small></span><button class="btn sm" data-del="${i}">Borrar</button></div>`).join('') : '<div class="help">Sin zonas.</div>';
+  $('#draw').disabled = drawing; for (const id of ['close', 'undo', 'cancel']) $('#' + id).disabled = !drawing;
+  $('#close').disabled = !drawing || cur.length < 3; paint();
+}
+function point(e){ const r = cv.getBoundingClientRect(); return [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))]; }
+cv.addEventListener('click', e => { if (!drawing) return; cur.push(point(e)); reflect(); });
+cv.addEventListener('dblclick', e => { if (drawing && cur.length > 3) { cur.pop(); closeZone(); } });
+function closeZone(){
+  if (cur.length < 3) return;
+  const t = $('#type').value;
+  zones.push({id: 'z' + Date.now().toString(36), type: t, name: $('#name').value.trim(), text: t === 'nota' ? $('#text').value.trim() : '', pts: cur.map(p => [+p[0].toFixed(4), +p[1].toFixed(4)])});
+  cur = []; drawing = false; dirty = true; $('#name').value = ''; $('#text').value = ''; msg('Sin guardar', ''); reflect();
+}
+$('#draw').onclick = () => { if ($('#type').value === 'nota' && !$('#text').value.trim()) { msg('Escribe la descripción fija primero', 'err'); return; } drawing = true; cur = []; msg(''); reflect(); };
+$('#close').onclick = closeZone;
+$('#undo').onclick = () => { cur.pop(); reflect(); };
+$('#cancel').onclick = () => { cur = []; drawing = false; reflect(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && drawing) $('#cancel').click(); });
+$('#list').addEventListener('click', e => { const b = e.target.closest('[data-del]'); if (!b) return; zones.splice(+b.dataset.del, 1); dirty = true; msg('Sin guardar'); reflect(); });
+$('#cam').onchange = () => { if (dirty && !confirm('Hay cambios sin guardar en esta cámara. ¿Descartarlos?')) { return; } pick(); };
+$('#refresh').onclick = loadImg;
+$('#save').onclick = async () => {
+  try {
+    const id = $('#cam').value;
+    const r = await J(`/api/zones/${encodeURIComponent(id)}`, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({zones})});
+    cams.find(c => c.id === id).zones = r.zones; dirty = false; msg('Guardado', 'ok');
+  } catch (e) { msg('No se pudo guardar: ' + e.message, 'err'); }
+};
+window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+init().catch(e => msg('Error cargando cámaras: ' + e.message, 'err'));
+</script>
+</body>
+</html>

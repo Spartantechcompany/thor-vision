@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>THOR Vision · TV</title>
+<style>
+/* Modo TV (Fire TV / Silk, pantallas con control remoto): sin desenfoques, sin animaciones, miniaturas ligeras, foco visible con el D-pad */
+:root{color-scheme:dark;--bg:#0b0e13;--panel:#151a23;--line:#262d3a;--text:#eef2f7;--muted:#98a2b3;--accent:#76B900;--warn:#f2b01e;--bad:#ef5350}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.35 system-ui,-apple-system,Roboto,sans-serif;overflow-x:hidden}
+.bar{display:flex;align-items:center;gap:18px;padding:8px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.bar b{font-size:20px}.bar .sp{flex:1}.clock{font-size:22px;font-variant-numeric:tabular-nums}
+.pill{border:1px solid var(--line);border-radius:999px;padding:3px 12px;font-size:15px}.pill.ok{border-color:var(--accent);color:var(--accent)}.pill.warn{border-color:var(--warn);color:var(--warn)}.pill.bad{border-color:var(--bad);color:var(--bad)}
+a.link{color:var(--muted);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:4px 12px}a.link:focus,a.link:hover{outline:3px solid var(--accent);color:var(--text)}
+#grid{display:grid;gap:8px;padding:8px}
+.t{position:relative;background:#000;border:3px solid transparent;border-radius:10px;overflow:hidden;cursor:pointer;aspect-ratio:16/9}
+.t img{width:100%;height:100%;object-fit:contain;display:block;background:#000}
+.t .n{position:absolute;left:0;right:0;bottom:0;padding:4px 10px;background:rgba(0,0,0,.65);font-size:15px;display:flex;justify-content:space-between;gap:8px}
+.t.p{border-color:var(--warn)}.t.a{border-color:var(--bad)}.t:focus{outline:4px solid var(--accent);outline-offset:-2px}
+#tick{padding:6px 16px 14px;display:grid;gap:4px}
+.al{display:flex;gap:10px;font-size:16px;border-left:4px solid var(--line);padding:2px 10px;background:var(--panel);border-radius:4px}.al small{color:var(--muted);white-space:nowrap}
+</style>
+{% if umami_src and umami_id %}<script defer src="{{ umami_src }}" data-website-id="{{ umami_id }}"></script>{% endif %}
+</head>
+<body>
+<div class="bar"><b>THOR Vision</b><span class="pill" id="live">…</span><span class="pill" id="pers">Personas 0</span><span class="sp"></span><a class="link" href="/?full=1" id="full">Panel completo</a><span class="clock" id="clock"></span></div>
+<div id="grid"></div>
+<div id="tick"></div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let cams = [], alive = true, W = 480;
+$('#full').onclick = () => { try { localStorage.setItem('thor_full', '1'); } catch (_) {} };
+const clock = () => { $('#clock').textContent = new Date().toLocaleTimeString('es-MX', {hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false}); };
+setInterval(clock, 1000); clock();
+const ORDER = ['cam-189', 'cam-191', 'cam-vto', 'cam-228', 'cam-113', 'cam-120', 'cam-118', 'cam-cowork', 'cam-sala-juntas', 'cam-236', 'cam-215'];   // filas de 3: calle y videoportero / entradas / garage, cowork, juntas / escaleras P2 y cocina
+function cols(){ return 3; }
+function layout(){ $('#grid').style.gridTemplateColumns = `repeat(${cols()}, 1fr)`; }
+addEventListener('resize', layout);
+
+async function init(){
+  const r = await (await fetch('/api/cameras')).json();
+  cams = (Array.isArray(r) ? r : (r.cameras || [])).filter(c => c.id);
+  cams.sort((a, b) => { const x = ORDER.indexOf(a.id), y = ORDER.indexOf(b.id); return (x < 0 ? 99 : x) - (y < 0 ? 99 : y); });
+  $('#grid').innerHTML = cams.map(c => `<div class="t" tabindex="0" role="link" data-id="${esc(c.id)}"><img alt="" decoding="async"><div class="n"><span>${esc(c.name || c.id)}</span><span class="pc"></span></div></div>`).join('');
+  layout();
+  document.querySelectorAll('.t').forEach((t, i) => {
+    const img = t.querySelector('img'), id = t.dataset.id;
+    const go = () => { location.href = '/camara/' + encodeURIComponent(id); };
+    t.addEventListener('click', go); t.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+    const tick = () => {                              // se precarga la siguiente y se cambia al terminar: sin parpadeo
+      if (!alive) return setTimeout(tick, 2000);
+      const nx = new Image();
+      nx.onload = () => { img.src = nx.src; setTimeout(tick, 1400); };
+      nx.onerror = () => setTimeout(tick, 5000);
+      nx.src = `/api/snapshot/${encodeURIComponent(id)}?w=${W}&t=${Date.now()}`;
+    };
+    setTimeout(tick, i * 250);                       // escalonado: no se piden las 11 a la vez
+  });
+  document.querySelector('.t')?.focus();
+}
+async function status(){
+  try {
+    const h = await (await fetch('/api/health')).json();
+    $('#live').textContent = `${h.live}/${h.total} en vivo`; $('#live').className = 'pill ' + (h.live === h.total ? 'ok' : h.live ? 'warn' : 'bad');
+    const d = (await (await fetch('/api/detections')).json()).cameras || {};
+    let n = 0; const now = Date.now() / 1000;
+    document.querySelectorAll('.t').forEach(t => {
+      const x = d[t.dataset.id] || {}, p = x.person_count || 0; n += p;
+      t.classList.toggle('p', p > 0); t.querySelector('.pc').textContent = p ? '👤 ' + p : '';
+      const al = ((x.vlm || {}).alerts || []).filter(a => String(a).trim()); t.classList.toggle('a', al.length > 0 && now - ((x.vlm || {})._ts || 0) < 120);
+    });
+    $('#pers').textContent = 'Personas ' + n;
+  } catch (_) {}
+}
+async function alerts(){
+  try {
+    const until = Date.now() / 1000, d = await (await fetch(`/api/timeline?since=${until - 3600}&until=${until}&_=${Date.now()}`, {cache: 'no-store'})).json();
+    const ev = d.events.filter(e => e.type !== 'trafico_calle').slice(-6).reverse();
+    $('#tick').innerHTML = ev.length ? ev.map(e => { const c = (d.cams.find(x => x.id === e.cam) || {}).name || e.cam;
+      return `<div class="al"><small>${new Date(e.ts * 1000).toLocaleTimeString('es-MX', {hour: '2-digit', minute: '2-digit', hour12: false})}</small><b>${esc(c)}</b><span>${esc((e.type || '').replace(/_/g, ' '))} — ${esc(e.text)}</span></div>`; }).join('')
+      : '<div class="al"><small>—</small><span>Sin alertas en la última hora</span></div>';
+    $('#tick').insertAdjacentHTML('beforeend', `<div class="al"><small>actualizado ${new Date().toLocaleTimeString('es-MX', {hour12: false})}</small></div>`);
+  } catch (_) {}
+}
+document.addEventListener('visibilitychange', () => { alive = !document.hidden; });
+setTimeout(() => location.reload(), 6 * 3600 * 1000);          // libera memoria del navegador de la TV
+init(); status(); alerts(); setInterval(status, 3000); setInterval(alerts, 20000);
+(function(){ let id = null; try { id = localStorage.getItem('thor_device_id'); } catch (_) {}
+  let n = 0; const t = setInterval(() => { if (window.umami && window.umami.track) { if (id && window.umami.identify) window.umami.identify(id, {nombre: 'TV', formato: 'tv'}); window.umami.track('tv_vista', {}); clearInterval(t); } else if (++n > 40) clearInterval(t); }, 250); })();
+</script>
+<script>
+// Banner de armado absoluto: visible en todas las pantallas mientras el modo esta activo
+(function(){
+  const bar = document.createElement('div');
+  bar.id = 'arm-banner'; bar.hidden = true; bar.setAttribute('role', 'status');
+  bar.style.cssText = 'position:sticky;top:0;z-index:9999;background:#ff3b30;color:#fff;font:700 13px/1 system-ui,sans-serif;letter-spacing:.06em;text-align:center;padding:9px 12px;box-shadow:0 2px 12px rgba(255,59,48,.5)';
+  document.body.prepend(bar);
+  const base = document.title.replace(/^🔴 ARMADO · /, '');
+  const paint = st => {
+    const on = st.mode === 'absoluto';
+    bar.hidden = !on;
+    document.title = on ? '🔴 ARMADO · ' + base : base;
+    if (on) bar.textContent = 'ARMADO ABSOLUTO ACTIVO · toda persona es alerta · desde ' + new Date(st.since * 1000).toLocaleString('es-MX', {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false});
+  };
+  const poll = () => fetch('/api/arming', {cache: 'no-store'}).then(r => r.json()).then(paint).catch(() => {});
+  poll(); setInterval(poll, 10000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IoT · THOR Vision</title>
+<style>
+:root{--bg:#0e1117;--panel:#161b24;--panel2:#1c2130;--line:#252c3a;--text:#e8edf3;--muted:#8b949e;--accent:#76B900;--bad:#ef5350;--warn:#d29922}
+:root{color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+header{display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid var(--line)}header a{color:var(--muted);text-decoration:none;font-size:13px}h1{font-size:18px;margin:0}
+main{max-width:1200px;margin:0 auto;padding:16px 20px 60px}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:500;font-size:12px}
+.b{display:inline-block;border-radius:999px;padding:1px 10px;font-size:12px;border:1px solid var(--line)}.ok{color:var(--accent);border-color:var(--accent)}.bad{color:var(--bad);border-color:var(--bad)}.warn{color:var(--warn);border-color:var(--warn)}.muted{color:var(--muted)}
+h3{margin:22px 0 8px;font-size:14px}.box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px}.bar{height:10px;border-radius:6px;background:var(--panel2);overflow:hidden;margin:6px 0}.bar>i{display:block;height:100%;background:var(--accent)}.bar.warn>i{background:var(--warn)}.bar.bad>i{background:var(--bad)}.camgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.cam{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}.cam img{width:100%;border-radius:8px;background:#000;min-height:120px;display:block}.cam button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:4px 10px;cursor:pointer;margin:8px 6px 0 0}.cam button:hover{border-color:var(--accent)}.ev{font-size:13px;padding:4px 0;border-bottom:1px solid var(--line)}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));grid-auto-rows:1fr;gap:12px;margin-bottom:6px}.sech{margin:18px 0 8px;font-size:15px}
+.sc{min-height:150px}.sc .ctl{margin-top:auto}.sc .cmsg:empty{display:none}
+.sc{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px;position:relative;overflow:hidden}
+.sc.open{border-color:var(--warn);box-shadow:0 0 0 1px var(--warn) inset}.sc.closed{border-left:3px solid var(--accent)}.sc.off{opacity:.65}
+.sc .top{display:flex;align-items:center;gap:12px}.sc svg.ic{width:44px;height:44px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.sc.open svg.ic{color:var(--warn)}.sc.closed svg.ic{color:var(--accent)}.sc.nodata svg.ic,.sc.off svg.ic{color:var(--muted)}
+.sc .nm{font-weight:650;line-height:1.2}.sc .role{color:var(--muted);font-size:12.5px}
+.sc .stt{font-size:20px;font-weight:700}.sc.open .stt{color:var(--warn)}.sc.closed .stt{color:var(--accent)}.sc.nodata .stt{color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 9px;color:var(--text);text-decoration:none}a.chip:hover{border-color:var(--accent)}
+.bat{display:inline-flex;align-items:center;gap:5px;font-size:12px}.bat i{display:inline-block;width:22px;height:10px;border:1.5px solid currentColor;border-radius:3px;position:relative}.bat i:after{content:"";position:absolute;left:1px;top:1px;bottom:1px;width:var(--p);background:currentColor;border-radius:1px}
+.ctl{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.ctl button{min-height:36px;padding:6px 12px;border-radius:8px;border:1px solid var(--line,#394057);background:transparent;color:inherit;cursor:pointer}.ctl button.on{border-color:var(--warn);color:var(--warn)}.ctl button:disabled{opacity:.5}
+</style>
+</head>
+<body>
+<header><a href="/">← Dashboard</a><h1>Dispositivos IoT (Tuya)</h1><span id="st" class="b"></span><span class="muted" style="margin-left:auto">Estado por MQTT · luces y cortinas con control (queda registro)</span></header>
+<main>
+  <div id="sensors"></div>
+  <h3>Video de las cámaras Tuya <span class="muted" style="font-weight:400">(bajo demanda; consume la cuota de la nube)</span></h3>
+  <div id="usage" class="box"></div>
+  <div id="cams" class="camgrid"></div>
+  <h3>Eventos recientes</h3><div id="ev" class="muted">Sin eventos todavía.</div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const KIND = {door: 'Puerta', window: 'Ventana', garage: 'Garage', camera: 'Cámara', light: 'Luz', curtain: 'Cortina'};
+const when = ts => ts ? new Date(ts * 1000).toLocaleString('es-MX', {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false}) : '—';
+const ICON = {
+  light: '<svg class="ic" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>',
+  light_open: '<svg class="ic" viewBox="0 0 24 24" style="color:var(--warn)"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z" fill="currentColor" fill-opacity=".35"/><path d="M12 0v1M3 4l1 1M21 4l-1 1"/></svg>',
+  door: '<svg class="ic" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="1.5"/><circle cx="14.5" cy="12" r="1"/></svg>',
+  door_open: '<svg class="ic" viewBox="0 0 24 24"><path d="M6 21V4l8-1.5v17"/><path d="M14 8h4v13h-4"/><circle cx="11.5" cy="12" r="1"/></svg>',
+  window: '<svg class="ic" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M12 4v16M4 12h16"/></svg>',
+  window_open: '<svg class="ic" viewBox="0 0 24 24"><path d="M4 4h9v16H4z"/><path d="M13 6l7-2v16l-7-2"/><path d="M4 12h9"/></svg>',
+  garage: '<svg class="ic" viewBox="0 0 24 24"><path d="M3 10l9-6 9 6v10H3z"/><path d="M7 20v-7h10v7M7 15h10M7 17.5h10"/></svg>',
+  garage_open: '<svg class="ic" viewBox="0 0 24 24"><path d="M3 10l9-6 9 6v10H3z"/><path d="M7 20v-7h10v7M7 13h10"/></svg>',
+  camera: '<svg class="ic" viewBox="0 0 24 24"><path d="M4 8h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2z"/><path d="M16 12l5-3v8l-5-3"/></svg>',
+};
+const ago = ts => { if (!ts) return '—'; const s = Date.now() / 1000 - ts; return s < 90 ? 'ahora' : s < 3600 ? 'hace ' + Math.round(s / 60) + ' min' : s < 86400 ? 'hace ' + Math.round(s / 3600) + ' h' : 'hace ' + Math.round(s / 86400) + ' d'; };
+const ctl = (x) => {
+  if (x.kind === 'light') {
+    const sw = Object.entries(x.switches || {});
+    return `<div class="ctl">${sw.map(([c, on], i) => `<button data-d="${esc(x.device_id)}" data-c="${esc(c)}" data-v="${!on}" class="${on ? 'on' : ''}">${sw.length > 1 ? (c === 'switch_led' ? 'Foco' : 'Botón ' + c.replace('switch_', '')) + ' · ' : ''}${on ? 'Apagar' : 'Encender'}</button>`).join('') || '<span class="muted" style="font-size:12px">sin estado de la nube todavía</span>'}</div>`;
+  }
+  if (x.kind === 'curtain') return `<div class="ctl"><button data-d="${esc(x.device_id)}" data-c="control" data-v="open">Abrir</button><button data-d="${esc(x.device_id)}" data-c="control" data-v="stop">Detener</button><button data-d="${esc(x.device_id)}" data-c="control" data-v="close">Cerrar</button></div>`;
+  return '';
+};
+function card(x){
+  const cam = x.kind === 'camera';
+  const light = x.kind === 'light';
+  const known = x.open !== null && x.open !== undefined;
+  const state = cam ? (x.last_ts ? 'closed' : 'nodata') : (x.online === false ? 'off' : (known ? (x.open ? 'open' : 'closed') : 'nodata'));
+  const label = cam ? (x.last_ts ? 'Activa' : 'Sin datos') : (x.online === false ? 'Sin conexión' : (known ? (light ? (x.open ? 'ENCENDIDA' : 'Apagada') : (x.open ? 'ABIERTA' : 'Cerrada')) : 'Sin datos'));
+  const icon = ICON[cam ? 'camera' : (x.kind + (state === 'open' ? '_open' : ''))] || ICON.door;
+  const bat = x.battery != null ? `<span class="bat" style="color:${x.battery <= 15 ? 'var(--bad)' : x.battery <= 30 ? 'var(--warn)' : 'var(--muted)'}"><i style="--p:${Math.max(4, Math.min(100, x.battery)) * 0.18}px"></i>${x.battery}%</span>` : '';
+  const rel = (x.related || []).map(r => /^(cam-)/.test(r.id) ? `<a class="chip" href="/camara/${esc(r.id)}" title="Abrir la vista de esta cámara">${esc(r.name)}</a>` : `<span class="chip">${esc(r.name)}</span>`).join('');
+  return `<div class="sc ${state}"><div class="top">${icon}<div><div class="nm">${esc(x.name)}</div><div class="stt">${label}</div></div></div>
+    <div class="muted" style="font-size:12.5px">${known && !cam ? (light ? (x.open ? 'encendida ' : 'apagada ') : (x.open ? 'abierta ' : 'cerrada ')) + ago(x.since) + ' · ' : ''}último mensaje ${ago(x.last_ts)} ${bat ? '· ' : ''}${bat}</div>
+  ${ctl(x)}<div class="muted cmsg" style="font-size:12px"></div></div>`;
+}
+async function tick(){
+  try {
+    const d = await (await fetch('/api/iot/devices')).json();
+    const s = d.status || {};
+    $('#st').className = 'b ' + (s.connected ? 'ok' : 'bad'); $('#st').textContent = s.connected ? 'MQTT conectado' : ('MQTT: ' + (s.error || 'sin conexión'));
+    const sec = (t, f) => { const l = d.devices.filter(f); return l.length ? `<h3 class="sech">${t} <span class="muted" style="font-weight:400">${l.length}</span></h3><div class="sgrid">${l.map(card).join('')}</div>` : ''; };
+    $('#sensors').innerHTML = sec('Cámaras Tuya', x => x.kind === 'camera') + sec('Puertas, ventanas y garage', x => !['camera', 'light'].includes(x.kind)) + sec('Luces', x => x.kind === 'light');
+    const e = (await (await fetch('/api/iot/events?limit=40')).json()).events;
+    $('#ev').innerHTML = e.length ? e.map(r => `<div class="ev"><span class="muted">${when(r.ts)}</span> · <b>${esc(r.name)}</b> · ${esc(LABEL[r.code] || r.code)}${r.value && typeof r.value === 'object' ? '' : ' = ' + esc(JSON.stringify(r.value))} <span class="muted">(${esc(r.source)})</span></div>`).join('') : 'Sin eventos todavía.';
+  } catch (er) { $('#st').className = 'b bad'; $('#st').textContent = 'sin respuesta'; }
+}
+let SVC = '';
+const LABEL = { ipc_motion: 'Movimiento detectado', ipc_bang: 'Ruido fuerte detectado', dp239: 'Aviso de movimiento' };
+async function usage(){
+  if (!SVC) return;
+  try {
+    const u = await (await fetch(SVC + '/usage')).json();
+    const cls = u.pct >= u.warn_pcts[2] ? 'bad' : u.pct >= u.warn_pcts[0] ? 'warn' : '';
+    $('#usage').innerHTML = `<b>${u.used_gb} GB de ${u.quota_gb} GB</b> usados este mes (${u.month}) · <b>${u.pct}%</b> · ${u.minutes} min de video
+      <div class="bar ${cls}"><i style="width:${Math.min(100, u.pct)}%"></i></div>
+      <span class="muted">Estimado a ${u.est_mbps} Mbps. Avisa al ${u.warn_pcts.join(', ')}% y bloquea nuevos flujos al ${u.block_pct}%. ${u.level === 'blocked' ? '<b style="color:var(--bad)">Cuota agotada: no se piden más flujos.</b>' : ''} Para calibrar con el portal de Tuya: <code>curl -X POST "${SVC}/calibrate?used_gb=&lt;GB reales&gt;"</code></span>`;
+    document.querySelectorAll('.cam button').forEach(b => b.disabled = u.level === 'blocked');
+    window._maxs = u.max_session_s;
+  } catch (e) { $('#usage').innerHTML = '<span class="muted">Servicio de video de Tuya no disponible (oapc-devops).</span>'; }
+}
+async function initVideo(){
+  const cfg = await (await fetch('/api/iot/config')).json(); SVC = cfg.tuya_service;
+  const d = await (await fetch('/api/iot/devices')).json();
+  $('#cams').innerHTML = d.devices.filter(x => x.kind === 'camera').map(x => `<div class="cam" data-id="${esc(x.device_id)}"><b>${esc(x.name)}</b>
+    <img alt="" src=""><div><button data-a="snap">Captura ahora</button><button data-a="live">En vivo</button><button data-a="stop">Detener</button></div><div class="muted msg"></div></div>`).join('');
+  usage(); setInterval(usage, 15000);
+}
+document.addEventListener('click', async e => {
+  const cb = e.target.closest('.ctl button');
+  if (cb) {
+    const msg = cb.closest('.sc').querySelector('.cmsg'); cb.disabled = true; msg.textContent = 'Enviando…';
+    let v = cb.dataset.v; if (v === 'true') v = true; else if (v === 'false') v = false;
+    try {
+      const r = await fetch(SVC + '/control/' + cb.dataset.d, {method: 'POST', body: JSON.stringify({code: cb.dataset.c, value: v})});
+      const j = await r.json(); msg.textContent = j.ok ? 'Enviado; el estado se actualiza en unos segundos' : 'No se pudo: ' + j.result;
+      setTimeout(tick, 4000);
+    } catch (er) { msg.textContent = 'Servicio de control no disponible'; }
+    setTimeout(() => { cb.disabled = false; }, 1500);
+    return;
+  }
+  const b = e.target.closest('.cam button'); if (!b) return;
+  const c = b.closest('.cam'), img = c.querySelector('img'), msg = c.querySelector('.msg'), id = c.dataset.id, a = b.dataset.a;
+  if (a === 'stop') { img.src = ''; msg.textContent = ''; setTimeout(usage, 800); return; }
+  msg.textContent = a === 'snap' ? 'Pidiendo captura…' : 'En vivo (máx. ' + (window._maxs || 180) + ' s)…';
+  img.onerror = () => { msg.textContent = 'No se pudo obtener video (¿cuota agotada o cámara sin conexión?)'; };
+  img.onload = () => { if (a === 'snap') { msg.textContent = 'Captura de ' + new Date().toLocaleTimeString('es-MX'); setTimeout(usage, 800); } };
+  img.src = a === 'snap' ? `${SVC}/frame/${encodeURIComponent(id)}?t=${Date.now()}` : `${SVC}/live/${encodeURIComponent(id)}.mjpg?secs=${window._maxs || 180}&t=${Date.now()}`;
+});
+tick(); setInterval(tick, 5000); initVideo();
+</script>
+</body>
+</html>

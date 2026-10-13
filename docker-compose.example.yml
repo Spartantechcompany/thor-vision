@@ -6,32 +6,55 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
+      - ./app:/app/app:ro               # código montado: cambios sin rebuild
       - ./config:/app/config:ro
-      - ./data:/app/data:rw        # persistencia: events.db + snapshots + logs + metadata
-    runtime: nvidia                # requiere NVIDIA Container Toolkit
+      - ./data:/app/data:rw            # persistencia: events.db + snapshots + logs + metadata
+      # Libs NPP del CUDA toolkit del host — opencv-contrib-python-rolling
+      # (GStreamer+NVDEC) las necesita en tiempo de import y no vienen
+      # incluidas en el wheel ni se montan solas via nvidia-container-runtime
+      # (a diferencia de las libs Tegra/GStreamer, que si se montan solas).
+      - /usr/local/cuda-13.0/targets/sbsa-linux/lib:/usr/local/cuda-13.0/targets/sbsa-linux/lib:ro
+    runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
+      - UNNAMED_TTL_DAYS=30
+      - FACE_BLUR_MIN=40
       - NVIDIA_DRIVER_CAPABILITIES=all
-      - TZ=America/Mexico_City     # ajusta a tu zona horaria
+      # cudnn: instalado via pip (nvidia-cudnn-cu13); cuda-13.0 NPP: montado
+      # arriba desde el host. Sin esto, cv2 no importa (ImportError en las
+      # libs NVCUVID/NPP que opencv-contrib-python-rolling enlaza).
+      - LD_LIBRARY_PATH=/opt/venv/lib/python3.12/site-packages/nvidia/cudnn/lib:/usr/local/cuda-13.0/targets/sbsa-linux/lib
+      - TZ=America/Mexico_City
+      - UMAMI_SCRIPT_URL=                 # opcional: http://<HOST>:8300/script.js
+      - UMAMI_WEBSITE_ID=                 # opcional
       - LOG_LEVEL=INFO
       - INSIGHTFACE_HOME=/app/data/models
+      # ── Analizador semántico (VLM en Spark01) ─────────────────────────
+      - VLM_ENDPOINT=http://<LLM_GATEWAY>:<PORT>
+      - VLM_MODEL=<MODEL_ALIAS>
+      - VLM_API_KEY=<API_KEY>
+      # Pipeline de detalle de pantallas para cam-cowork (experimento).
+      # Kill-switch explícito: false hasta confirmar en logs que arranca
+      # limpio y que no agrega presión al gateway (ver CLAUDE.md).
+      - COWORK_DETAIL_ENABLED=true
+      # Reportes periódicos generados por el VLM (triage de alertas +
+      # resumen de actividad). Kill-switch: false hasta probar el trigger
+      # manual (POST /api/reports/generate) y confirmar que el texto sale bien.
+      - REPORT_ENABLED=true
+      - REPORT_INTERVAL_HOURS=12          # cada cuánto corre el hilo automático
+      - REPORT_PERIOD_HOURS=12            # ventana que resume cada corrida
+      - REPORT_KIND=daily
       - INFER_THREADS=4
       - OMP_NUM_THREADS=4
       - MKL_NUM_THREADS=4
       - OPENBLAS_NUM_THREADS=4
-      # Nemotron (LLM en DGX Spark o servidor remoto)
-      - NEMOTRON_ENDPOINT=http://<IP_DGX>:8003/v1/chat/completions
-      - NEMOTRON_MODEL=nemotron-omni
-      # Motion-gated scheduling
-      - NEMOTRON_MIN_INTERVAL_S=30
-      - NEMOTRON_MAX_INTERVAL_S=120
-      - NEMOTRON_MOTION_THRESHOLD=0.04
-      # Retención de datos
-      - SNAPSHOT_PERIODIC_S=600
-      - RETENTION_INTERVAL_S=3600
-      - RETENTION_MAX_EVENTS=200000
-      - RETENTION_MAX_SNAPSHOT_GB=50
-      - RETENTION_MAX_AGE_DAYS=30
+      # ── Storage / retention ───────────────────────────────────────────
+      - SNAPSHOT_PERIODIC_S=600          # snapshot programado cada 10 min por cámara
+      - RETENTION_INTERVAL_S=3600        # corre retention cada 1 h
+      - RETENTION_MAX_EVENTS=3000000     # ~1 año de metadata (~1.6 GB);
+                                         # los JPGs se topan aparte abajo
+      - RETENTION_MAX_SNAPSHOT_GB=50     # máx 50 GB de JPGs en disco
+      - RETENTION_MAX_AGE_DAYS=30        # borrar JPGs > 30 días
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
       interval: 30s

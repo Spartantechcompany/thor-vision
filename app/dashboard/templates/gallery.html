@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Miniaturas · THOR Vision</title>
+<style>
+:root{--bg:#0e1117;--panel:#161b24;--line:#252c3a;--text:#e8edf3;--muted:#8b949e;--accent:#76B900;--bad:#ef5350}
+:root{color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+header{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);z-index:5}
+header a{color:var(--muted);text-decoration:none;font-size:13px}header a:hover{color:var(--accent)}h1{font-size:17px;margin:0;flex:1}
+main{max-width:1500px;margin:0 auto;padding:14px 16px 60px}
+.btn,input,select{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font:inherit;cursor:pointer}input{cursor:text}
+.btn:hover{border-color:var(--accent)}.btn.on{border-color:var(--accent);color:var(--accent);font-weight:600}.btn.pri{background:var(--accent);border-color:var(--accent);color:#0d1400;font-weight:600}.btn.bad{border-color:var(--bad);color:var(--bad)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.pick{display:flex;gap:6px;flex-wrap:wrap;max-height:260px;overflow:auto;margin-bottom:10px}
+.pk{display:inline-flex;align-items:center;gap:6px;padding:4px 10px 4px 4px}.pk img{width:34px;height:34px;border-radius:6px;object-fit:cover;background:#000}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.th{position:relative;background:var(--panel);border:2px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer}.th.sel{border-color:var(--accent)}
+.th img{width:100%;aspect-ratio:3/4;object-fit:cover;display:block;background:#000}.th .c{position:absolute;left:6px;top:6px;width:20px;height:20px;accent-color:var(--accent)}
+.th .m{font-size:11px;color:var(--muted);padding:4px 6px}.th .z{position:absolute;right:4px;top:4px;background:rgba(0,0,0,.55);color:#fff;border:0;border-radius:6px;font-size:13px;padding:1px 6px;cursor:zoom-in}
+.help{color:var(--muted);font-size:12.5px;margin:0 0 10px}.empty{color:var(--muted);padding:30px;text-align:center}
+#big{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:40}#big.on{display:flex}#big img{max-width:94vw;max-height:90vh;min-height:50vh;object-fit:contain}
+</style>
+</head>
+<body>
+<header><a href="/identidades">← Identidades</a><h1>Miniaturas por identidad</h1></header>
+<main>
+  <div class="row" id="kinds"><button class="btn on" data-k="persona">Personas</button><button class="btn" data-k="mascota">Mascotas</button></div>
+  <div id="body"></div>
+</main>
+<div id="big"><img alt=""></div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const J = async (u, o) => { const r = await fetch(u, o); if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); };
+const send = (u, b) => J(u, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)});
+const fmt = ts => new Date(ts * 1000).toLocaleString('es-MX', {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false});
+const qs = new URLSearchParams(location.search);
+let kind = qs.get('kind') || 'persona', sel = new Set(), cur = null, shown = [], pets = {label: 'gigi', mode: 'label'};
+$('#big').onclick = () => $('#big').classList.remove('on');
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#big').classList.remove('on'); });
+const zoom = u => { $('#big img').src = u; $('#big').classList.add('on'); };
+
+document.querySelectorAll('#kinds .btn').forEach(b => b.onclick = () => { kind = b.dataset.k; sel.clear(); start(); });
+function start(){
+  document.querySelectorAll('#kinds .btn').forEach(b => b.classList.toggle('on', b.dataset.k === kind));
+  kind === 'persona' ? people() : petsView();
+}
+
+// ---------- personas
+async function people(){
+  $('#body').innerHTML = `<p class="help">Elige una identidad para ver todas sus miniaturas. Marca las que NO son de esa persona y muévelas a otra identidad, a una nueva, o elimínalas. El rostro promedio de la identidad se recalcula solo.</p>
+    <div class="row"><input id="q" placeholder="Buscar por nombre…" style="min-width:240px"><select id="cat"><option value="empleado">Empleados</option><option value="invitado">Invitados</option><option value="revisar">Por revisar</option></select></div>
+    <div class="pick" id="pick"></div><div id="g"></div>`;
+  const find = async () => {
+    const d = await J(`/api/people?category=${$('#cat').value}&limit=300&scope=all&q=${encodeURIComponent($('#q').value.trim())}`);
+    $('#pick').innerHTML = d.people.filter(p => p.visits > 0).map(p => `<button class="btn pk${cur === p.id ? ' on' : ''}" data-id="${p.id}"><img loading="lazy" src="/api/subjects/${p.id}/face" onerror="this.onerror=null;this.src='/api/subjects/${p.id}/body'" alt="">${esc(p.name)} <small style="color:var(--muted)">${p.visits}</small></button>`).join('') || '<span class="help">Sin resultados</span>';
+  };
+  $('#q').oninput = () => { clearTimeout(people.t); people.t = setTimeout(find, 250); };
+  $('#cat').onchange = find;
+  $('#pick').onclick = e => { const b = e.target.closest('[data-id]'); if (b){ cur = +b.dataset.id; sel.clear(); find(); gallery(0); } };
+  await find();
+  if (qs.get('id')) { cur = +qs.get('id'); qs.delete('id'); gallery(0); }
+}
+async function gallery(off){
+  const d = await J(`/api/people/${cur}/gallery?limit=120&offset=${off}`);
+  if (!off) shown = [];
+  shown = shown.concat(d.visits);
+  $('#g').innerHTML = `<div class="row"><b>${esc(d.name)}</b><span class="help" style="margin:0">${d.total} visitas · ${esc(d.category)}</span>
+    <button class="btn" id="all">Seleccionar todo</button><button class="btn" id="none">Ninguna</button>
+    <button class="btn pri" id="mv">Mover a otra identidad…</button><button class="btn" id="nw">Sacar a una identidad nueva</button><button class="btn bad" id="del">Eliminar</button><span id="n" class="help" style="margin:0"></span></div>
+    <div class="grid">${shown.map(v => `<div class="th${sel.has(v.id) ? ' sel' : ''}" data-id="${v.id}"><input class="c" type="checkbox" ${sel.has(v.id) ? 'checked' : ''}>
+      <img loading="lazy" src="/api/person-visits/${v.id}/${v.face ? 'face' : 'body'}" alt=""><button class="z" data-z="/api/person-visits/${v.id}/${v.body ? 'body' : 'face'}" title="Ampliar">⤢</button>
+      <div class="m">${esc(v.cam)} · ${fmt(v.ts)}${v.face ? '' : ' · sin rostro'}${v.attrs && v.attrs.upper ? ' · ' + esc(v.attrs.upper) + '/' + esc(v.attrs.lower || '?') : ''}${v.attrs && v.attrs.guess ? ' · ¿' + esc(v.attrs.guess.name) + '?' : ''}${v.attrs && v.attrs.journey ? ' · recorrido: ' + esc(v.attrs.journey.name) : ''}</div></div>`).join('')}</div>
+    ${shown.length < d.total ? '<div class="row" style="margin-top:12px"><button class="btn" id="more">Cargar más</button></div>' : ''}`;
+  const upd = () => { $('#n').textContent = sel.size + ' seleccionadas'; document.querySelectorAll('.th').forEach(t => { const on = sel.has(+t.dataset.id); t.classList.toggle('sel', on); t.querySelector('.c').checked = on; }); };
+  upd();
+  $('#g').onclick = async e => {
+    const z = e.target.closest('[data-z]'); if (z){ e.stopPropagation(); return zoom(z.dataset.z); }
+    const t = e.target.closest('.th'); if (t){ const id = +t.dataset.id; sel.has(id) ? sel.delete(id) : sel.add(id); return upd(); }
+    const id = e.target.id;
+    if (id === 'all'){ shown.forEach(v => sel.add(v.id)); upd(); }
+    else if (id === 'none'){ sel.clear(); upd(); }
+    else if (id === 'more') gallery(shown.length);
+    else if (id === 'del'){ if (!sel.size || !confirm('Se eliminarán ' + sel.size + ' capturas. No se deshace.')) return; await send('/api/person-visits/delete', {ids: [...sel]}); sel.clear(); gallery(0); }
+    else if (id === 'nw'){ if (!sel.size) return; const n = prompt('Nombre de la identidad nueva (vacío = sin nombre):', ''); if (n === null) return; await send('/api/person-visits/move', {ids: [...sel], to: null, name: n}); sel.clear(); gallery(0); }
+    else if (id === 'mv'){ if (!sel.size) return; const to = await chooser(); if (!to) return; await send('/api/person-visits/move', {ids: [...sel], to}); sel.clear(); gallery(0); }
+  };
+}
+async function chooser(){
+  const all = [];
+  for (const c of ['empleado', 'invitado', 'revisar']) all.push(...(await J(`/api/people?category=${c}&limit=300&scope=all`)).people);
+  const named = all.filter(p => p.id !== cur && p.name && !/^Persona #\d+$/.test(p.name)).sort((a, b) => (a.category === 'empleado' ? 0 : 1) - (b.category === 'empleado' ? 0 : 1) || a.name.localeCompare(b.name));
+  return new Promise(res => {
+    const bg = document.createElement('div');
+    bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99;display:flex;align-items:center;justify-content:center';
+    bg.innerHTML = `<div style="background:#1c2130;border:1px solid #333;border-radius:12px;padding:16px;width:min(420px,92vw);max-height:80vh;display:flex;flex-direction:column;gap:10px">
+      <b>Mover a una persona con nombre</b><input id="chq" placeholder="Filtrar por nombre" style="padding:8px;border-radius:8px;border:1px solid #444;background:#111;color:#eee">
+      <div id="chl" style="overflow:auto;display:flex;flex-direction:column;gap:4px"></div><button id="chx" class="btn">Cancelar</button></div>`;
+    document.body.appendChild(bg);
+    const draw = () => { const q = bg.querySelector('#chq').value.trim().toLowerCase();
+      bg.querySelector('#chl').innerHTML = named.filter(p => p.name.toLowerCase().includes(q)).map(p => `<button class="btn" data-id="${p.id}" style="text-align:left">${p.name.replace(/</g, '&lt;')} <span style="opacity:.6">· ${p.category} · ${p.visits} visitas</span></button>`).join('') || '<span style="opacity:.6">Sin coincidencias</span>'; };
+    draw(); bg.querySelector('#chq').oninput = draw; bg.querySelector('#chq').focus();
+    bg.onclick = e => { const b = e.target.closest('[data-id]'); if (b){ bg.remove(); res(+b.dataset.id); } else if (e.target === bg || e.target.id === 'chx'){ bg.remove(); res(null); } };
+  });
+}
+
+// ---------- mascotas
+const PET = {akamaru: 'Akamaru', mojo: 'Mojo-jojo', gigi: 'Gigi', otro: 'Otro', descartar: 'Descartar'};
+async function petsView(){
+  $('#body').innerHTML = `<p class="help">Valida las miniaturas de cada mascota. "Etiquetadas" son las que confirmaste; "Sugeridas" son las que el modelo propone sin que las hayas etiquetado. Marca y reetiqueta las equivocadas.</p>
+    <div class="row" id="pl">${['akamaru', 'mojo', 'gigi', 'otro', 'descartar'].map(k => `<button class="btn${pets.label === k ? ' on' : ''}" data-l="${k}">${PET[k]}</button>`).join('')}
+      <span style="width:12px"></span><button class="btn${pets.mode === 'label' ? ' on' : ''}" data-m="label">Etiquetadas</button><button class="btn${pets.mode === 'pred' ? ' on' : ''}" data-m="pred">Sugeridas por el modelo</button></div><div id="g"></div>`;
+  $('#pl').onclick = e => { const l = e.target.closest('[data-l]'), m = e.target.closest('[data-m]'); if (l) pets.label = l.dataset.l; if (m) pets.mode = m.dataset.m; if (l || m){ sel.clear(); petsView(); } };
+  petGrid(0);
+}
+async function petGrid(off){
+  const url = pets.mode === 'label' ? `/api/pets/crops?unlabeled=0&label=${pets.label}&order=recent&limit=60&offset=${off}` : `/api/pets/crops?unlabeled=1&pred=${pets.label}&order=confident&limit=60&offset=${off}`;
+  const d = await J(url);
+  if (!off) shown = [];
+  shown = shown.concat(d.crops);
+  $('#g').innerHTML = `<div class="row"><button class="btn" id="all">Seleccionar todo</button><button class="btn" id="none">Ninguna</button><span class="help" style="margin:0">Marcar como:</span>
+    ${Object.entries(PET).map(([k, v]) => `<button class="btn${k === 'descartar' ? ' bad' : ''}" data-set="${k}">${v}</button>`).join('')}<span id="n" class="help" style="margin:0"></span></div>
+    <div class="grid">${shown.map(c => `<div class="th" data-id="${c.id}"><input class="c" type="checkbox"><img loading="lazy" src="/api/pets/crops/${c.id}/image" alt=""><button class="z" data-z="/api/pets/crops/${c.id}/image">⤢</button>
+      <div class="m">${esc(c.cam)} · ${fmt(c.ts)}${c.pred_conf != null && pets.mode === 'pred' ? ' · ' + Math.round(c.pred_conf * 100) + '%' : ''}</div></div>`).join('') || '<div class="empty">Sin miniaturas aquí.</div>'}</div>
+    ${d.crops.length === 60 ? '<div class="row" style="margin-top:12px"><button class="btn" id="more">Cargar más</button></div>' : ''}`;
+  const upd = () => { $('#n').textContent = sel.size + ' seleccionadas'; document.querySelectorAll('.th').forEach(t => { const on = sel.has(+t.dataset.id); t.classList.toggle('sel', on); t.querySelector('.c').checked = on; }); };
+  upd();
+  $('#g').onclick = async e => {
+    const z = e.target.closest('[data-z]'); if (z){ e.stopPropagation(); return zoom(z.dataset.z); }
+    const t = e.target.closest('.th'); if (t){ const id = +t.dataset.id; sel.has(id) ? sel.delete(id) : sel.add(id); return upd(); }
+    const s = e.target.closest('[data-set]');
+    if (s){ if (!sel.size) return; for (const id of sel) await send(`/api/pets/crops/${id}/label`, {label: s.dataset.set}); sel.clear(); return petGrid(0); }
+    if (e.target.id === 'all'){ shown.forEach(c => sel.add(c.id)); upd(); }
+    else if (e.target.id === 'none'){ sel.clear(); upd(); }
+    else if (e.target.id === 'more') petGrid(shown.length);
+  };
+}
+start();
+</script>
+</body>
+</html>

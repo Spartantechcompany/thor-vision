@@ -1,0 +1,9 @@
+id: get-recent-frames-sin-tope
+language: python
+severity: error
+message: "get_recent_frames() devuelve hasta todo el buffer (30 frames a fps reales): el consumidor debe tener su propio tope (ver MAX_VIDEO_FRAMES)."
+note: "vlm_worker.py ya esta cubierto: el codificador submuestrea a MAX_VIDEO_FRAMES."
+ignores:
+  - app/vision/vlm_worker.py
+rule:
+  pattern: $B.get_recent_frames($$$ARGS)
