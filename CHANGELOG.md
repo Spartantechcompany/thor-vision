@@ -2,6 +2,14 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.33.0 — Video en la vista de cámara, menú Más y videoportero por go2rtc (2026-10-13)
+
+La página de cada cámara (/camara/<id>) también muestra video en vivo por WebRTC con respaldo a capturas; el panel suma un menú 'Más' con las páginas que no tenían enlace (Presencia, WiFi, Evaluación, Miniaturas, Conocimiento, Reglas, Zonas); y las cámaras de 5 MP solo usan video si el navegador las decodifica con fluidez (MediaCapabilities). El videoportero se lee a través de go2rtc para que su única sesión RTSP sirva a Thor y al navegador.
+
+- **Panel · Menú Más**: Enlaces a /presencia, /wifi, /evaluacion, /galeria, /conocimiento, /reglas y /zonas desde el encabezado.
+- **Video · Vista de cámara en vivo**: /camara/<id> usa WebRTC (go2rtc) y vuelve a capturas si falla; ?video=0 lo apaga. El doble clic sigue abriendo pantalla completa.
+- **Video · Videoportero**: Admite una sola sesión RTSP (503 en la segunda): Thor ahora lee rtsp://127.0.0.1:8554/cam-vto y go2rtc es el único cliente del videoportero.
+
 ## v2.32.0 — Video en vivo en el panel (go2rtc, WebRTC) (2026-10-12)
 
 Las tarjetas de cámara muestran video real por WebRTC desde go2rtc en vez de una foto cada 200 ms. Si una cámara no conecta en 8 s o se corta, vuelve sola a las fotos y reintenta a los 15 s. Sin audio ni controles de volumen.

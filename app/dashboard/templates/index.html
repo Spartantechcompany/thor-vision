@@ -981,6 +981,12 @@ html.tl-only .tl { margin:0; border:0; border-radius:0; }
 /* iconos de la segunda fila: etiqueta visible y brillo que sigue al mouse */
 .hdr-icons .hdr-btn { position:relative; display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; min-width:80px; padding:10px 12px 8px; border-radius:12px; background:linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02)); transition:transform .15s, border-color .2s, color .2s; color:var(--text-secondary); overflow:hidden; text-decoration:none; }
 .hdr-icons .hdr-btn .ico { width:26px; height:26px; stroke-width:1.8; }
+.hdr-more { position:relative; display:inline-flex; }
+.hdr-more > summary { list-style:none; cursor:pointer; font-size:12px; font-weight:600; }
+.hdr-more > summary::-webkit-details-marker { display:none; }
+.hdr-more-list { position:absolute; top:100%; right:0; z-index:60; margin-top:6px; min-width:210px; background:var(--bg-card, #161b22); border:1px solid var(--border); border-radius:10px; padding:6px; display:flex; flex-direction:column; box-shadow:0 8px 24px rgba(0,0,0,.4); }
+.hdr-more-list a { padding:8px 10px; border-radius:6px; color:var(--text-primary, #e8edf3); text-decoration:none; font-size:13px; }
+.hdr-more-list a:hover { background:rgba(118,185,0,.14); color:var(--oxm-blue); }
 .hdr-icons .hdr-btn:hover { transform:translateY(-2px); }
 header { padding-top:8px; }
 .hdr-icons .hdr-btn::after { content:attr(data-l); font-size:.68rem; font-weight:500; letter-spacing:.2px; color:var(--text-muted); }
@@ -1051,6 +1057,9 @@ try { if (!/[?&](full|tl)=/.test(location.search) && !localStorage.getItem('thor
 
   <div class="header-clock" id="clock">—</div>
   <div class="hdr-icons">
+  <details class="hdr-more" id="hdr-more"><summary class="hdr-btn" title="Más páginas">Más ▾</summary><div class="hdr-more-list">
+    <a href="/presencia">Presencia ahora</a><a href="/wifi">Presencia WiFi</a><a href="/evaluacion">Evaluación de YOLO</a><a href="/galeria">Miniaturas y mascotas</a><a href="/conocimiento">Conocimiento</a><a href="/reglas">Reglas de alerta</a><a href="/zonas">Zonas</a>
+  </div></details>
   <button class="hdr-btn" id="btn-history" title="Histórico de eventos" aria-label="Histórico de eventos"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
   <button class="hdr-btn" id="btn-spot" title="Cómo funciona OXM Vision (animación)" aria-label="Cómo funciona OXM Vision (animación)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg></button>
   <a class="hdr-btn" id="btn-ppl" href="/identidades" title="Identidades: empleados, invitados y asistencia" aria-label="Identidades" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="17.5" cy="9" r="2.4"/><path d="M16 14c3 0 5 1.8 5 4.5"/></svg></a>
@@ -1402,7 +1411,13 @@ let LIVE_ON = !LITE && (localStorage.getItem('thor_live_video') ?? '1') === '1';
 if (/[?&]video=0/.test(location.search)) LIVE_ON = false;
 if (/[?&]video=1/.test(location.search)) LIVE_ON = true;
 const _live = {};      // camId -> { pc, on, timer }
-const LIVE_SKIP = new Set(['cam-vto']);   // el videoportero solo admite una sesion RTSP: se queda con las fotos
+const HEAVY_CAMS = new Set(['cam-189', 'cam-191']);        // 2592x1944 H.264 a 30 fps
+let _heavyOk = null;
+try {   // MediaCapabilities (lo que comprueban herramientas como HwCodecDetect): decodificacion fluida de 5 MP en este navegador
+  navigator.mediaCapabilities.decodingInfo({ type: 'webrtc', video: { contentType: 'video/h264', width: 2592, height: 1944, framerate: 30, bitrate: 2560000 } })
+    .then(i => { _heavyOk = !!i.smooth; if (!_heavyOk) HEAVY_CAMS.forEach(c => stopLive(c, true)); }).catch(() => {});
+} catch (e) {}
+const LIVE_SKIP = new Set();
 
 function _setLive(camId, on){
   const card = document.getElementById(`img-${camId}`)?.closest('.cam-card');
@@ -1412,6 +1427,7 @@ async function startLive(camId){
   stopLive(camId, false);
   const v = document.getElementById(`vid-${camId}`);
   if (!v || !window.RTCPeerConnection || LIVE_SKIP.has(camId)) return;
+  if (HEAVY_CAMS.has(camId) && _heavyOk === false) return;                  // el navegador no decodifica 5 MP con fluidez: esa camara se queda con fotos
   const st = _live[camId] = { pc: null, on: false, timer: null };
   try {
     const pc = new RTCPeerConnection({ iceServers: [] });

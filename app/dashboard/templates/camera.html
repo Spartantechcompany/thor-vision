@@ -14,6 +14,8 @@ main{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(300px,1fr);gap:16
 @media (max-width:900px){main{grid-template-columns:1fr}}
 .stage{background:#000;border:1px solid var(--line);border-radius:12px;overflow:hidden;line-height:0;position:relative}
 .stage img{width:100%;display:block;max-height:78vh;object-fit:contain;background:#000}
+.stage video{width:100%;display:none;max-height:78vh;object-fit:contain;background:#000}
+.stage.vid video{display:block}.stage.vid img{display:none}
 .stage .tag{position:absolute;left:8px;top:8px;background:rgba(0,0,0,.6);color:#fff;border-radius:6px;padding:2px 8px;font-size:12px;line-height:1.4}
 .chips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;color:var(--muted);font-size:12.5px}.chips b{color:var(--text)}
 input[type=datetime-local]{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit}
@@ -42,7 +44,7 @@ input[type=datetime-local]{background:var(--panel);color:var(--text);border:1px 
 <header><a href="/">← Panel</a><h1 id="ttl">Cámara</h1><button class="btn" id="fs" title="Pantalla completa">⤢</button></header>
 <main>
   <section>
-    <div class="stage"><img id="live" alt="en vivo"><span class="tag" id="tag">en vivo</span></div>
+    <div class="stage"><video id="lv" muted playsinline autoplay disablepictureinpicture></video><img id="live" alt="en vivo"><span class="tag" id="tag">en vivo</span></div>
     <div class="chips" id="chips"><button class="btn on" id="hd" title="Vista de alta resolución (1920 px); apágalo para una vista ligera">HD</button><button class="btn" id="m5" title="Resolución nativa completa (hasta 5 MP): más pesada y lenta en las exteriores">5 MP</button></div>
     <iframe id="tlf" class="tlf" title="Línea de tiempo de esta cámara" loading="lazy"></iframe></div>
   </section>
@@ -73,7 +75,30 @@ function tick(){ if (!alive) return; live.src = `/api/snapshot/${encodeURICompon
 $('#hd').onclick = () => { hd = !hd; $('#hd').classList.toggle('on', hd); };
 $('#m5').onclick = () => { full5 = !full5; if (full5) { hd = true; $('#hd').classList.add('on'); } $('#m5').classList.toggle('on', full5); };
 live.onload = () => setTimeout(tick, full5 ? 2500 : hd ? 1200 : 600); live.onerror = () => setTimeout(tick, 3000); tick();
-document.addEventListener('visibilitychange', () => { alive = !document.hidden; if (alive) tick(); });
+// video en vivo por WebRTC (go2rtc); si no conecta o se corta, vuelve a las capturas y reintenta
+const GO2RTC = `${location.protocol}//${location.hostname}:1984`, lv = $('#lv'), stage = document.querySelector('.stage');
+let pc = null, vtimer = null, wantVideo = !/[?&]video=0/.test(location.search) && CAM !== 'cam-vto';
+function stopVideo(){ clearTimeout(vtimer); try { pc && pc.close(); } catch (e) {} pc = null; lv.srcObject = null; stage.classList.remove('vid'); alive = !document.hidden; if (alive) tick(); }
+function videoFail(){ stopVideo(); $('#tag').textContent = 'en vivo'; if (wantVideo && !document.hidden) setTimeout(startVideo, 15000); }
+async function startVideo(){
+  if (!wantVideo || pc || !window.RTCPeerConnection) return;
+  try {
+    pc = new RTCPeerConnection({ iceServers: [] });
+    pc.addTransceiver('video', { direction: 'recvonly' });
+    pc.ontrack = e => { lv.srcObject = (e.streams && e.streams[0]) || new MediaStream([e.track]); };
+    pc.onconnectionstatechange = () => { if (['failed', 'disconnected', 'closed'].includes(pc && pc.connectionState)) videoFail(); };
+    await pc.setLocalDescription(await pc.createOffer());
+    await new Promise(res => { if (pc.iceGatheringState === 'complete') return res(); const t = setTimeout(res, 1500); pc.onicegatheringstatechange = () => { if (pc.iceGatheringState === 'complete'){ clearTimeout(t); res(); } }; });
+    const r = await fetch(`${GO2RTC}/api/webrtc?src=${encodeURIComponent(CAM)}`, { method: 'POST', headers: { 'Content-Type': 'application/sdp' }, body: pc.localDescription.sdp });
+    if (!r.ok) throw new Error(r.status);
+    await pc.setRemoteDescription({ type: 'answer', sdp: await r.text() });
+    lv.onplaying = () => { clearTimeout(vtimer); alive = false; stage.classList.add('vid'); $('#tag').textContent = 'en vivo · video'; };
+    vtimer = setTimeout(() => { if (!stage.classList.contains('vid')) videoFail(); }, 8000);
+  } catch (e) { videoFail(); }
+}
+lv.ondblclick = () => $('#fs').onclick();
+startVideo();
+document.addEventListener('visibilitychange', () => { if (document.hidden) { stopVideo(); alive = false; } else { alive = true; tick(); startVideo(); } });
 $('#fs').onclick = () => { const st = document.querySelector('.stage'); document.fullscreenElement ? document.exitFullscreen() : st.requestFullscreen?.(); };
 live.ondblclick = $('#fs').onclick;
 

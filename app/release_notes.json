@@ -1,5 +1,28 @@
 [
   {
+    "version": "2.33.0",
+    "date": "2026-10-13",
+    "name": "Video en la vista de cámara, menú Más y videoportero por go2rtc",
+    "summary": "La página de cada cámara (/camara/<id>) también muestra video en vivo por WebRTC con respaldo a capturas; el panel suma un menú 'Más' con las páginas que no tenían enlace (Presencia, WiFi, Evaluación, Miniaturas, Conocimiento, Reglas, Zonas); y las cámaras de 5 MP solo usan video si el navegador las decodifica con fluidez (MediaCapabilities). El videoportero se lee a través de go2rtc para que su única sesión RTSP sirva a Thor y al navegador.",
+    "highlights": [
+      {
+        "area": "Panel",
+        "title": "Menú Más",
+        "text": "Enlaces a /presencia, /wifi, /evaluacion, /galeria, /conocimiento, /reglas y /zonas desde el encabezado."
+      },
+      {
+        "area": "Video",
+        "title": "Vista de cámara en vivo",
+        "text": "/camara/<id> usa WebRTC (go2rtc) y vuelve a capturas si falla; ?video=0 lo apaga. El doble clic sigue abriendo pantalla completa."
+      },
+      {
+        "area": "Video",
+        "title": "Videoportero",
+        "text": "Admite una sola sesión RTSP (503 en la segunda): Thor ahora lee rtsp://127.0.0.1:8554/cam-vto y go2rtc es el único cliente del videoportero."
+      }
+    ]
+  },
+  {
     "version": "2.32.0",
     "date": "2026-10-12",
     "name": "Video en vivo en el panel (go2rtc, WebRTC)",
