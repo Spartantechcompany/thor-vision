@@ -59,3 +59,45 @@ def test_poda_conserva_las_mejores_fotos_por_camara():
     assert prune_employee_images(c, 500.0, 5) == 3
     kept = {r[0] for r in c.execute("SELECT id FROM person_visits WHERE face IS NOT NULL OR body IS NOT NULL")}
     assert kept == {4, 5, 6, 7, 8, 20, 30, 40}
+
+
+def _emp_db():
+    db = DB()
+    db._conn.executescript("CREATE TABLE subjects (id INTEGER PRIMARY KEY, name TEXT, category TEXT); INSERT INTO subjects VALUES (1, 'Ana', 'empleado');")
+    return db
+
+
+def named(name, mac, t=1_000_000.0):
+    return [{"name": name, "ip": "1.1.1.1", "mac": mac, "type": "WIRELESS", "connectedAt": "2026-10-12T14:00:00Z"}]
+
+
+def test_el_rol_se_adivina_por_el_nombre():
+    g = routes_wifi.guess_role
+    assert g("iOS Oswaldo Pérez") == "telefono" and g("MacBook Air Armando Zeferino") == "laptop" and g("Alexa Cocina") == "otro" and g("Watch 08:ed") == "otro"
+
+
+def test_laptop_olvidada_no_cuenta_si_el_telefono_esta_fuera():
+    db = _emp_db()
+    routes_wifi.ingest(db, named("iOS Ana", "aa:bb:cc:dd:00:01") + named("MacBook Air Ana", "aa:bb:cc:dd:00:02"), now=1_000_000.0)
+    db._conn.execute("UPDATE wifi_devices SET subject_id=1")
+    routes_wifi.ingest(db, named("MacBook Air Ana", "aa:bb:cc:dd:00:02"), now=1_001_000.0)          # el telefono lleva mas de 10 min sin verse; la laptop sigue
+    assert routes_wifi.online_employees(db, 1_001_000.0) == set()
+    routes_wifi.ingest(db, named("iOS Ana", "aa:bb:cc:dd:00:01"), now=1_001_020.0)
+    assert routes_wifi.online_employees(db, 1_001_020.0) == {1}
+
+
+def test_sin_telefono_asignado_la_laptop_si_cuenta():
+    db = _emp_db()
+    routes_wifi.ingest(db, named("MacBook Air Ana", "aa:bb:cc:dd:00:02"), now=1_000_000.0)
+    db._conn.execute("UPDATE wifi_devices SET subject_id=1")
+    assert routes_wifi.online_employees(db, 1_000_010.0) == {1}
+
+
+def test_cambio_de_mac_con_el_mismo_nombre_hereda_al_duenio():
+    db = _emp_db()
+    routes_wifi.ingest(db, named("iOS Oswaldo Pérez", "02:fe:83:bf:73:4a"), now=1_000_000.0)
+    db._conn.execute("UPDATE wifi_devices SET subject_id=1, role='telefono'")
+    routes_wifi.ingest(db, named("iOS Oswaldo Perez", "22:ca:a7:58:d0:a7"), now=1_000_100.0)            # direccion privada nueva, mismo nombre sin acentos
+    assert db._conn.execute("SELECT subject_id, role FROM wifi_devices WHERE mac='22:ca:a7:58:d0:a7'").fetchone() == (1, "telefono")
+    routes_wifi.ingest(db, named("iPhone 49:56", "aa:47:35:cc:49:56"), now=1_000_100.0)               # nombre generico: no hereda a nadie
+    assert db._conn.execute("SELECT subject_id FROM wifi_devices WHERE mac='aa:47:35:cc:49:56'").fetchone()[0] is None

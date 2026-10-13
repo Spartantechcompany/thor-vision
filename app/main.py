@@ -283,7 +283,7 @@ async def lifespan(app: FastAPI):
             except Exception as exc:                         # noqa: BLE001 - una regla con error no debe frenar el armado ni los viajes
                 logger.warning("yolo_rules: %s", exc)
         _tr = getattr(app.state, "trips", None)
-        if _tr is not None and cam_id == "cam-vto":
+        if _tr is not None and cam_id == "cam-vto" and (v["last_ts"] - v["first_ts"] >= 4 or v.get("name")):
             _tr.start("vto-visita", v["first_ts"])          # alguien llego al videoportero: se sigue su recorrido hacia adentro
         from app.vision import arming
         if not arming.is_absolute():

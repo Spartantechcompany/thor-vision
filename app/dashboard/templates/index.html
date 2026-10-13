@@ -981,10 +981,18 @@ html.tl-only .tl { margin:0; border:0; border-radius:0; }
 /* iconos de la segunda fila: etiqueta visible y brillo que sigue al mouse */
 .hdr-icons .hdr-btn { position:relative; display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; min-width:80px; padding:10px 12px 8px; border-radius:12px; background:linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02)); transition:transform .15s, border-color .2s, color .2s; color:var(--text-secondary); overflow:hidden; text-decoration:none; }
 .hdr-icons .hdr-btn .ico { width:26px; height:26px; stroke-width:1.8; }
-.hdr-more { position:relative; display:inline-flex; }
+/* una sola fila: botones compactos, sin saltos de linea; si la ventana es angosta la fila se desplaza sin barra */
+.hdr-icons { flex-wrap:nowrap !important; overflow-x:auto; justify-content:safe center !important; gap:8px !important; scrollbar-width:none; padding:8px 4px 10px !important; }
+.hdr-icons::-webkit-scrollbar { display:none; }
+.hdr-icons .hdr-btn { flex:0 0 auto; min-width:62px !important; padding:8px 8px 6px !important; gap:3px !important; border-radius:10px !important; }
+.hdr-icons .hdr-btn .ico { width:22px !important; height:22px !important; }
+.hdr-icons .hdr-btn::after { font-size:.62rem !important; white-space:nowrap; }
+.hdr-icons .hdr-btn:focus-visible, .hdr-more-list a:focus-visible { outline:2px solid var(--oxm-blue); outline-offset:2px; }
+.hdr-more { position:relative; display:inline-flex; flex:0 0 auto; }
+.hdr-more[open] > summary { color:var(--oxm-blue); border-color:var(--oxm-blue-dark); }
 .hdr-more > summary { list-style:none; cursor:pointer; font-size:12px; font-weight:600; }
 .hdr-more > summary::-webkit-details-marker { display:none; }
-.hdr-more-list { position:absolute; top:100%; right:0; z-index:60; margin-top:6px; min-width:210px; background:var(--bg-card, #161b22); border:1px solid var(--border); border-radius:10px; padding:6px; display:flex; flex-direction:column; box-shadow:0 8px 24px rgba(0,0,0,.4); }
+.hdr-more-list { position:fixed; top:64px; left:8px; z-index:200; min-width:210px; background:var(--bg-card, #161b22); border:1px solid var(--border); border-radius:10px; padding:6px; display:flex; flex-direction:column; box-shadow:0 8px 24px rgba(0,0,0,.4); }
 .hdr-more-list a { padding:8px 10px; border-radius:6px; color:var(--text-primary, #e8edf3); text-decoration:none; font-size:13px; }
 .hdr-more-list a:hover { background:rgba(118,185,0,.14); color:var(--oxm-blue); }
 .hdr-icons .hdr-btn:hover { transform:translateY(-2px); }
@@ -1058,7 +1066,7 @@ try { if (!/[?&](full|tl)=/.test(location.search) && !localStorage.getItem('thor
   <div class="header-clock" id="clock">—</div>
   <div class="hdr-icons">
   <details class="hdr-more" id="hdr-more"><summary class="hdr-btn" title="Más páginas">Más ▾</summary><div class="hdr-more-list">
-    <a href="/presencia">Presencia ahora</a><a href="/wifi">Presencia WiFi</a><a href="/evaluacion">Evaluación de YOLO</a><a href="/galeria">Miniaturas y mascotas</a><a href="/conocimiento">Conocimiento</a><a href="/reglas">Reglas de alerta</a><a href="/zonas">Zonas</a>
+    <a href="/presencia">Presencia ahora</a><a href="/wifi">Presencia WiFi</a><a href="/evaluacion">Evaluación de YOLO</a><a href="/conocimiento">Conocimiento</a>
   </div></details>
   <button class="hdr-btn" id="btn-history" title="Histórico de eventos" aria-label="Histórico de eventos"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
   <button class="hdr-btn" id="btn-spot" title="Cómo funciona OXM Vision (animación)" aria-label="Cómo funciona OXM Vision (animación)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg></button>
@@ -1395,7 +1403,7 @@ function updateCard(cam) {
 //   - Snapshot polling usa conexiones cortas que se liberan rápido.
 // ══════════════════════════════════════════════════════════════
 // Equipos con poca memoria o navegadores de TV (Silk): sin efectos, 1 fps y miniaturas de 640 px (el navegador se reiniciaba por falta de memoria)
-const LITE = (navigator.deviceMemory && navigator.deviceMemory <= 2) || /Silk|AFT[A-Z]/i.test(navigator.userAgent) || /[?&]lite=1/.test(location.search);
+const LITE = (navigator.deviceMemory && navigator.deviceMemory <= 2) || /Silk|AFT[A-Z]|Tizen|SMART-TV|Web0S|WebOS|HbbTV/i.test(navigator.userAgent) || /[?&]lite=1/.test(location.search);
 if (LITE) document.documentElement.classList.add('lite');
 const POLL_INTERVAL_MS = LITE ? 1000 : 200;   // 5 fps por cámara — suficiente para vigilancia
 const _pollers = {};            // cam_id → { running, errors }
@@ -1464,6 +1472,17 @@ function liveFail(camId){
   stopLive(camId, true);                                   // vuelve a las fotos
   setTimeout(() => { if (LIVE_ON && !document.hidden && !_live[camId]) startLive(camId); }, 15000);
 }
+_onDomReady(() => {      // el menu 'Más' se coloca bajo su boton sin que lo recorte la fila de botones
+  const d = document.getElementById('hdr-more');
+  if (!d) return;
+  d.addEventListener('toggle', () => {
+    if (!d.open) return;
+    const l = d.querySelector('.hdr-more-list'), r = d.getBoundingClientRect();
+    l.style.top = (r.bottom + 6) + 'px';
+    l.style.left = Math.max(8, Math.min(r.left, innerWidth - 230)) + 'px';
+  });
+  document.addEventListener('click', e => { if (d.open && !d.contains(e.target)) d.open = false; });
+});
 function _initLiveVideo(cameras){
   if (!document.getElementById('live-toggle')){
     const b = document.createElement('button');

@@ -4,9 +4,13 @@ Un lector de solo lectura en oapc-devops envia cada 3 min los clientes del UDM (
 dispositivo; el usuario asigna cada MAC a un empleado (una sola vez) y la asistencia suma esa presencia a la de las camaras.
 Solo se asignan dispositivos de empleados que firmaron el aviso de privacidad; los demas pueden marcarse como ignorados."""
 import datetime
+import json
 import logging
 import os
+import re
 import time
+import sqlite3
+import unicodedata
 from typing import Optional
 
 from fastapi import APIRouter, Body, HTTPException, Request
@@ -17,11 +21,34 @@ router = APIRouter()
 GAP_S = float(os.environ.get("WIFI_GAP_S", "600"))          # un dispositivo que desaparece menos de esto sigue en la misma sesion
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS wifi_devices (mac TEXT PRIMARY KEY, name TEXT, ip TEXT, kind TEXT, subject_id INTEGER, ignore INTEGER NOT NULL DEFAULT 0,
-  first_seen REAL, last_seen REAL);
+  first_seen REAL, last_seen REAL, role TEXT, suggest TEXT);
 CREATE TABLE IF NOT EXISTS wifi_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, mac TEXT NOT NULL, start_ts REAL NOT NULL, end_ts REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_wifi_sess ON wifi_sessions(mac, end_ts);
 """
 _ready = False
+ROLES = ("telefono", "laptop", "otro")
+_PHONE = re.compile(r"iphone|\bios\b|android|galaxy|pixel|redmi|xiaomi|huawei|oppo|motorola|celular|phone", re.I)
+_LAPTOP = re.compile(r"macbook|laptop|thinkpad|desktop|windows|surface|\bmbp\b|\bmac\b|notebook|lenovo|dell|latitude|elitebook", re.I)
+_OTHER = re.compile(r"watch|alexa|apple ?tv|camara|\bcam\b|tuya|panel|foco|\btv\b|impresora|printer|echo|kl\d{3}|lwip|wlan0|smart", re.I)
+_GENERIC = re.compile(r"(^|\s)([0-9a-f]{2}:[0-9a-f]{2})$|^([0-9a-f]{2}:){5}[0-9a-f]{2}$", re.I)       # nombres por defecto: 'iPhone 49:56', 'wlan0 a6:1f'
+
+
+def guess_role(name: str) -> str:
+    """Telefono / laptop / otro segun el nombre del cliente en UniFi (solo una pista; el usuario la corrige)."""
+    n = name or ""
+    if _OTHER.search(n):
+        return "otro"
+    if _PHONE.search(n):
+        return "telefono"
+    if _LAPTOP.search(n):
+        return "laptop"
+    return "otro"
+
+
+def norm_name(name: str) -> str:
+    """Nombre sin acentos ni mayusculas; vacio si es un nombre generico con la cola de la MAC (no identifica a nadie)."""
+    n = unicodedata.normalize("NFKD", name or "").encode("ascii", "ignore").decode().lower().strip()
+    return "" if (not n or _GENERIC.search(n)) else re.sub(r"\s+", " ", n)
 
 
 def _db(request: Request):
@@ -32,6 +59,11 @@ def _db(request: Request):
     if not _ready:
         with db._lock:
             db._conn.executescript(_SCHEMA)
+            for col in ("role TEXT", "suggest TEXT"):
+                try:
+                    db._conn.execute(f"ALTER TABLE wifi_devices ADD COLUMN {col}")
+                except sqlite3.OperationalError:
+                    pass                                      # la columna ya existe
             db._conn.commit()
         _ready = True
     return db
@@ -43,6 +75,21 @@ def _ts(iso: str, now: float) -> float:
         return t if now - 86400 <= t <= now else now
     except (ValueError, TypeError):
         return now
+
+
+def _classify_device(db, mac: str, name: str) -> None:
+    """Rol por nombre y, si el equipo cambio de MAC (direccion privada) pero conserva su nombre, hereda al empleado y el rol del que ya se asigno."""
+    sid, role = db._conn.execute("SELECT subject_id, role FROM wifi_devices WHERE mac=?", (mac,)).fetchone()
+    new_role = role or guess_role(name)
+    new_sid = sid
+    key = norm_name(name)
+    if sid is None and key:
+        for osid, oname, orole in db._conn.execute("SELECT subject_id, name, role FROM wifi_devices WHERE subject_id IS NOT NULL AND mac!=?", (mac,)).fetchall():
+            if norm_name(oname) == key:
+                new_sid, new_role = osid, role or orole or new_role
+                break
+    if (new_sid, new_role) != (sid, role):
+        db._conn.execute("UPDATE wifi_devices SET subject_id=?, role=? WHERE mac=?", (new_sid, new_role, mac))
 
 
 def ingest(db, clients: list, now: Optional[float] = None) -> int:
@@ -57,6 +104,7 @@ def ingest(db, clients: list, now: Optional[float] = None) -> int:
                 "INSERT INTO wifi_devices (mac, name, ip, kind, first_seen, last_seen) VALUES (?,?,?,?,?,?) ON CONFLICT(mac) DO UPDATE SET "
                 "name=excluded.name, ip=excluded.ip, last_seen=excluded.last_seen",
                 (mac, str(c.get("name") or "")[:80], str(c.get("ip") or c.get("ipAddress") or "")[:40], str(c.get("type") or "")[:12], now, now))
+            _classify_device(db, mac, str(c.get("name") or ""))
             row = db._conn.execute("SELECT id FROM wifi_sessions WHERE mac=? AND end_ts>=? ORDER BY end_ts DESC LIMIT 1", (mac, now - GAP_S)).fetchone()
             if row:
                 db._conn.execute("UPDATE wifi_sessions SET end_ts=? WHERE id=?", (now, row[0]))
@@ -70,6 +118,7 @@ def ingest(db, clients: list, now: Optional[float] = None) -> int:
 class Assign(BaseModel):
     subject_id: Optional[int] = None
     ignore: Optional[bool] = None
+    role: Optional[str] = None
 
 
 @router.post("/api/wifi/clients")
@@ -83,10 +132,60 @@ def devices(request: Request):
     now = time.time()
     with db._lock:
         rows = db._conn.execute(
-            "SELECT d.mac, d.name, d.ip, d.subject_id, s.name, d.ignore, d.last_seen FROM wifi_devices d LEFT JOIN subjects s ON s.id=d.subject_id "
+            "SELECT d.mac, d.name, d.ip, d.subject_id, s.name, d.ignore, d.last_seen, d.role, d.suggest FROM wifi_devices d LEFT JOIN subjects s ON s.id=d.subject_id "
             "ORDER BY (d.subject_id IS NULL), d.last_seen DESC LIMIT 500").fetchall()
-    return {"devices": [{"mac": m, "name": n, "ip": ip, "subject_id": sid, "employee": en, "ignore": bool(ig), "last_seen": ls, "online": now - (ls or 0) < GAP_S}
-                        for m, n, ip, sid, en, ig, ls in rows]}
+    out = []
+    for m, n, ip, sid, en, ig, ls, role, sug in rows:
+        try:
+            sg = json.loads(sug) if sug else None
+        except ValueError:
+            sg = None
+        out.append({"mac": m, "name": n, "ip": ip, "subject_id": sid, "employee": en, "ignore": bool(ig), "last_seen": ls, "online": now - (ls or 0) < GAP_S,
+                    "role": role or guess_role(n), "suggest": sg})
+    return {"devices": out}
+
+
+KIND_Q = {"type": "choice", "instructions": "What kind of device is this, judging only by its network name?", "criteria": {
+    "phone": "A smartphone (iPhone, iOS, Android, Galaxy, Pixel...)", "laptop": "A laptop or desktop computer (MacBook, Windows PC...)",
+    "tablet": "A tablet (iPad...)", "other": "A watch, TV, speaker, camera, light, printer, access point or any other non-personal device"}}
+
+
+def suggest_owners(db, clef, limit: int = 60, now: Optional[float] = None) -> int:
+    """Clef lee el nombre de cada equipo sin duenio y sugiere de que tipo es y de que empleado parece; solo guarda la sugerencia (nunca asigna solo)."""
+    now = now or time.time()
+    with db._lock:
+        emps = db._conn.execute("SELECT id, name FROM subjects WHERE category='empleado' AND name IS NOT NULL AND TRIM(name)!='' ORDER BY name").fetchall()
+        cands = db._conn.execute("SELECT mac, name FROM wifi_devices WHERE subject_id IS NULL AND ignore=0 AND last_seen>? ORDER BY last_seen DESC LIMIT ?",
+                                 (now - 14 * 86400, limit * 3)).fetchall()
+    if not emps:
+        return 0
+    owner_q = {"type": "choice", "instructions": "Whose personal device is this, judging only by its network name? Choose 'none' if the name does not point to one of the listed people.",
+               "criteria": {**{f"e{i}": f"{n} (employee)" for i, n in emps}, "none": "No listed person, or the name does not say"}}
+    n = 0
+    for mac, name in [c for c in cands if norm_name(c[1])][:limit]:
+        out = clef.decide({"wifi_client_name": name, "context": "Client names come from a company WiFi network"}, [], {"kind": KIND_Q, "owner": owner_q})
+        if not out:
+            continue
+        try:
+            a = out["answers"]
+            kind, owner = a["kind"]["choice"], a["owner"]["choice"]
+            p_owner = float((a["owner"].get("probabilities") or {}).get(owner, 0.0))
+        except (KeyError, TypeError, ValueError):
+            continue
+        sug = {"kind": kind, "owner_id": int(owner[1:]) if owner.startswith("e") and owner[1:].isdigit() else None, "p": round(p_owner, 2)}
+        with db._lock:
+            db._conn.execute("UPDATE wifi_devices SET suggest=? WHERE mac=? AND subject_id IS NULL", (json.dumps(sug), mac))
+            db._conn.commit()
+        n += 1
+    return n
+
+
+@router.post("/api/wifi/suggest")
+def suggest(request: Request):
+    clef = getattr(request.app.state, "clef", None)
+    if clef is None:
+        raise HTTPException(503, "Clef no esta activo")
+    return {"ok": True, "suggested": suggest_owners(_db(request), clef)}
 
 
 @router.get("/api/wifi/employees")
@@ -113,6 +212,13 @@ def assign(mac: str, body: Assign, request: Request):
         if body.ignore is not None:
             sets.append("ignore=?")
             args.append(int(body.ignore))
+        if body.role is not None:
+            if body.role not in ROLES:
+                raise HTTPException(400, f"rol invalido; usa uno de {list(ROLES)}")
+            sets.append("role=?")
+            args.append(body.role)
+        if "subject_id" in body.model_fields_set:
+            sets.append("suggest=NULL")                       # ya se decidio: la sugerencia deja de aplicar
         if not sets:
             raise HTTPException(400, "nada que cambiar")
         cur = db._conn.execute(f"UPDATE wifi_devices SET {', '.join(sets)} WHERE mac=?", (*args, mac))
@@ -133,16 +239,19 @@ def presence_by_employee(db, t0: float, t1: float) -> dict:
     out: dict = {}
     with db._lock:
         rows = db._conn.execute(
-            "SELECT d.subject_id, d.mac, d.name, s.start_ts, s.end_ts FROM wifi_sessions s JOIN wifi_devices d ON d.mac=s.mac "
+            "SELECT d.subject_id, d.mac, d.name, s.start_ts, s.end_ts, d.role FROM wifi_sessions s JOIN wifi_devices d ON d.mac=s.mac "
             "WHERE d.subject_id IS NOT NULL AND d.ignore=0 AND s.end_ts>=? AND s.start_ts<?", (t0, t1)).fetchall()
-    for sid, mac, name, a, b in rows:
+        has_phone = {r[0] for r in db._conn.execute("SELECT subject_id FROM wifi_devices WHERE subject_id IS NOT NULL AND ignore=0 AND role='telefono'").fetchall()}
+    for sid, mac, name, a, b, role in rows:
+        if sid in has_phone and role != "telefono":
+            continue
         e = out.setdefault(sid, {"segments": [], "devices": set()})
         e["segments"].append((max(a, t0), min(b, t1)))
         e["devices"].add(name or mac)
     for e in out.values():
         segs = sorted(e["segments"])
         merged: list = []
-        for a, b in segs:                                 # une dispositivos del mismo empleado que se traslapan (celular + laptop)
+        for a, b in segs:                                 # une dispositivos del mismo empleado que se traslapan
             if merged and a <= merged[-1][1] + GAP_S:
                 merged[-1][1] = max(merged[-1][1], b)
             else:
@@ -151,16 +260,13 @@ def presence_by_employee(db, t0: float, t1: float) -> dict:
     return out
 
 
-@router.get("/api/wifi/presence")
-def presence(request: Request, date: Optional[str] = None):
-    db = _db(request)
-    t0, t1 = day_bounds(date)
+def online_employees(db, now: float) -> set:
+    """Empleados con un dispositivo conectado ahora que cuenta como presencia: su telefono; si no tiene uno asignado, cualquiera de sus equipos.
+    Una laptop olvidada en la oficina no cuenta mientras su telefono este fuera."""
     with db._lock:
-        names = dict(db._conn.execute("SELECT id, name FROM subjects WHERE category='empleado'").fetchall())
-    res = presence_by_employee(db, t0, t1)
-    return {"date": datetime.date.fromtimestamp(t0).isoformat(), "employees": [
-        {"subject_id": sid, "name": names.get(sid), "first": v["first"], "last": v["last"], "minutes": v["minutes"], "devices": v["devices"]}
-        for sid, v in sorted(res.items(), key=lambda kv: names.get(kv[0]) or "")]}
+        rows = db._conn.execute("SELECT subject_id, role, last_seen FROM wifi_devices WHERE subject_id IS NOT NULL AND ignore=0").fetchall()
+    has_phone = {sid for sid, role, _ in rows if role == "telefono"}
+    return {sid for sid, role, seen in rows if now - (seen or 0) < GAP_S and (role == "telefono" or sid not in has_phone)}
 
 
 @router.get("/api/presence/now")
@@ -170,9 +276,7 @@ def presence_now(request: Request):
     db = _db(request)
     now = time.time()
     att = build_attendance(request, None)
-    with db._lock:
-        online = {r[0] for r in db._conn.execute(
-            "SELECT DISTINCT subject_id FROM wifi_devices WHERE subject_id IS NOT NULL AND ignore=0 AND last_seen>=?", (now - GAP_S,)).fetchall()}
+    online = online_employees(db, now)
     emps = []
     for e in att["employees"]:
         wifi_on = e["id"] in online

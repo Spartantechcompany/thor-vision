@@ -77,7 +77,7 @@ $('#m5').onclick = () => { full5 = !full5; if (full5) { hd = true; $('#hd').clas
 live.onload = () => setTimeout(tick, full5 ? 2500 : hd ? 1200 : 600); live.onerror = () => setTimeout(tick, 3000); tick();
 // video en vivo por WebRTC (go2rtc); si no conecta o se corta, vuelve a las capturas y reintenta
 const GO2RTC = `${location.protocol}//${location.hostname}:1984`, lv = $('#lv'), stage = document.querySelector('.stage');
-let pc = null, vtimer = null, wantVideo = !/[?&]video=0/.test(location.search) && CAM !== 'cam-vto';
+let pc = null, vtimer = null, wantVideo = !/[?&]video=0/.test(location.search) && !/Silk|AFT[A-Z]|Tizen|SMART-TV|Web0S|WebOS|HbbTV/i.test(navigator.userAgent);
 function stopVideo(){ clearTimeout(vtimer); try { pc && pc.close(); } catch (e) {} pc = null; lv.srcObject = null; stage.classList.remove('vid'); alive = !document.hidden; if (alive) tick(); }
 function videoFail(){ stopVideo(); $('#tag').textContent = 'en vivo'; if (wantVideo && !document.hidden) setTimeout(startVideo, 15000); }
 async function startVideo(){

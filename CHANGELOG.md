@@ -2,6 +2,16 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.34.0 — Presencia WiFi por teléfono, sugerencias con Clef, encabezado en una fila y TV ligera (2026-10-13)
+
+Para el WiFi, el teléfono es la presencia: una laptop olvidada en la oficina ya no cuenta mientras el teléfono del empleado esté fuera. Los equipos que cambian de MAC pero conservan su nombre heredan al dueño, y Clef sugiere de quién es cada equipo a partir de su nombre. El lector de UniFi pasa a cada minuto. El encabezado queda en una sola fila y las Smart TV (Tizen, WebOS, Silk) usan el modo ligero sin video en vivo.
+
+- **Presencia · El teléfono manda**: Rol por dispositivo (teléfono, laptop, otro; se adivina por el nombre y se corrige en /wifi). Con un teléfono asignado, solo los teléfonos cuentan. Sin teléfono, cuentan todos sus equipos.
+- **Presencia · Clef sugiere dueño**: POST /api/wifi/suggest: Clef lee el nombre de cada equipo sin dueño y propone tipo y empleado (5 de 6 aciertos con dueño conocido; 'Ernesto Pastrana' no lo liga a 'Neto'). Nunca asigna solo.
+- **Presencia · Cambio de MAC**: Un equipo nuevo con el mismo nombre (sin acentos ni mayúsculas) que uno ya asignado hereda al empleado y el rol. Los nombres genéricos tipo 'iPhone 49:56' no heredan.
+- **Panel · Una fila y TV ligera**: Botones compactos en una sola fila (se desplaza sin barra si la ventana es angosta), menú Más posicionado bajo su botón. Smart TV: sin video en vivo, que saturaba la TV y las cámaras.
+- **Viajes · Menos disparos del videoportero**: Solo las visitas de 4 s o más (o con nombre) abren un viaje; los rostros de 0-2 s ya no activaban refuerzos cada pocos minutos.
+
 ## v2.33.0 — Video en la vista de cámara, menú Más y videoportero por go2rtc (2026-10-13)
 
 La página de cada cámara (/camara/<id>) también muestra video en vivo por WebRTC con respaldo a capturas; el panel suma un menú 'Más' con las páginas que no tenían enlace (Presencia, WiFi, Evaluación, Miniaturas, Conocimiento, Reglas, Zonas); y las cámaras de 5 MP solo usan video si el navegador las decodifica con fluidez (MediaCapabilities). El videoportero se lee a través de go2rtc para que su única sesión RTSP sirva a Thor y al navegador.
