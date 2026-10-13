@@ -40,3 +40,7 @@ docker-compose.yml
 *.log
 logs/
 app/build_info.json
+
+# Configuracion real con codigos/distribucion de la oficina: nunca al repo
+config/iot.yml
+config/topology.yml
