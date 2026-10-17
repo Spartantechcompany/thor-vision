@@ -2,6 +2,12 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.34.1 — El video en vivo se reinicia solo si se congela (2026-10-17)
+
+Cuando una cámara se cae y go2rtc reconecta (el videoportero rechazó conexiones RTSP unos 11 minutos), el video del navegador se quedaba en el último cuadro. Un vigilante revisa cada 2.5 s si el video avanza y, si lleva 7.5 s sin avanzar, lo reinicia y vuelve a las fotos mientras reconecta.
+
+- **Video · Vigilante de video congelado**: En el panel y en /camara/<id>: currentTime sin cambios 3 revisiones seguidas dispara el reintento.
+
 ## v2.34.0 — Presencia WiFi por teléfono, sugerencias con Clef, encabezado en una fila y TV ligera (2026-10-13)
 
 Para el WiFi, el teléfono es la presencia: una laptop olvidada en la oficina ya no cuenta mientras el teléfono del empleado esté fuera. Los equipos que cambian de MAC pero conservan su nombre heredan al dueño, y Clef sugiere de quién es cada equipo a partir de su nombre. El lector de UniFi pasa a cada minuto. El encabezado queda en una sola fila y las Smart TV (Tizen, WebOS, Silk) usan el modo ligero sin video en vivo.

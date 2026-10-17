@@ -461,7 +461,7 @@ La documentacion interactiva esta en `/docs`. Guia de uso y significado de los d
 | GET | `/api/wifi/devices` | Devices |  |  |
 | PUT | `/api/wifi/devices/{mac}` | Assign | `mac`* | Assign |
 | GET | `/api/wifi/employees` | Employees |  |  |
-| GET | `/api/wifi/presence` | Presence | `date` |  |
+| POST | `/api/wifi/suggest` | Suggest |  |  |
 | GET | `/wifi` | Wifi Page |  |  |
 
 ## yolo-rules
