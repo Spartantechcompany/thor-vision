@@ -1483,6 +1483,16 @@ _onDomReady(() => {      // el menu 'Más' se coloca bajo su boton sin que lo re
   });
   document.addEventListener('click', e => { if (d.open && !d.contains(e.target)) d.open = false; });
 });
+const _vt = {};      // vigilante: camId -> { t, n }
+setInterval(() => {
+  Object.keys(_live).forEach(id => {
+    const st = _live[id], v = document.getElementById(`vid-${id}`);
+    if (!st || !st.on || !v) return;
+    const w = _vt[id] || (_vt[id] = { t: -1, n: 0 });
+    if (v.currentTime === w.t && !v.paused) { if (++w.n >= 3) { w.n = 0; liveFail(id); } } else w.n = 0;
+    w.t = v.currentTime;
+  });
+}, 2500);
 function _initLiveVideo(cameras){
   if (!document.getElementById('live-toggle')){
     const b = document.createElement('button');

@@ -97,6 +97,13 @@ async function startVideo(){
   } catch (e) { videoFail(); }
 }
 lv.ondblclick = () => $('#fs').onclick();
+// vigilante: si el video deja de avanzar (la camara se cayo y go2rtc reconecto), se reinicia solo
+let _lastT = -1, _stall = 0;
+setInterval(() => {
+  if (!stage.classList.contains('vid')) { _stall = 0; return; }
+  if (lv.currentTime === _lastT && !lv.paused) { if (++_stall >= 3) { _stall = 0; videoFail(); } } else _stall = 0;
+  _lastT = lv.currentTime;
+}, 2500);
 startVideo();
 document.addEventListener('visibilitychange', () => { if (document.hidden) { stopVideo(); alive = false; } else { alive = true; tick(); startVideo(); } });
 $('#fs').onclick = () => { const st = document.querySelector('.stage'); document.fullscreenElement ? document.exitFullscreen() : st.requestFullscreen?.(); };

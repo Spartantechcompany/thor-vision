@@ -1,5 +1,18 @@
 [
   {
+    "version": "2.34.1",
+    "date": "2026-10-17",
+    "name": "El video en vivo se reinicia solo si se congela",
+    "summary": "Cuando una cámara se cae y go2rtc reconecta (el videoportero rechazó conexiones RTSP unos 11 minutos), el video del navegador se quedaba en el último cuadro. Un vigilante revisa cada 2.5 s si el video avanza y, si lleva 7.5 s sin avanzar, lo reinicia y vuelve a las fotos mientras reconecta.",
+    "highlights": [
+      {
+        "area": "Video",
+        "title": "Vigilante de video congelado",
+        "text": "En el panel y en /camara/<id>: currentTime sin cambios 3 revisiones seguidas dispara el reintento."
+      }
+    ]
+  },
+  {
     "version": "2.34.0",
     "date": "2026-10-13",
     "name": "Presencia WiFi por teléfono, sugerencias con Clef, encabezado en una fila y TV ligera",
