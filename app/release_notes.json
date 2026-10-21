@@ -1,5 +1,18 @@
 [
   {
+    "version": "2.34.3",
+    "date": "2026-10-21",
+    "name": "Toda visita guarda al menos el cuadro completo",
+    "summary": "Las alertas de persona nocturna de Garage frontal salían sin imagen: sus visitas no generaban recorte de cuerpo ni de cara. Ahora, si una visita no tiene escena, se guarda el cuadro con el recuadro de la persona en cuanto se detecta.",
+    "highlights": [
+      {
+        "area": "Alertas",
+        "title": "Imagen garantizada",
+        "text": "En 24 h, 19 de 100 alertas persona_nocturna (modo sin VLM) y todas de cam-228 no traían captura; las demás alertas ya la traen (Tuya recuperó la suya con la clave nueva)."
+      }
+    ]
+  },
+  {
     "version": "2.34.2",
     "date": "2026-10-21",
     "name": "Reconexión automática de cámaras con el video colgado",

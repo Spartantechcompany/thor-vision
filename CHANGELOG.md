@@ -2,6 +2,12 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.34.3 — Toda visita guarda al menos el cuadro completo (2026-10-21)
+
+Las alertas de persona nocturna de Garage frontal salían sin imagen: sus visitas no generaban recorte de cuerpo ni de cara. Ahora, si una visita no tiene escena, se guarda el cuadro con el recuadro de la persona en cuanto se detecta.
+
+- **Alertas · Imagen garantizada**: En 24 h, 19 de 100 alertas persona_nocturna (modo sin VLM) y todas de cam-228 no traían captura; las demás alertas ya la traen (Tuya recuperó la suya con la clave nueva).
+
 ## v2.34.2 — Reconexión automática de cámaras con el video colgado (2026-10-21)
 
 El videoportero llevaba unas 7 horas congelado en Thor y marcado como 'streaming': cap.read() se quedó bloqueado sin que nada lo detectara. Ahora un vigilante por cámara libera la captura si no llegan cuadros nuevos en 20 s (STREAM_STALL_S) y el lector reconecta solo.

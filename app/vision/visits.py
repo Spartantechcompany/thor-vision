@@ -359,6 +359,9 @@ class VisitManager:
                     tr.live_bbox = pb
                 if frame is not None:
                     self._body_candidate(tr, frame, pb, [o for o in persons if o is not pb])
+                    if tr.scene is None:                    # respaldo: aunque el recorte de cuerpo no pase los minimos (cam-228), la visita guarda el cuadro con su recuadro
+                        tr.scene = _scene_with_box(frame, tuple(pb), [o for o in persons if o is not pb])
+                        tr.dirty = tr.dirty or tr.scene is not None
                     self._maybe_verify(cam_id, tr)
                     if src != "pre":
                         self._door_dwell(cam_id, tr, pb, frame, persons, ots, result)
