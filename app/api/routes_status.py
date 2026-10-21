@@ -178,11 +178,22 @@ def pipeline(request: Request):
                 "ms": round(det.inference_ms) if det else 0,
             },
             "vlm": {**(w.last_info or {}), "calls_1h": calls,
-                     "skips_1h": w.skips_last_hour()},
+                     "skips_1h": w.skips_last_hour(),
+                     "same_1h": _last_hour(getattr(w, "same_skips", ())),
+                     "busy_1h": _last_hour(getattr(w, "busy_skips", ()))},
         }
     skips = sum(c["vlm"]["skips_1h"] for c in cams.values())
+    from app.vision import vlm_analyzer
     return {"ts": time.time(), "cameras": cams, "vlm_calls_1h": totals,
-            "vlm_skips_1h": skips}
+            "vlm_skips_1h": skips,
+            "vlm_same_scene_1h": sum(c["vlm"]["same_1h"] for c in cams.values()),
+            "vlm_busy_skips_1h": sum(c["vlm"]["busy_1h"] for c in cams.values()),
+            "gateway": vlm_analyzer.busy_stats()}
+
+
+def _last_hour(ts_list) -> int:
+    cutoff = time.time() - 3600
+    return sum(1 for t in list(ts_list) if t >= cutoff)
 
 
 def _tcp_rtt(host, port, timeout=1.0):

@@ -2,6 +2,14 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.40.0 — Escena completa con menos llamadas (2026-10-21)
+
+El modelo veía clips de apenas 1 a 2 segundos (30 cuadros seguidos del búfer) y el servidor solo tomaba ~4 cuadros de ellos. Ahora cada clip es la escena de los últimos 16 s en 8 cuadros a 480x270 (un cuadro cada 2 s, ~530 tokens, casi lo mismo que antes), esperando 4 s tras el inicio del movimiento para que la acción entre. Si la escena no cambió desde el último análisis (mismas personas en el mismo lugar, mismos objetos, imagen casi igual) no se llama al modelo; se vuelve a mirar a los 5 minutos. thor-vision manda como mucho 2 peticiones a la vez y, cuando el gateway contesta 503 por capacidad, abre una pausa común: la rutina espera y solo pasan las prioritarias (noche en zonas de alerta, armado, videoportero, personas en la calle). El texto fijo de cada cámara va antes del video para que el servidor lo reutilice de su caché, y la foto del heartbeat va a 640x360.
+
+- **Modelo · Clip de escena de 16 s**: VLM_SCENE_FRAMES=8, VLM_SCENE_WINDOW_S=16, VLM_SCENE_WIDTH/HEIGHT=480x270, VLM_RISE_DELAY_S=4. Medido: 8 cuadros a 480x270 = 527 tokens; 10 cuadros de 1 s = 471 (el servidor muestrea a 2 fps).
+- **Modelo · Escena igual sin llamada**: VLM_SAME_GATE, VLM_SAME_STALE_S=300, VLM_SAME_PIX=0.06, VLM_SAME_MOVE=0.08. /api/pipeline: vlm_same_scene_1h.
+- **Modelo · Saturación del gateway**: VLM_MAX_CONCURRENCY=2; pausa 4-60 s tras un 503 de capacidad; rutina omitida (vlm_busy_skips_1h) y prioritarias con un solo reintento. /api/pipeline: gateway.
+
 ## v2.39.0 — Caras nítidas y alertas de día sin "persona nocturna" (2026-10-21)
 
 Las miniaturas de rostro ya no se agrandan: se guardan a su tamaño real (máximo 160 px) y se prefiere la captura JPEG de la cámara sobre el cuadro del video. Una cara de menos de 40 px en el cuadro original no se guarda como miniatura, y al cerrar cada visita Clef revisa si la cara se ve bien: si está barrida, borrosa o no es una cara, la visita se queda solo con el cuerpo. Cowork y Sala de Juntas vuelven a su horario: el modo de alerta total del 9 de octubre estaba fijo en la configuración y daba unas 1,200 alertas de "persona nocturna" de día; para alertar por toda persona está el botón de armado, y de día esa alerta ahora se llama actividad del armado. En la vista de cámara la línea de tiempo incrustada ya no pide video ni capturas de las 11 cámaras, que dejaban sin conexión a la imagen de la alerta.

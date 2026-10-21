@@ -88,7 +88,9 @@ class SceneContext:
         night, mode, _ = self._rule(now)
         return night and mode == "alert"
 
-    def render(self, now: Optional[float] = None, video: bool = False) -> str:
+    def render_parts(self, now: Optional[float] = None, video: bool = False) -> tuple:
+        """(fijo, variable). El texto fijo de la camara va antes del video/imagen y es identico en cada llamada (el servidor lo reutiliza
+        de su cache de prefijos); la hora, las reglas de horario y el tipo de medio van despues."""
         now = now or time.time()
         night, mode, weekend = self._rule(now)
         lt = time.strftime("%H:%M", time.localtime(now))
@@ -100,7 +102,6 @@ class SceneContext:
             *([f"FLUJO NORMAL: {' '.join(self.flujo.split())}"] if self.flujo else []),
             "Usa la TOMA y las ZONAS para decir en activity DONDE ocurre algo y HACIA DONDE se mueve (p. ej. 'se acerca a la puerta peatonal', 'sube la escalera'). "
             "Empieza activity por lo mas importante de la escena.",
-            f"HORA LOCAL: {lt} ({'NOCTURNO' if night else 'diurno'})",
             "LO QUE IMPORTA:",
             *[f"- {x}" for x in self.focus],
             "IGNORA (es normal, NO generes alerta):",
@@ -108,32 +109,38 @@ class SceneContext:
             "CODIGOS DE ALERTA PERMITIDOS (usa solo estos en alert_types):",
             *[f"- {c}: {self.catalog.get(c, c)}" for c in sorted(self.alert_types)],
         ]
-        if self.known_pets:
+        if self.known_pets and "animal" in self.alert_types:
             lines.append("MASCOTAS CONOCIDAS (son de la casa, NO son alerta animal; nombralas como mascota): "
                          + "; ".join(self.known_pets))
-        if weekend and self.weekend_mode == "note":
-            lines.append("FIN DE SEMANA: el uso casual de esta area es normal; no generes persona_nocturna.")
-        if weekend and self.weekend_mode == "alert_all":
-            lines.append("FIN DE SEMANA: aqui no deberia haber actividad; cualquier persona visible es alerta persona_nocturna.")
-        if night and mode == "alert":
-            lines.append("REGLA NOCTURNA: aqui no deberia haber nadie de noche; "
-                         "cualquier persona visible es alerta persona_nocturna.")
-        elif night:
-            lines.append("REGLA NOCTURNA: de noche una persona solo de paso NO es alerta; "
-                         "alerta solo si se detiene, merodea o toca algo.")
         if self.vehicles:
             lines.append("Cuenta vehiculos solo si se mueven, llegan o se detienen; "
                          "los ya estacionados no cuentan.")
         head = "\n".join(lines)
-        media = ("Analiza esta secuencia de video de unos segundos; en activity describe "
-                 "quien entra/sale/se mueve y hacia donde.\n" if video
-                 else "Analiza este frame.\n")
         from app.vision import zones
         fixed = zones.notes(self.cam_id)
         if fixed:
             head += "\nELEMENTOS FIJOS DE ESTA ESCENA (siempre estan ahi: NO los describas ni alertes por ellos):\n" + \
                 "\n".join(f"- {n + ': ' if n else ''}{t}" for n, t in fixed)
-        return f"{head}\n\n{media}{SCHEMA_INSTRUCTIONS}"
+        static = f"{head}\n\n{SCHEMA_INSTRUCTIONS}"
+        dyn = [f"HORA LOCAL: {lt} ({'NOCTURNO' if night else 'diurno'})"]
+        if weekend and self.weekend_mode == "note":
+            dyn.append("FIN DE SEMANA: el uso casual de esta area es normal; no generes persona_nocturna.")
+        if weekend and self.weekend_mode == "alert_all":
+            dyn.append("FIN DE SEMANA: aqui no deberia haber actividad; cualquier persona visible es alerta persona_nocturna.")
+        if night and mode == "alert":
+            dyn.append("REGLA NOCTURNA: aqui no deberia haber nadie de noche; "
+                       "cualquier persona visible es alerta persona_nocturna.")
+        elif night:
+            dyn.append("REGLA NOCTURNA: de noche una persona solo de paso NO es alerta; "
+                       "alerta solo si se detiene, merodea o toca algo.")
+        dyn.append("Analiza esta secuencia de video; en activity describe quien entra/sale/se mueve y hacia donde." if video
+                   else "Analiza esta imagen.")
+        dyn.append("Responde SOLO con el JSON indicado arriba.")
+        return static, "\n".join(dyn)
+
+    def render(self, now: Optional[float] = None, video: bool = False) -> str:
+        static, dyn = self.render_parts(now, video)
+        return f"{static}\n\n{dyn}"
 
 
 class Scenes:

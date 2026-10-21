@@ -1,5 +1,28 @@
 [
   {
+    "version": "2.40.0",
+    "date": "2026-10-21",
+    "name": "Escena completa con menos llamadas",
+    "summary": "El modelo veía clips de apenas 1 a 2 segundos (30 cuadros seguidos del búfer) y el servidor solo tomaba ~4 cuadros de ellos. Ahora cada clip es la escena de los últimos 16 s en 8 cuadros a 480x270 (un cuadro cada 2 s, ~530 tokens, casi lo mismo que antes), esperando 4 s tras el inicio del movimiento para que la acción entre. Si la escena no cambió desde el último análisis (mismas personas en el mismo lugar, mismos objetos, imagen casi igual) no se llama al modelo; se vuelve a mirar a los 5 minutos. thor-vision manda como mucho 2 peticiones a la vez y, cuando el gateway contesta 503 por capacidad, abre una pausa común: la rutina espera y solo pasan las prioritarias (noche en zonas de alerta, armado, videoportero, personas en la calle). El texto fijo de cada cámara va antes del video para que el servidor lo reutilice de su caché, y la foto del heartbeat va a 640x360.",
+    "highlights": [
+      {
+        "area": "Modelo",
+        "title": "Clip de escena de 16 s",
+        "text": "VLM_SCENE_FRAMES=8, VLM_SCENE_WINDOW_S=16, VLM_SCENE_WIDTH/HEIGHT=480x270, VLM_RISE_DELAY_S=4. Medido: 8 cuadros a 480x270 = 527 tokens; 10 cuadros de 1 s = 471 (el servidor muestrea a 2 fps)."
+      },
+      {
+        "area": "Modelo",
+        "title": "Escena igual sin llamada",
+        "text": "VLM_SAME_GATE, VLM_SAME_STALE_S=300, VLM_SAME_PIX=0.06, VLM_SAME_MOVE=0.08. /api/pipeline: vlm_same_scene_1h."
+      },
+      {
+        "area": "Modelo",
+        "title": "Saturación del gateway",
+        "text": "VLM_MAX_CONCURRENCY=2; pausa 4-60 s tras un 503 de capacidad; rutina omitida (vlm_busy_skips_1h) y prioritarias con un solo reintento. /api/pipeline: gateway."
+      }
+    ]
+  },
+  {
     "version": "2.39.0",
     "date": "2026-10-21",
     "name": "Caras nítidas y alertas de día sin \"persona nocturna\"",
