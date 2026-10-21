@@ -2,6 +2,13 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.37.0 — Identidad en dos etapas: InsightFace + Clef (2026-10-21)
+
+Con el umbral actual (0.45) InsightFace solo reconocía al 12 % de las visitas de la misma persona en otro momento, y por eso se acumulaban cientos de personas 'por revisar'. Ahora, cuando el parecido queda en la zona gris (0.25-0.45), Clef compara la cara de la visita con la mejor cara del candidato al cerrar la visita.
+
+- **Identidad · Reglas**: Clef >= 0.85: la visita pasa sola a esa persona y se borra la identidad temporal si quedó vacía. Clef 0.6-0.85: sugerencia en /identidades (pestaña Sugerencias, con el % de Clef). Nunca se mueve una visita de alguien con nombre. Todo queda en la tabla identity_checks.
+- **Medición · Prueba con 160 pares**: AUC InsightFace 0.928, Clef 0.915, combinados 0.955. En una semana de visitas: ~37 uniones automáticas (0 entre dos personas con nombre) y el caso Oswaldo/Neto (Clef 0.74) habría quedado solo como sugerencia.
+
 ## v2.36.1 — El vigilante de cuadros ya no tumba el contenedor (2026-10-21)
 
 El vigilante de v2.34.2 liberaba desde otro hilo la captura colgada; con FFmpeg (respaldo de cam-118) eso tumbó el proceso dos veces el 21-oct (01:16 y 01:19, sin apagado ordenado). Ahora solo libera capturas de GStreamer (seguro, probado con el videoportero) y las de FFmpeg llevan tiempos máximos propios de apertura (10 s) y lectura (8 s).

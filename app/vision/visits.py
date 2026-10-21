@@ -183,6 +183,7 @@ class Track:
         self.person_p: Optional[float] = None        # Clef: probabilidad de que el recorte sea una persona real
         self.ver_q = 0.0                              # calidad del cuerpo con el que se verifico
         self.ver_pending = False
+        self.gray: Optional[tuple] = None             # (sujeto candidato, parecido) cuando InsightFace quedo en la zona gris
         self.door_first = self.door_last = None      # primera y ultima vez que su punto base cayo en una zona 'puerta_peatonal'
         self.door_alerted = False
 
@@ -220,6 +221,9 @@ GHOST_MIN = int(os.environ.get("GHOST_MIN", "3"))                 # tantos track
 GHOST_WINDOW_S = float(os.environ.get("GHOST_WINDOW_S", "21600"))
 VERIFY_MIN_P = float(os.environ.get("CLEF_PERSON_MIN_P", "0.20"))       # Clef: por debajo de esta probabilidad de "persona real" la visita es un falso (arbol, poste, sombra)
 DOOR_DWELL_S = float(os.environ.get("DOOR_DWELL_S", "20"))              # segundos frente a la puerta peatonal para contar como merodeo
+ID_GRAY_MIN = float(os.environ.get("ID_GRAY_MIN", "0.25"))              # identidad en dos etapas: parecido InsightFace en [0.25, MATCH_THR) lo decide Clef
+ID_AUTO_P = float(os.environ.get("ID_CLEF_AUTO", "0.85"))               # Clef >= esto: la visita pasa sola a esa persona (con candados)
+ID_SUGGEST_P = float(os.environ.get("ID_CLEF_SUGGEST", "0.6"))          # Clef entre esto y AUTO: queda como sugerencia en /identidades
 VERIFY_MIN_HITS = int(os.environ.get("CLEF_VERIFY_MIN_HITS", "4"))
 
 
@@ -247,6 +251,7 @@ class VisitManager:
         self.burst_cb = None    # callable(cam_id, reason): pide analisis retroactivo del pre-roll
         self.zone_cb = None     # callable(cam_id, dict): persona que merodea frente a la puerta peatonal
         self.trips_attend = None    # callable(cam_id) -> bool: un viaje abierto sigue esta camara (sube el fps de YOLO)
+        self._id_q: queue.Queue = queue.Queue(maxsize=60)
         self.verifier = None    # ClefClient: confirma que el recorte de una visita sin cara es una persona real
         self._ver_q: queue.Queue = queue.Queue(maxsize=40)
         self._models = None
@@ -268,6 +273,7 @@ class VisitManager:
     def set_verifier(self, client) -> None:
         if self.verifier is None:
             threading.Thread(target=self._ver_loop, daemon=True, name="visit-clef").start()
+            threading.Thread(target=self._id_loop, daemon=True, name="visit-clef-id").start()
         self.verifier = client
 
     def _maybe_verify(self, cam_id, tr: Track) -> None:
@@ -302,6 +308,50 @@ class VisitManager:
             self.zone_cb(cam_id, info)
         except (KeyError, TypeError, ValueError, OSError) as exc:
             logger.warning("zone_cb: %s", exc)
+
+    def _id_loop(self) -> None:
+        """Segunda etapa de identidad: Clef compara la cara de la visita con la mejor cara del candidato. Candados: nunca mueve una visita de alguien
+        con nombre, nunca une dos personas con nombre distinto; >= ID_AUTO_P la pasa sola, entre ID_SUGGEST_P y ID_AUTO_P queda como sugerencia."""
+        while True:
+            vid, sid0, cand, sim, face = self._id_q.get()
+            try:
+                self._id_check(vid, sid0, cand, sim, face)
+            except Exception as exc:        # noqa: BLE001 - la segunda etapa es opcional: nunca debe tumbar el tracker
+                logger.warning("identidad Clef visita=%s: %s", vid, exc)
+
+    def _id_check(self, vid, sid0, cand, sim, face) -> Optional[str]:
+        with self.db._lock:
+            row = self.db._conn.execute("SELECT face FROM person_visits WHERE subject_id=? AND face IS NOT NULL ORDER BY face_score DESC LIMIT 1", (cand,)).fetchone()
+        if not row or self.verifier is None:
+            return None
+        p = self.verifier.same_person(face, row[0])
+        if p is None:
+            return None
+        s0, sc = self._subjects.get(sid0) or {}, self._subjects.get(cand) or {}
+        blocked = bool(s0.get("named"))                          # visitas de alguien con nombre no se mueven solas (evito un Oswaldo -> Neto)
+        decision = "bloqueado" if blocked and p >= ID_SUGGEST_P else "no"
+        if p >= ID_AUTO_P and not blocked:
+            decision = "auto"
+            with self._lock:
+                self.db.update_person_visit(vid, subject_id=cand)
+                with self.db._lock:
+                    left = self.db._conn.execute("SELECT COUNT(*) FROM person_visits WHERE subject_id=?", (sid0,)).fetchone()[0] if sid0 else 1
+                    if sid0 and not left and not s0.get("named"):
+                        self.db._conn.execute("DELETE FROM subjects WHERE id=? AND named=0 AND NOT EXISTS (SELECT 1 FROM person_visits WHERE subject_id=?)", (sid0, sid0))
+                        self._subjects.pop(sid0, None)
+                    self.db._conn.commit()
+            self.stats["id_clef_auto"] = self.stats.get("id_clef_auto", 0) + 1
+        elif p >= ID_SUGGEST_P and not blocked:
+            decision = "sugerencia"
+            self.stats["id_clef_suggest"] = self.stats.get("id_clef_suggest", 0) + 1
+        with self.db._lock:
+            self.db._conn.execute("CREATE TABLE IF NOT EXISTS identity_checks (id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, visit_id INTEGER, from_sid INTEGER, "
+                                  "into_sid INTEGER, sim REAL, p_clef REAL, decision TEXT)")
+            self.db._conn.execute("INSERT INTO identity_checks (ts, visit_id, from_sid, into_sid, sim, p_clef, decision) VALUES (?,?,?,?,?,?,?)",
+                                  (time.time(), vid, sid0, cand, round(sim, 3), round(p, 3), decision))
+            self.db._conn.commit()
+        logger.info("ID_CLEF visita=%s %s -> %s IF=%.2f Clef=%.2f %s", vid, sid0, cand, sim, p, decision)
+        return decision
 
     def _ver_loop(self) -> None:
         names = {}
@@ -623,6 +673,11 @@ class VisitManager:
                         cam_id, tr.visit_id, qs, qn, qp, tr.snap_n, tr.pre_n, tr.face_src)
         self._flush(tr, time.time(), "closed")
         self.stats["visits_closed"] += 1
+        if tr.gray and tr.face and self.verifier is not None and tr.visit_id is not None and not tr.ghost:
+            try:
+                self._id_q.put_nowait((tr.visit_id, tr.subject_id, tr.gray[0], tr.gray[1], tr.face))
+            except queue.Full:
+                pass
         if self.bodyid is not None and tr.body and not tr.static and not tr.ghost and tr.visit_id is not None:
             self.bodyid.submit(tr.visit_id, tr.body)
         cb = self.visit_cb.get(cam_id)
@@ -702,6 +757,8 @@ class VisitManager:
                 if v > sim:
                     sid, sim = k, v
             if sim < MATCH_THR:
+                if sid is not None and sim >= ID_GRAY_MIN and not known:
+                    tr.gray = (sid, sim)               # zona gris: se crea/usa la identidad de siempre y Clef revisa despues
                 sid = None
         if sid is not None:
             s = self._subjects[sid]

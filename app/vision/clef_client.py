@@ -32,6 +32,10 @@ PERSON_QUESTIONS = {
 }
 
 
+SAME_FACE_Q = {"same": {"type": "noul", "instructions": "Are these two face photos the same person? Judge only facial features (eyes, nose, mouth, face shape, "
+                                                    "hairline); ignore lighting, angle, image quality and clothing."}}
+
+
 class ClefClient:
     def __init__(self, url: str = URL):
         self.url = url.rstrip("/")
@@ -63,6 +67,14 @@ class ClefClient:
                     self._paused_until, self._fails = time.time() + PAUSE_S, 0
                     logger.warning("Clef: %d fallos seguidos, pausa de %.0f s (%s)", FAILS, PAUSE_S, exc)
             self.stats["errors"] += 1
+            return None
+
+    def same_person(self, face_a: bytes, face_b: bytes) -> Optional[float]:
+        """Probabilidad de que dos rostros sean la misma persona (solo rasgos de la cara), o None si no hay respuesta."""
+        out = self.decide({"task": "Two face crops from security cameras taken at different times."}, [face_a, face_b], SAME_FACE_Q)
+        try:
+            return float(out["answers"]["same"]["noul"]) if out else None
+        except (KeyError, TypeError, ValueError):
             return None
 
     def verify_person(self, crop_jpg: bytes, where: str = "") -> Optional[dict]:

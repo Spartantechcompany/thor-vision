@@ -531,7 +531,26 @@ def suggestions(request: Request, min_sim: float = 0.4, limit: int = 120):
             out.append({"from": sid, "from_name": nm[0], "visits": nm[1], "into": s["id"], "into_name": s["name"], "category": s["category"], "sim": s["sim"]})
         if len(out) >= limit:
             break
-    return {"pairs": out}
+    # segunda etapa con Clef: lo que Clef juzgo "probablemente la misma persona" (0.6-0.85) se suma o se marca
+    try:
+        with db._lock:
+            ck = db._conn.execute(
+                "SELECT c.from_sid, c.into_sid, MAX(c.p_clef), COALESCE(f.name,'Persona #'||f.id), (SELECT COUNT(*) FROM person_visits WHERE subject_id=f.id), "
+                "COALESCE(t.name,'Persona #'||t.id), t.category FROM identity_checks c JOIN subjects f ON f.id=c.from_sid JOIN subjects t ON t.id=c.into_sid "
+                "WHERE c.decision='sugerencia' AND f.named=0 GROUP BY c.from_sid, c.into_sid").fetchall()
+    except sqlite3.OperationalError:
+        ck = []
+    rej = _rejected(db)
+    seen = {(p["from"], p["into"]): p for p in out}
+    for fs, ts_, pc, fname, nvis, tname, cat in ck:
+        if (fs, ts_) in rej:
+            continue
+        if (fs, ts_) in seen:
+            seen[(fs, ts_)]["clef"] = round(pc, 2)
+        else:
+            out.append({"from": fs, "from_name": fname, "visits": nvis, "into": ts_, "into_name": tname, "category": cat, "sim": None, "clef": round(pc, 2)})
+    out.sort(key=lambda p: (-(p.get("clef") or 0), -(p.get("sim") or 0)))
+    return {"pairs": out[:limit]}
 
 
 class MergeMany(BaseModel):

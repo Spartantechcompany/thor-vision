@@ -235,14 +235,14 @@ async function suggestions(){
   v.innerHTML = '<div class="empty">Buscando parecidos…</div>';
   const d = await J('/api/people/suggestions?min_sim=0.4&limit=150');
   const key = p => p.from + '>' + p.into;
-  tools.innerHTML = '<button class="btn sm" id="s-all">Seleccionar ≥ 60%</button><button class="btn sm" id="s-none">Ninguna</button><button class="btn pri sm" id="s-go">Unir seleccionadas</button><span class="chip" id="s-n"></span>';
+  tools.innerHTML = '<button class="btn sm" id="s-all">Seleccionar ≥ 60% o Clef ≥ 75%</button><button class="btn sm" id="s-none">Ninguna</button><button class="btn pri sm" id="s-go">Unir seleccionadas</button><span class="chip" id="s-n"></span>';
   const picked = new Set();
   const upd = () => { $('#s-n').textContent = picked.size + ' seleccionadas de ' + d.pairs.length; v.querySelectorAll('.sgrow').forEach(r => { const on = picked.has(r.dataset.k); r.classList.toggle('sel', on); r.querySelector('input').checked = on; }); };
   const img = id => `<img loading="lazy" src="/api/subjects/${id}/face" onerror="this.onerror=null;this.src='/api/subjects/${id}/body'" alt="" style="width:92px;height:92px;object-fit:cover;border-radius:8px;background:#000">`;
   v.innerHTML = d.pairs.length ? d.pairs.map(p => `<div class="sgrow card" data-k="${key(p)}" style="display:flex;flex-direction:row;align-items:center;gap:12px;padding:8px;margin-bottom:8px;cursor:pointer">
       <input type="checkbox" style="width:20px;height:20px">
       <div style="text-align:center">${img(p.from)}<div class="meta">${esc(p.from_name)} · ${p.visits} vis.</div></div>
-      <div style="font-size:20px;color:var(--accent);min-width:56px;text-align:center">${Math.round(p.sim * 100)}%</div>
+      <div style="font-size:20px;color:var(--accent);min-width:72px;text-align:center">${p.sim != null ? Math.round(p.sim * 100) + '%' : '—'}${p.clef != null ? `<div class="meta" title="Clef comparó las dos caras">Clef ${Math.round(p.clef * 100)}%</div>` : ''}</div>
       <div style="text-align:center">${img(p.into)}<div class="meta"><b>${esc(p.into_name)}</b> · ${esc(p.category)}</div></div>
       <button class="btn sm" data-no="${key(p)}" style="margin-left:auto">No son la misma</button></div>`).join('') : '<div class="empty">Sin sugerencias nuevas.</div>';
   upd();
@@ -252,7 +252,7 @@ async function suggestions(){
     const row = e.target.closest('.sgrow'); if (!row) return;
     const k = row.dataset.k; picked.has(k) ? picked.delete(k) : picked.add(k); upd();
   };
-  $('#s-all').onclick = () => { d.pairs.filter(p => p.sim >= 0.6).forEach(p => picked.add(key(p))); upd(); };
+  $('#s-all').onclick = () => { d.pairs.filter(p => (p.sim || 0) >= 0.6 || (p.clef || 0) >= 0.75).forEach(p => picked.add(key(p))); upd(); };
   $('#s-none').onclick = () => { picked.clear(); upd(); };
   $('#s-go').onclick = async () => {
     if (!picked.size) return alert('Marca al menos una.');
