@@ -2,6 +2,12 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.34.4 — El video llega al modelo como cuadros (2026-10-21)
+
+OmniRoute descarta el video_url (el modelo recibía 33 tokens y respondía 'no hay video'), por lo que los análisis de video de las cámaras trabajaban solo con el texto y el recorte. Ahora la secuencia se manda como 6 imágenes en orden cronológico a 640x360, que el gateway sí respeta (misma descripción que directo a Spark01). VLM_VIDEO_AS_FRAMES=false vuelve al video.
+
+- **Modelo · Secuencia como imágenes**: Prueba con un clip real: directo a Spark01 el video_url dio 547 tokens y descripción correcta; por el gateway 33 tokens y 'no hay video'; las mismas 8 imágenes por el gateway 1009 tokens y la misma descripción correcta.
+
 ## v2.34.3 — Toda visita guarda al menos el cuadro completo (2026-10-21)
 
 Las alertas de persona nocturna de Garage frontal salían sin imagen: sus visitas no generaban recorte de cuerpo ni de cara. Ahora, si una visita no tiene escena, se guarda el cuadro con el recuadro de la persona en cuanto se detecta.

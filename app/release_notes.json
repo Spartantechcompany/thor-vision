@@ -1,5 +1,18 @@
 [
   {
+    "version": "2.34.4",
+    "date": "2026-10-21",
+    "name": "El video llega al modelo como cuadros",
+    "summary": "OmniRoute descarta el video_url (el modelo recibía 33 tokens y respondía 'no hay video'), por lo que los análisis de video de las cámaras trabajaban solo con el texto y el recorte. Ahora la secuencia se manda como 6 imágenes en orden cronológico a 640x360, que el gateway sí respeta (misma descripción que directo a Spark01). VLM_VIDEO_AS_FRAMES=false vuelve al video.",
+    "highlights": [
+      {
+        "area": "Modelo",
+        "title": "Secuencia como imágenes",
+        "text": "Prueba con un clip real: directo a Spark01 el video_url dio 547 tokens y descripción correcta; por el gateway 33 tokens y 'no hay video'; las mismas 8 imágenes por el gateway 1009 tokens y la misma descripción correcta."
+      }
+    ]
+  },
+  {
     "version": "2.34.3",
     "date": "2026-10-21",
     "name": "Toda visita guarda al menos el cuadro completo",

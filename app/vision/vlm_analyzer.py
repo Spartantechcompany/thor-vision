@@ -18,6 +18,8 @@ from app.vision.scenes import normalize_result
 logger = logging.getLogger(__name__)
 VIDEO_MAX_W = int(os.environ.get("VLM_VIDEO_MAX_WIDTH", "640"))
 VIDEO_MAX_H = int(os.environ.get("VLM_VIDEO_MAX_HEIGHT", "360"))
+VIDEO_AS_FRAMES = os.environ.get("VLM_VIDEO_AS_FRAMES", "true").lower() == "true"     # OmniRoute descarta video_url (33 tokens de entrada); los cuadros como imagenes si llegan
+VIDEO_FRAMES = int(os.environ.get("VLM_VIDEO_FRAMES", "6"))
 
 SYSTEM_PROMPT = (
     "Eres un analista de cámaras de seguridad. Describes solo lo que es "
@@ -228,15 +230,19 @@ class VLMAnalyzer:
         if len(frames) < 2:
             return self.analyze(frames[-1], context, scene=scene)
 
+        crop_part = self._person_crop_part(
+            crop_frame if crop_frame is not None else frames[-1], context, tag)
+        user_text = self._build_context_prefix(context) + (
+            scene.render(video=True) if scene else self.video_user_prompt)
+
+        if VIDEO_AS_FRAMES:
+            return self._analyze_frames(frames, fps, crop_part, user_text, tag, scene, context)
+
         mp4 = self._encode_mp4(frames, fps)
         if not mp4:
             return self._error("video encode failed")
 
         b64 = base64.b64encode(mp4).decode()
-        crop_part = self._person_crop_part(
-            crop_frame if crop_frame is not None else frames[-1], context, tag)
-        user_text = self._build_context_prefix(context) + (
-            scene.render(video=True) if scene else self.video_user_prompt)
 
         content_part = {"type": "video_url", "video_url": {
             "url": f"data:video/mp4;base64,{b64}"
@@ -246,6 +252,31 @@ class VLMAnalyzer:
         return self._finish(self._request(content_part, user_text, self.video_timeout,
                               debug_tag=tag, debug_media=mp4, debug_ext=".mp4"),
                             scene, context)
+
+    def _analyze_frames(self, frames: List[np.ndarray], fps: float, crop_part, user_text: str, tag: str, scene, context) -> dict:
+        """La misma secuencia como imagenes en orden cronologico (6 cuadros a 640x360 por defecto): funciona por el gateway aunque este descarte el video."""
+        n = len(frames)
+        k = min(VIDEO_FRAMES, n)
+        sel = [frames[round(i * (n - 1) / max(k - 1, 1))] for i in range(k)]
+        parts, last = [], None
+        for fr in sel:
+            h, w = fr.shape[:2]
+            tw, th = self._target_dims(w, h)
+            vs = min(VIDEO_MAX_W / tw, VIDEO_MAX_H / th, 1.0)
+            small = cv2.resize(fr, (max(2, int(tw * vs)), max(2, int(th * vs))), interpolation=cv2.INTER_AREA)
+            ok, buf = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 72])
+            if not ok:
+                continue
+            last = buf.tobytes()
+            parts.append({"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(last).decode()}})
+        if len(parts) < 2:
+            return self._error("frames encode failed")
+        secs = n / fps if fps and fps > 0 else 0
+        note = (f"Las {len(parts)} primeras imagenes son cuadros de UNA secuencia de video de ~{secs:.0f} s, en orden cronologico "
+                "(la primera es la mas antigua): describe el movimiento entre ellas.\n")
+        if crop_part:
+            parts.append(crop_part)
+        return self._finish(self._request(parts, note + user_text, self.video_timeout, debug_tag=tag, debug_media=last, debug_ext=".jpg"), scene, context)
 
     @staticmethod
     def _union_box(context: dict):
