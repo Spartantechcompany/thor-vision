@@ -1,3 +1,4 @@
+import os
 import urllib.parse
 import logging
 import threading
@@ -125,7 +126,12 @@ class RTSPReader(threading.Thread):
             self._native_wh = None
             logger.info("[%s] Streaming started", self.cam.id)
 
-            self._read_loop(cap)
+            done = threading.Event()
+            threading.Thread(target=self._watchdog, args=(cap, done), daemon=True, name=f"stall-{self.cam.id}").start()
+            try:
+                self._read_loop(cap)
+            finally:
+                done.set()
             cap.release()
 
             if not self._stop_event.is_set():
@@ -137,6 +143,22 @@ class RTSPReader(threading.Thread):
         logger.info("[%s] Reader stopped", self.cam.id)
 
     # ── Internals ────────────────────────────────────────────────────────────
+
+    def _watchdog(self, cap: cv2.VideoCapture, done: threading.Event) -> None:
+        """cap.read() puede quedarse bloqueado para siempre si la fuente deja de enviar (el videoportero estuvo ~7 h congelado y marcado 'streaming').
+        Si no llega un cuadro nuevo en STALL_S s, se libera la captura desde aqui: read() devuelve False y el lector reconecta."""
+        stall_s = float(os.environ.get("STREAM_STALL_S", "20"))
+        while not done.wait(5.0):
+            if time.time() - self._connected_since < stall_s:
+                continue
+            lat = self.buffer.latency_ms()
+            if lat < 0 or lat > stall_s * 1000:
+                logger.warning("[%s] sin cuadros nuevos en %.0f s: se fuerza la reconexion", self.cam.id, max(lat, 0) / 1000)
+                try:
+                    cap.release()
+                except cv2.error as exc:
+                    logger.warning("[%s] liberar captura colgada: %s", self.cam.id, exc)
+                return
 
     def _open_capture(self) -> Optional[cv2.VideoCapture]:
         self._connect_attempts += 1

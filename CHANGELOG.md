@@ -2,6 +2,12 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.34.2 — Reconexión automática de cámaras con el video colgado (2026-10-21)
+
+El videoportero llevaba unas 7 horas congelado en Thor y marcado como 'streaming': cap.read() se quedó bloqueado sin que nada lo detectara. Ahora un vigilante por cámara libera la captura si no llegan cuadros nuevos en 20 s (STREAM_STALL_S) y el lector reconecta solo.
+
+- **Captura · Vigilante de cuadros**: Aplica a todas las cámaras. Si la captura se libera, el log dice 'sin cuadros nuevos en N s: se fuerza la reconexion'.
+
 ## v2.34.1 — El video en vivo se reinicia solo si se congela (2026-10-17)
 
 Cuando una cámara se cae y go2rtc reconecta (el videoportero rechazó conexiones RTSP unos 11 minutos), el video del navegador se quedaba en el último cuadro. Un vigilante revisa cada 2.5 s si el video avanza y, si lleva 7.5 s sin avanzar, lo reinicia y vuelve a las fotos mientras reconecta.

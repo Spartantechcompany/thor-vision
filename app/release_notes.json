@@ -1,5 +1,18 @@
 [
   {
+    "version": "2.34.2",
+    "date": "2026-10-21",
+    "name": "Reconexión automática de cámaras con el video colgado",
+    "summary": "El videoportero llevaba unas 7 horas congelado en Thor y marcado como 'streaming': cap.read() se quedó bloqueado sin que nada lo detectara. Ahora un vigilante por cámara libera la captura si no llegan cuadros nuevos en 20 s (STREAM_STALL_S) y el lector reconecta solo.",
+    "highlights": [
+      {
+        "area": "Captura",
+        "title": "Vigilante de cuadros",
+        "text": "Aplica a todas las cámaras. Si la captura se libera, el log dice 'sin cuadros nuevos en N s: se fuerza la reconexion'."
+      }
+    ]
+  },
+  {
     "version": "2.34.1",
     "date": "2026-10-17",
     "name": "El video en vivo se reinicia solo si se congela",
