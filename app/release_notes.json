@@ -1,5 +1,28 @@
 [
   {
+    "version": "2.35.0",
+    "date": "2026-10-21",
+    "name": "Íconos por tipo de equipo, puertas de enlace en /iot y ONVIF sin el videoportero duplicado",
+    "summary": "En /iot cada equipo Tuya muestra un ícono según lo que es (foco, interruptor de 1/2/3 botones, sensor de contacto, abre-portón, cortina, enchufe, gateway, panel, alarma) y su rótulo; se agregan las puertas de enlace Zigbee, el panel y la alarma con su estado en línea desde la nube. El videoportero deja de aparecer como 'cam-vto · 127.0.0.1:80' en la página ONVIF.",
+    "highlights": [
+      {
+        "area": "IoT",
+        "title": "Tipos e íconos",
+        "text": "config/iot.yml lleva type (y gangs en interruptores) por dispositivo; la página agrupa en Puertas de enlace, Cámaras, Sensores de puertas/ventanas/garage, Focos, Interruptores y enchufes, Cortinas."
+      },
+      {
+        "area": "IoT",
+        "title": "Gateways",
+        "text": "Gateway Site (en línea según la nube), Gateway 2do Piso (la nube no autoriza el equipo: sin datos), Panel de control P1 y Alarma Site (desconectada). El puente sincroniza su estado en línea cada 10 min."
+      },
+      {
+        "area": "ONVIF",
+        "title": "Sin duplicado del videoportero",
+        "text": "Las cámaras que Thor lee por go2rtc (127.0.0.1) ya no se listan como equipos propios: el aparato real sigue siendo el endpoint 'vto' (192.168.0.3)."
+      }
+    ]
+  },
+  {
     "version": "2.34.4",
     "date": "2026-10-21",
     "name": "El video llega al modelo como cuadros",

@@ -4,24 +4,29 @@
 alert_open_minutes: 0         # 0 = sin avisos repetidos; solo cambios de estado (al cerrar se anota cuanto estuvo abierta). Un numero > 0 reactiva el aviso periodico
 low_battery_pct: 15
 devices:
-  ebd84e19bf42731470j1ao: {name: "Recepcion Puerta (cristal)", kind: door,   cam: cam-113,       confirmed: true, alias: door-recepcion, related: [cam-113], role: "Inicia el viaje de Escaleras entrada", open_code: doorcontact_state, open_value: true}
-  ebbd958cb06f9669f80fyc: {name: "Oficina Abr Puerta Cristal", kind: door,   cam: cam-cowork,    confirmed: false, alias: door-oficina-abr, related: [cam-cowork], open_code: doorcontact_state, open_value: true}
-  eb1e69b9cf71ccfc05plub: {name: "Puerta Comedor",            kind: door,   cam: cam-215,       confirmed: true, alias: door-comedor, related: [cam-215, tuya-jardin], role: "Conecta la Cocina con la camara Tuya del jardin", open_code: doorcontact_state, open_value: true}
-  eb73fc0af524735e99irh8: {name: "Cocina Ventana",            kind: window, cam: cam-215,       confirmed: false, alias: window-cocina, related: [cam-215], open_code: doorcontact_state, open_value: true}
-  ebd376c2d51a16859eizkw: {name: "Oficina Adm ventana",       kind: window, cam: null,          confirmed: false, alias: window-oficina-adm, open_code: doorcontact_state, open_value: true}
-  eb841b85892ac7f25fjb5d: {name: "Garage (portón)",     kind: garage, cam: cam-228,       confirmed: true, alias: garage-abre, related: [cam-228, cam-118, cam-189, cam-191, tuya-garaje], role: "Garage: la Tuya del garage, Garage frontal y posterior, y Exterior 1 y 2", open_code: doorcontact_state, open_value: true}
-  eb2d6b38b8299a0a85gosq: {name: "Security Camera (Tuya)",    kind: camera, cam: null, alias: tuya-security}
-  eb0ba0012624a25aeaessh: {name: "Jardin camara (Tuya)",      kind: camera, cam: null, alias: tuya-jardin, related: [cam-120, cam-215], role: "Entre Acceso Site y la cocina (jardin)"}
-  ebe7b3e437b01b584813lw: {name: "Camara garaje (Tuya)",      kind: camera, cam: null, alias: tuya-garaje, related: [cam-228], role: "Punto ciego del garage: anticipa la entrada a Garage frontal"}
-  eb52f2fa3d249b00fbdq4u: {name: "Camara Escaleras P2 (Tuya)", kind: camera, cam: cam-236, confirmed: true, alias: tuya-escaleras-p2, related: [cam-236, cam-113], role: "Escaleras del segundo piso: anticipa a Escaleras P2"}
+  ebd84e19bf42731470j1ao: {type: contacto, name: "Recepcion Puerta (cristal)", kind: door,   cam: cam-113,       confirmed: true, alias: door-recepcion, related: [cam-113], role: "Inicia el viaje de Escaleras entrada", open_code: doorcontact_state, open_value: true}
+  ebbd958cb06f9669f80fyc: {type: contacto, name: "Oficina Abr Puerta Cristal", kind: door,   cam: cam-cowork,    confirmed: false, alias: door-oficina-abr, related: [cam-cowork], open_code: doorcontact_state, open_value: true}
+  eb1e69b9cf71ccfc05plub: {type: contacto, name: "Puerta Comedor",            kind: door,   cam: cam-215,       confirmed: true, alias: door-comedor, related: [cam-215, tuya-jardin], role: "Conecta la Cocina con la camara Tuya del jardin", open_code: doorcontact_state, open_value: true}
+  eb73fc0af524735e99irh8: {type: contacto, name: "Cocina Ventana",            kind: window, cam: cam-215,       confirmed: false, alias: window-cocina, related: [cam-215], open_code: doorcontact_state, open_value: true}
+  ebd376c2d51a16859eizkw: {type: contacto, name: "Oficina Adm ventana",       kind: window, cam: null,          confirmed: false, alias: window-oficina-adm, open_code: doorcontact_state, open_value: true}
+  eb841b85892ac7f25fjb5d: {type: porton, name: "Garage (portón)",     kind: garage, cam: cam-228,       confirmed: true, alias: garage-abre, related: [cam-228, cam-118, cam-189, cam-191, tuya-garaje], role: "Garage: la Tuya del garage, Garage frontal y posterior, y Exterior 1 y 2", open_code: doorcontact_state, open_value: true}
+  eb2d6b38b8299a0a85gosq: {type: camara, name: "Security Camera (Tuya)",    kind: camera, cam: null, alias: tuya-security}
+  eb0ba0012624a25aeaessh: {type: camara, name: "Jardin camara (Tuya)",      kind: camera, cam: null, alias: tuya-jardin, related: [cam-120, cam-215], role: "Entre Acceso Site y la cocina (jardin)"}
+  ebe7b3e437b01b584813lw: {type: camara, name: "Camara garaje (Tuya)",      kind: camera, cam: null, alias: tuya-garaje, related: [cam-228], role: "Punto ciego del garage: anticipa la entrada a Garage frontal"}
+  eb52f2fa3d249b00fbdq4u: {type: camara, name: "Camara Escaleras P2 (Tuya)", kind: camera, cam: cam-236, confirmed: true, alias: tuya-escaleras-p2, related: [cam-236, cam-113], role: "Escaleras del segundo piso: anticipa a Escaleras P2"}
 # Luces y cortinas: el estado llega por la sincronizacion de la nube; encender/apagar no genera alertas. Se controlan desde la pagina IoT (servicio tuya-video, con registro).
-  eba489b866e875fbaexmvz: {name: "Jardin Site",        kind: light, cam: null, cams: [cam-120]}
-  eb900fdff8fe114146tis1: {name: "Taller",             kind: light, cam: null, cams: [cam-120, cam-118]}
-  ebb4323c9e34693e17bxkp: {name: "Jardin",             kind: light, cam: null, cams: [cam-120, cam-215], ignore_codes: [switch_2]}
-  eb4279cc5d4926b265whj2: {name: "Garage Entrada",     kind: light, cam: null, cams: [cam-228]}
-  eb249320564b5a78e8dhom: {name: "Cocina",             kind: light, cam: null, cams: [cam-215]}
-  ebc43046158228271bqadq: {name: "Cowork f2",          kind: light, cam: null, cams: [cam-cowork]}
-  eb8b4c40c4f9f5ee1ddakj: {name: "Cowork f1",          kind: light, cam: null, cams: [cam-cowork]}
-  eb74f3c081419c4ce0ksmp: {name: "Lobbi Jardin",       kind: light, cam: null}
-  eb89e49ed3a132abcchbsj: {name: "Arbol de Navidad",   kind: light, cam: null}
-  ebcbbdf4e2c9da083f2snj: {name: "Cortina S.J derecho", kind: curtain, cam: null}
+  eba489b866e875fbaexmvz: {type: interruptor, gangs: 2, name: "Jardin Site",        kind: light, cam: null, cams: [cam-120]}
+  eb900fdff8fe114146tis1: {type: interruptor, gangs: 3, name: "Taller",             kind: light, cam: null, cams: [cam-120, cam-118]}
+  ebb4323c9e34693e17bxkp: {type: interruptor, gangs: 2, name: "Jardin",             kind: light, cam: null, cams: [cam-120, cam-215], ignore_codes: [switch_2]}
+  eb4279cc5d4926b265whj2: {type: interruptor, gangs: 3, name: "Garage Entrada",     kind: light, cam: null, cams: [cam-228]}
+  eb249320564b5a78e8dhom: {type: interruptor, gangs: 2, name: "Cocina",             kind: light, cam: null, cams: [cam-215]}
+  ebc43046158228271bqadq: {type: foco, name: "Cowork f2",          kind: light, cam: null, cams: [cam-cowork]}
+  eb8b4c40c4f9f5ee1ddakj: {type: foco, name: "Cowork f1",          kind: light, cam: null, cams: [cam-cowork]}
+  eb74f3c081419c4ce0ksmp: {type: foco, name: "Lobbi Jardin",       kind: light, cam: null}
+  eb89e49ed3a132abcchbsj: {type: enchufe, name: "Arbol de Navidad",   kind: light, cam: null}
+  ebcbbdf4e2c9da083f2snj: {type: cortina, name: "Cortina S.J derecho", kind: curtain, cam: null}
+# Puertas de enlace y otros equipos Tuya (solo se muestran; el estado en linea sale de la nube cada 10 min)
+  eba79e7bdb4f7a75be0rmj: {type: gateway, name: "Gateway Site", kind: gateway, cam: null, role: "Puerta de enlace Zigbee cableada: de ella dependen los sensores de puertas y ventanas"}
+  eb3224a86b884ecc07hcls: {type: gateway, name: "Gateway 2do Piso", kind: gateway, cam: null, cloud: false, role: "Puerta de enlace Zigbee del segundo piso (el proyecto de la nube no tiene permiso sobre este equipo)"}
+  ebf39d45e025d66fd6k8d1: {type: panel, name: "Panel de control P1", kind: panel, cam: null}
+  ebf2f24e12bdd3bcd9bg57: {type: alarma, name: "Alarma Site", kind: alarm, cam: null}

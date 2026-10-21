@@ -90,6 +90,10 @@ class IotListener:
         dev_id = msg.get("device_id") or topic.split("/")[-2]
         changes = msg.get("changes") or {}
         dev = self.devices.get(dev_id)
+        if dev is not None and not changes and "online" in msg:         # gateways y equipos sin sensores: solo informan si estan en linea (sincronizacion de la nube)
+            st0 = self.state.setdefault(dev_id, {"open": None, "since": None, "battery": None, "last_ts": None})
+            st0["online"], st0["last_ts"] = bool(msg["online"]), float(msg.get("ts") or time.time())
+            return
         if dev is None or not changes:
             return
         self.status["messages"] += 1
@@ -436,6 +440,7 @@ class IotListener:
                         "cam_name": self.cam_names.get(dev.get("cam") or "", None), "confirmed": bool(dev.get("confirmed")),
                         "open": st.get("open"), "since": st.get("since"), "battery": st.get("battery"), "last_ts": st.get("last_ts"), "online": st.get("online"),
                         "alias": dev.get("alias"), "role": dev.get("role"), "switches": st.get("sw"), "percent": st.get("percent"),
+                        "type": dev.get("type"), "gangs": dev.get("gangs"),
                         "related": [{"id": c, "name": self.cam_names.get(c) or (self.devices_by_alias.get(c) or c)} for c in (dev.get("related") or [])]})
         return out
 

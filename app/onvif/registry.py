@@ -37,6 +37,8 @@ def camera_endpoints(config) -> list:
     out = []
     for c in config.cameras:
         host = urlparse(c.rtsp_url).hostname
+        if host in ("127.0.0.1", "localhost", "::1"):
+            continue                                              # se lee a traves de go2rtc (p. ej. el videoportero): el equipo real ya es un endpoint propio ('vto')
         if host and not c.rtsp_url.startswith("onvif://"):         # esos equipos ya son un endpoint propio (registro ONVIF)
             out.append({"id": c.id, "name": c.name, "kind": "camera", "host": host, "port": 80, "listen": False, "zone": c.zone})
     return out

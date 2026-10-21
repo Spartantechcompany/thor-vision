@@ -39,7 +39,7 @@ class DeviceManager:
 
     def _sunapi(self, dev_id: str) -> sn.Sunapi:
         c = self._camera_cfg(dev_id)
-        if c is None or c.rtsp_url.startswith("onvif://"):
+        if c is None or c.rtsp_url.startswith("onvif://") or urllib.parse.urlparse(c.rtsp_url).hostname in ("127.0.0.1", "localhost"):
             raise sn.SunapiError("este equipo no se administra por SUNAPI")
         u = urllib.parse.urlparse(c.rtsp_url)
         return sn.Sunapi(u.hostname, u.username or "", u.password or "")

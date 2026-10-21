@@ -39,6 +39,9 @@ h3{margin:22px 0 8px;font-size:14px}.box{background:var(--panel);border:1px soli
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const KIND = {door: 'Puerta', window: 'Ventana', garage: 'Garage', camera: 'Cámara', light: 'Luz', curtain: 'Cortina'};
+// Qué es cada equipo, para el rótulo bajo el nombre (si es contacto, ahí se dice si va en puerta o ventana)
+const TYPE_LABEL = x => ({foco: 'Foco', interruptor: `Interruptor de ${x.gangs || '?'} ${x.gangs == 1 ? 'botón' : 'botones'}`, contacto: x.kind === 'window' ? 'Sensor de contacto · ventana' : 'Sensor de contacto · puerta',
+  camara: 'Cámara Wi-Fi', porton: 'Abre-portón del garage', cortina: 'Motor de cortina', enchufe: 'Enchufe inteligente', gateway: 'Puerta de enlace Zigbee', panel: 'Panel de control', alarma: 'Alarma'}[x.type] || KIND[x.kind] || '');
 const when = ts => ts ? new Date(ts * 1000).toLocaleString('es-MX', {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false}) : '—';
 const ICON = {
   light: '<svg class="ic" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>',
@@ -50,6 +53,28 @@ const ICON = {
   garage: '<svg class="ic" viewBox="0 0 24 24"><path d="M3 10l9-6 9 6v10H3z"/><path d="M7 20v-7h10v7M7 15h10M7 17.5h10"/></svg>',
   garage_open: '<svg class="ic" viewBox="0 0 24 24"><path d="M3 10l9-6 9 6v10H3z"/><path d="M7 20v-7h10v7M7 13h10"/></svg>',
   camera: '<svg class="ic" viewBox="0 0 24 24"><path d="M4 8h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2z"/><path d="M16 12l5-3v8l-5-3"/></svg>',
+  // contacto magnetico: dos piezas con la separacion entre ellas
+  contacto: '<svg class="ic" viewBox="0 0 24 24"><rect x="2.5" y="8" width="7" height="8" rx="1.5"/><rect x="14.5" y="8" width="7" height="8" rx="1.5"/><path d="M11.5 12h1" stroke-dasharray="1 1.5"/><circle cx="6" cy="12" r=".8"/></svg>',
+  contacto_open: '<svg class="ic" viewBox="0 0 24 24"><rect x="2.5" y="8" width="7" height="8" rx="1.5"/><rect x="14.5" y="8" width="7" height="8" rx="1.5" transform="rotate(14 18 12)"/><path d="M12 5l1.5-2M10.5 5L9 3"/></svg>',
+  // interruptor de pared con 1, 2 o 3 botones
+  switch1: '<svg class="ic" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><rect x="9" y="7" width="6" height="10" rx="1"/><path d="M9 12h6"/></svg>',
+  switch2: '<svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="6" y="7" width="5" height="10" rx="1"/><rect x="13" y="7" width="5" height="10" rx="1"/></svg>',
+  switch3: '<svg class="ic" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><rect x="4.5" y="7" width="3.8" height="10" rx="1"/><rect x="10.1" y="7" width="3.8" height="10" rx="1"/><rect x="15.7" y="7" width="3.8" height="10" rx="1"/></svg>',
+  curtain: '<svg class="ic" viewBox="0 0 24 24"><path d="M3 4h18"/><path d="M5 4v16M9 4c0 6-2 10-2 16M19 4v16M15 4c0 6 2 10 2 16"/></svg>',
+  // puerta de enlace: caja con antena y ondas
+  gateway: '<svg class="ic" viewBox="0 0 24 24"><rect x="3" y="12" width="18" height="8" rx="2"/><path d="M7 16h.01M11 16h.01M12 12V8"/><path d="M8.5 6a5 5 0 0 1 7 0M6 3.5a8.5 8.5 0 0 1 12 0"/></svg>',
+  panel: '<svg class="ic" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><rect x="7" y="6" width="10" height="5" rx="1"/><path d="M8 15h.01M12 15h.01M16 15h.01M8 18h.01M12 18h.01M16 18h.01"/></svg>',
+  plug: '<svg class="ic" viewBox="0 0 24 24"><path d="M9 3v4M15 3v4"/><path d="M6 7h12v4a6 6 0 0 1-12 0z"/><path d="M12 17v4"/></svg>',
+  alarm: '<svg class="ic" viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0 1 12 0v6"/><path d="M4 17h16M10 20h4"/><path d="M12 2v1.5M3 6l1 1M21 6l-1 1"/></svg>',
+};
+// Ícono según el tipo real del equipo (foco, interruptor, contacto, gateway...); si no hay, el de su categoría
+const iconFor = (x, open) => {
+  if (x.kind === 'camera') return ICON.camera;
+  if (x.type === 'interruptor') return ICON['switch' + Math.min(3, Math.max(1, +x.gangs || 1))];
+  if (x.type === 'foco') return open ? ICON.light_open : ICON.light;
+  if (x.type === 'enchufe') return ICON.plug;
+  if (x.type === 'contacto') return open ? ICON.contacto_open : ICON.contacto;
+  return ICON[x.type] || ICON[x.kind + (open ? '_open' : '')] || ICON.door;
 };
 const ago = ts => { if (!ts) return '—'; const s = Date.now() / 1000 - ts; return s < 90 ? 'ahora' : s < 3600 ? 'hace ' + Math.round(s / 60) + ' min' : s < 86400 ? 'hace ' + Math.round(s / 3600) + ' h' : 'hace ' + Math.round(s / 86400) + ' d'; };
 const ctl = (x) => {
@@ -64,12 +89,13 @@ function card(x){
   const cam = x.kind === 'camera';
   const light = x.kind === 'light';
   const known = x.open !== null && x.open !== undefined;
-  const state = cam ? (x.last_ts ? 'closed' : 'nodata') : (x.online === false ? 'off' : (known ? (x.open ? 'open' : 'closed') : 'nodata'));
-  const label = cam ? (x.last_ts ? 'Activa' : 'Sin datos') : (x.online === false ? 'Sin conexión' : (known ? (light ? (x.open ? 'ENCENDIDA' : 'Apagada') : (x.open ? 'ABIERTA' : 'Cerrada')) : 'Sin datos'));
-  const icon = ICON[cam ? 'camera' : (x.kind + (state === 'open' ? '_open' : ''))] || ICON.door;
+  const info = ['gateway', 'panel', 'alarm'].includes(x.kind);          // solo informan si estan en linea
+  const state = info ? (x.online === true ? 'closed' : x.online === false ? 'off' : 'nodata') : cam ? (x.last_ts ? 'closed' : 'nodata') : (x.online === false ? 'off' : (known ? (x.open ? 'open' : 'closed') : 'nodata'));
+  const label = info ? (x.online === true ? 'En línea' : x.online === false ? 'Sin conexión' : 'Sin datos (la nube no lo reporta)') : cam ? (x.last_ts ? 'Activa' : 'Sin datos') : (x.online === false ? 'Sin conexión' : (known ? (light ? (x.open ? 'ENCENDIDA' : 'Apagada') : (x.open ? 'ABIERTA' : 'Cerrada')) : 'Sin datos'));
+  const icon = iconFor(x, state === 'open');
   const bat = x.battery != null ? `<span class="bat" style="color:${x.battery <= 15 ? 'var(--bad)' : x.battery <= 30 ? 'var(--warn)' : 'var(--muted)'}"><i style="--p:${Math.max(4, Math.min(100, x.battery)) * 0.18}px"></i>${x.battery}%</span>` : '';
   const rel = (x.related || []).map(r => /^(cam-)/.test(r.id) ? `<a class="chip" href="/camara/${esc(r.id)}" title="Abrir la vista de esta cámara">${esc(r.name)}</a>` : `<span class="chip">${esc(r.name)}</span>`).join('');
-  return `<div class="sc ${state}"><div class="top">${icon}<div><div class="nm">${esc(x.name)}</div><div class="stt">${label}</div></div></div>
+  return `<div class="sc ${state}"><div class="top">${icon}<div><div class="nm">${esc(x.name)}</div><div class="muted" style="font-size:12px">${esc(TYPE_LABEL(x))}</div><div class="stt">${label}</div></div></div>
     <div class="muted" style="font-size:12.5px">${known && !cam ? (light ? (x.open ? 'encendida ' : 'apagada ') : (x.open ? 'abierta ' : 'cerrada ')) + ago(x.since) + ' · ' : ''}último mensaje ${ago(x.last_ts)} ${bat ? '· ' : ''}${bat}</div>
   ${ctl(x)}<div class="muted cmsg" style="font-size:12px"></div></div>`;
 }
@@ -79,7 +105,9 @@ async function tick(){
     const s = d.status || {};
     $('#st').className = 'b ' + (s.connected ? 'ok' : 'bad'); $('#st').textContent = s.connected ? 'MQTT conectado' : ('MQTT: ' + (s.error || 'sin conexión'));
     const sec = (t, f) => { const l = d.devices.filter(f); return l.length ? `<h3 class="sech">${t} <span class="muted" style="font-weight:400">${l.length}</span></h3><div class="sgrid">${l.map(card).join('')}</div>` : ''; };
-    $('#sensors').innerHTML = sec('Cámaras Tuya', x => x.kind === 'camera') + sec('Puertas, ventanas y garage', x => !['camera', 'light'].includes(x.kind)) + sec('Luces', x => x.kind === 'light');
+    const GW = ['gateway', 'panel', 'alarm'];
+    $('#sensors').innerHTML = sec('Puertas de enlace y paneles', x => GW.includes(x.kind)) + sec('Cámaras Tuya', x => x.kind === 'camera') + sec('Sensores de puertas, ventanas y garage', x => ['door', 'window', 'garage'].includes(x.kind))
+      + sec('Focos', x => x.kind === 'light' && x.type === 'foco') + sec('Interruptores y enchufes', x => x.kind === 'light' && x.type !== 'foco') + sec('Cortinas', x => x.kind === 'curtain');
     const e = (await (await fetch('/api/iot/events?limit=40')).json()).events;
     $('#ev').innerHTML = e.length ? e.map(r => `<div class="ev"><span class="muted">${when(r.ts)}</span> · <b>${esc(r.name)}</b> · ${esc(LABEL[r.code] || r.code)}${r.value && typeof r.value === 'object' ? '' : ' = ' + esc(JSON.stringify(r.value))} <span class="muted">(${esc(r.source)})</span></div>`).join('') : 'Sin eventos todavía.';
   } catch (er) { $('#st').className = 'b bad'; $('#st').textContent = 'sin respuesta'; }

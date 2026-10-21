@@ -2,6 +2,14 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.35.0 — Íconos por tipo de equipo, puertas de enlace en /iot y ONVIF sin el videoportero duplicado (2026-10-21)
+
+En /iot cada equipo Tuya muestra un ícono según lo que es (foco, interruptor de 1/2/3 botones, sensor de contacto, abre-portón, cortina, enchufe, gateway, panel, alarma) y su rótulo; se agregan las puertas de enlace Zigbee, el panel y la alarma con su estado en línea desde la nube. El videoportero deja de aparecer como 'cam-vto · 127.0.0.1:80' en la página ONVIF.
+
+- **IoT · Tipos e íconos**: config/iot.yml lleva type (y gangs en interruptores) por dispositivo; la página agrupa en Puertas de enlace, Cámaras, Sensores de puertas/ventanas/garage, Focos, Interruptores y enchufes, Cortinas.
+- **IoT · Gateways**: Gateway Site (en línea según la nube), Gateway 2do Piso (la nube no autoriza el equipo: sin datos), Panel de control P1 y Alarma Site (desconectada). El puente sincroniza su estado en línea cada 10 min.
+- **ONVIF · Sin duplicado del videoportero**: Las cámaras que Thor lee por go2rtc (127.0.0.1) ya no se listan como equipos propios: el aparato real sigue siendo el endpoint 'vto' (192.168.0.3).
+
 ## v2.34.4 — El video llega al modelo como cuadros (2026-10-21)
 
 OmniRoute descarta el video_url (el modelo recibía 33 tokens y respondía 'no hay video'), por lo que los análisis de video de las cámaras trabajaban solo con el texto y el recorte. Ahora la secuencia se manda como 6 imágenes en orden cronológico a 640x360, que el gateway sí respeta (misma descripción que directo a Spark01). VLM_VIDEO_AS_FRAMES=false vuelve al video.
