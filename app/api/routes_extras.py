@@ -280,3 +280,59 @@ def pets_presence(request: Request):
     """Estado de cada mascota conocida: en casa / fuera / sin datos, con su ultima camara y hora."""
     pp = getattr(request.app.state, "pet_presence", None)
     return {"pets": pp.status() if pp else []}
+
+
+@router.get("/api/selfcheck")
+def selfcheck(request: Request):
+    """Autochequeo: cada pieza que puede fallar en silencio, con estado ok / aviso / falla. Pensado para vigilarlo desde fuera (Grafana, cron)."""
+    import json as _json
+    import shutil
+    import socket
+    import urllib.request as _rq
+    from urllib.parse import urlparse
+    st = request.app.state
+    checks = []
+
+    def add(name, level, detail):
+        checks.append({"name": name, "level": level, "detail": detail})
+
+    def tcp(host, port, t=1.5):
+        try:
+            with socket.create_connection((host, port), timeout=t):
+                return True
+        except OSError:
+            return False
+
+    mgr = getattr(st, "capture_manager", None)
+    stats = mgr.get_all_stats() if mgr else []
+    bad = [f"{c['id']} ({c.get('state')}, {round((c.get('latency_ms') or 0) / 1000)} s)" for c in stats if c.get("state") != "streaming" or (c.get("latency_ms") or 0) > 10000]
+    add("camaras", "falla" if bad else "ok", ", ".join(bad) if bad else f"{len(stats)} en vivo")
+    an = getattr(st, "vlm_analyzer", None)
+    age = time.time() - (getattr(an, "last_ok_ts", 0) or 0) if an else None
+    add("modelo de vision", "ok" if age is not None and age < 300 else "falla", "sin respuesta valida" if age is None or age >= 300 else f"ultima respuesta hace {round(age)} s")
+    yr = getattr(st, "yolo_rules", None)
+    if yr is not None and yr.active():
+        add("modo sin VLM", "aviso", "activo: persona nocturna y merodeo salen por reglas")
+    cl = getattr(st, "clef", None)
+    try:
+        with _rq.urlopen((cl.url if cl else "http://127.0.0.1:20140") + "/health", timeout=2) as r:
+            h = _json.loads(r.read())
+        add("Clef", "ok" if h.get("ready") else "falla", f"{h.get('calls')} decisiones, p50 {h.get('p50_ms')} ms")
+    except (OSError, ValueError):
+        add("Clef", "falla", "no responde")
+    add("go2rtc", "ok" if tcp("127.0.0.1", 1984) else "falla", "video en vivo del navegador y del videoportero")
+    ep = urlparse(os.environ.get("NEMOTRON_ENDPOINT", ""))
+    if ep.hostname:
+        add("gateway de IA", "ok" if tcp(ep.hostname, ep.port or 80) else "falla", f"{ep.hostname}:{ep.port}")
+    iot = getattr(st, "iot", None)
+    if iot is not None:
+        add("Tuya (MQTT)", "ok" if iot.status.get("connected") else "falla", iot.status.get("error") or f"{iot.status.get('messages')} mensajes")
+    du = shutil.disk_usage("/app/data")
+    pct = round(100 * du.used / du.total)
+    add("disco de datos", "falla" if pct > 90 else "aviso" if pct > 80 else "ok", f"{pct}% usado, {round(du.free / 1e9)} GB libres")
+    db = _db(request)
+    with db._lock:
+        last = db._conn.execute("SELECT MAX(ts) FROM events WHERE type='nemotron'").fetchone()[0] or 0
+    add("eventos recientes", "ok" if time.time() - last < 900 else "aviso", f"el ultimo hace {round((time.time() - last) / 60)} min")
+    worst = "falla" if any(c["level"] == "falla" for c in checks) else "aviso" if any(c["level"] == "aviso" for c in checks) else "ok"
+    return {"status": worst, "checks": checks, "ts": time.time()}

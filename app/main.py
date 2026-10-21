@@ -512,6 +512,8 @@ app = FastAPI(title="THOR Vision", lifespan=lifespan)
 
 from app.utils.quiet import QuietClosed
 app.add_middleware(QuietClosed)
+from app.utils.gzip_mw import SelectiveGZip
+app.add_middleware(SelectiveGZip)
 
 app.include_router(stream_router)
 app.include_router(status_router)

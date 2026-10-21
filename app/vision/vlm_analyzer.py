@@ -75,11 +75,11 @@ def _dump_debug(tag: str, media_bytes: bytes, media_ext: str, response_body: str
         base.with_suffix(media_ext).write_bytes(media_bytes)
         base.with_suffix(".response.json").write_text(response_body, encoding="utf-8")
 
-        files = sorted(DEBUG_DIR.iterdir(), key=lambda p: p.stat().st_mtime)
+        files = sorted((p for p in DEBUG_DIR.iterdir() if p.is_file()), key=lambda p: p.stat().st_mtime)      # 'latest/' es una carpeta: borrarla fallaba en cada llamada
         excess = len(files) - DEBUG_MAX_FILES
         for f in files[:max(excess, 0)]:
             f.unlink(missing_ok=True)
-    except Exception as e:
+    except OSError as e:
         logger.warning("No se pudo guardar debug dump: %s", e)
 
 

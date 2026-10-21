@@ -2,6 +2,15 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.36.0 — Auditoría: compresión, un bug que llenaba el log, ahorro en pestañas ocultas y autochequeo (2026-10-21)
+
+Pasada adversarial con una batería fija (scripts/audit_battery.py) medida antes y después. Se corrige el borrado del volcado de depuración que fallaba en cada llamada (45 % de los avisos del log), se comprimen páginas y JSON (el panel y la línea de tiempo pesaban 220 y 640 KB), la línea de tiempo se guarda 10 s en caché, el panel deja de consultar con la pestaña oculta y abre los videos escalonados, y hay un nuevo /api/selfcheck.
+
+- **Bug · Volcado de depuración**: Al rotar archivos intentaba borrar la carpeta 'latest' y fallaba: 4,956 de 12,150 avisos en 24 h.
+- **Rendimiento · Gzip selectivo**: Páginas y JSON comprimidos; imágenes, clips y flujos no se tocan.
+- **Panel · Pestaña oculta y precarga**: Los 13 temporizadores se saltan con la pestaña oculta y refrescan al volver; preconexión a go2rtc, prefetch de la vista de cámara al pasar el cursor, videos escalonados cada 250 ms.
+- **Operación · /api/selfcheck**: Cámaras, modelo, modo sin VLM, Clef, go2rtc, gateway de IA, Tuya, disco y eventos recientes en un solo estado ok/aviso/falla.
+
 ## v2.35.0 — Íconos por tipo de equipo, puertas de enlace en /iot y ONVIF sin el videoportero duplicado (2026-10-21)
 
 En /iot cada equipo Tuya muestra un ícono según lo que es (foco, interruptor de 1/2/3 botones, sensor de contacto, abre-portón, cortina, enchufe, gateway, panel, alarma) y su rótulo; se agregan las puertas de enlace Zigbee, el panel y la alarma con su estado en línea desde la nube. El videoportero deja de aparecer como 'cam-vto · 127.0.0.1:80' en la página ONVIF.

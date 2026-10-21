@@ -4,6 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>THOR Vision — OXM Tech</title>
+<script>
+// Precarga y ahorro: el temporizador de consulta se salta cuando la pestaña esta oculta (TV apagada, otra pestaña) y se actualiza al volver;
+// y se abre la conexion con go2rtc antes de pedir el primer video.
+(() => {
+  const si = window.setInterval.bind(window);
+  window.setInterval = (fn, ms, ...a) => si(function(){ if (document.hidden && ms < 60000 && ms !== 1000) return; return fn.apply(this, arguments); }, ms, ...a);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) return;
+    ['refreshVLM', 'refreshPipeline', '_pollDetections', 'loadTimelineEvents'].forEach(n => { try { if (typeof window[n] === 'function') window[n](); } catch (e) {} }); });
+  try { const l = document.createElement('link'); l.rel = 'preconnect'; l.href = `${location.protocol}//${location.hostname}:1984`; document.head.appendChild(l); } catch (e) {}
+  document.addEventListener('pointerover', e => {                   // precarga la vista de camara al pasar el cursor por el enlace
+    const a = e.target.closest && e.target.closest('a.cam-open'); if (!a || a.dataset.pf) return;
+    a.dataset.pf = '1'; const l = document.createElement('link'); l.rel = 'prefetch'; l.href = a.href; document.head.appendChild(l);
+  }, { passive: true });
+})();
+</script>
 <style>
 :root {
   --oxm-blue:       #76B900;       /* acento NVIDIA, antes azul OXM */
@@ -1508,7 +1523,7 @@ function _initLiveVideo(cameras){
     document.getElementById('cam-grid').before(b);
     document.addEventListener('visibilitychange', () => cameras.forEach(c => (document.hidden || !LIVE_ON) ? stopLive(c.id, !document.hidden ? true : false) : startLive(c.id)));
   }
-  if (LIVE_ON) cameras.forEach(c => startLive(c.id));
+  if (LIVE_ON) cameras.forEach((c, i) => setTimeout(() => { if (LIVE_ON && !document.hidden) startLive(c.id); }, i * 250));      // escalonado: 11 negociaciones WebRTC a la vez saturan equipos modestos
 }
 
 function startSnapshotPolling(camId) {
