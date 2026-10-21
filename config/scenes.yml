@@ -35,6 +35,12 @@ alert_catalog:
 cameras:
   cam-189:
     name: Exterior 1
+    toma: "Cámara alta sobre el muro del inmueble, gran angular de 5 MP, mira en diagonal calle abajo."
+    zonas:
+      - "izquierda: muro naranja del propio inmueble con rejas; abajo a la izquierda está la puerta peatonal"
+      - "centro: banqueta ancha con jardinera y un árbol"
+      - "derecha y fondo: calle con autos estacionados en ambos lados, árboles y casas de enfrente"
+    flujo: "Los peatones recorren la banqueta en ambos sentidos; quien se pega al muro de la izquierda o se detiene ahí va o mira hacia la puerta peatonal. Los autos circulan por la calle a la derecha. Exterior 2 ve el mismo tramo desde el otro lado: una persona que pasa aparece en las dos."
     where: >
       Exterior, banqueta y calle frente al inmueble vistas desde arriba en
       diagonal. A la izquierda un muro con rejas del propio inmueble y un
@@ -58,6 +64,13 @@ cameras:
 
   cam-191:
     name: Exterior 2
+    toma: "Cámara alta sobre el muro del inmueble, gran angular de 5 MP, mira la misma banqueta en sentido contrario a Exterior 1."
+    zonas:
+      - "derecha: muro del propio inmueble con rejas; abajo a la derecha, la zona de la puerta peatonal"
+      - "centro: banqueta ancha"
+      - "izquierda: calle con autos estacionados"
+      - "fondo: casas y portón de un vecino, esquina"
+    flujo: "Peatones en ambos sentidos por la banqueta; detenerse junto al muro de la derecha es acercarse al inmueble. Mismo tramo que Exterior 1."
     where: >
       Exterior, la misma banqueta y calle que Exterior 1 desde otro angulo:
       calle a la izquierda, banqueta amplia al centro, muro con rejas del
@@ -77,6 +90,12 @@ cameras:
 
   cam-113:
     name: Escaleras entrada
+    toma: "Cámara montada de lado: la imagen sale vertical. Mira el recibidor desde arriba."
+    zonas:
+      - "recibidor con jardineras, plantas y el logo de OXM"
+      - "puerta de cristal de la recepción hacia la calle"
+      - "escalera de madera que sube al piso 1"
+    flujo: "Quien llega de la calle entra por la puerta de cristal y sube la escalera; quien sale baja y cruza la puerta."
     where: >
       Interior, recibidor de entrada con el logo de OXM tech en la pared,
       una palmera, jardineras y la escalera de madera que sube. La camara
@@ -96,6 +115,12 @@ cameras:
 
   cam-sala-juntas:
     name: Sala de Juntas
+    toma: "Cámara alta en esquina, gran angular."
+    zonas:
+      - "centro e izquierda: mesa de juntas con sillas"
+      - "derecha: sofá en L (zona de descanso)"
+      - "fondo: escalera y ventanal"
+    flujo: "Reuniones en la mesa y descanso en el sofá; sillas y cojines vacíos no son personas."
     where: >
       Interior, sala de juntas con mesa de reuniones y sillas. Uso esperado:
       reuniones y trabajo del personal, a veces hasta tarde entre semana.
@@ -114,6 +139,12 @@ cameras:
 
   cam-118:
     name: Garage posterior
+    toma: "Cámara alta dentro de la cochera posterior, mira el auto blanco estacionado y el portón al fondo."
+    zonas:
+      - "centro: auto blanco estacionado"
+      - "izquierda: lockers amarillos, tarimas, bicicletas y una moto"
+      - "fondo derecho: portón a la calle (entra luz fuerte)"
+    flujo: "Las personas entran o salen por el portón del fondo a la derecha y caminan junto al auto. Manipular el auto o los objetos guardados es lo que importa."
     where: >
       Interior, cochera cerrada con un auto blanco estacionado en el centro,
       bicicleta/moto y objetos guardados a la izquierda, pared a la derecha.
@@ -132,9 +163,14 @@ cameras:
 
   cam-228:
     name: Garage frontal
+    toma: "Cámara alta dentro de la cochera frontal, mira la parte trasera del auto estacionado hacia la escalera de acceso."
+    zonas:
+      - "izquierda y centro: auto plateado estacionado"
+      - "derecha: pared de piedra con extintor, señalización y una bicicleta"
+      - "arriba a la derecha: escalones que suben al interior"
+    flujo: "Quien entra por el portón cruza junto al auto y sube los escalones de la derecha; quien sale baja por ahí hacia el portón. De noche la imagen es casi negra."
     where: >
-      Interior/semi-exterior, acceso frontal de cochera. En la noche la
-      imagen es casi negra con tinte azul; puede haber muy poca informacion.
+      Interior, cochera frontal techada: auto plateado estacionado, pared de piedra con extintor y una bicicleta, escalones de acceso al interior. De noche sin luz la imagen es casi negra con tinte azul y puede no haber informacion.
     focus:
       - personas o vehiculos que entran o salen por el acceso
       - persona parada frente al porton o forzandolo
@@ -147,9 +183,14 @@ cameras:
 
   cam-120:
     name: Acceso Site
+    toma: "Cámara alta en esquina, mira una sala pequeña que da al cuarto de site."
+    zonas:
+      - "izquierda: puerta negra"
+      - "centro: sillón, cuadro pop-art y extintor"
+      - "derecha: puerta de cristal 'ALMACÉN' que lleva al site"
+    flujo: "Las mascotas pasan seguido por aquí. Cruzar la puerta de cristal de la derecha es entrar al site (equipo de red)."
     where: >
-      Interior, acceso al cuarto de site (equipo de red/servidores). En la
-      noche la imagen es casi negra con algunos puntos de luz de equipos.
+      Interior, sala pequena antes del cuarto de site (equipo de red): sillon, cuadro pop-art, puerta negra y puerta de cristal ALMACEN hacia el site. De noche casi negra, solo luces de equipos.
     focus:
       - CUALQUIER persona frente a la puerta o dentro del site es alerta acceso_no_autorizado, a cualquier hora
       - la puerta abierta o alguien manipulando equipos
@@ -162,6 +203,13 @@ cameras:
 
   cam-215:
     name: Cocina-Patio
+    toma: "Cámara alta en esquina de la cocina, gran angular."
+    zonas:
+      - "izquierda: refrigerador con imanes"
+      - "fondo: cocina integral con estufa y fregadero"
+      - "derecha: puerta corrediza de vidrio al patio con plantas"
+      - "frente: mesa redonda de vidrio con sillas"
+    flujo: "La puerta corrediza de la derecha conecta la cocina con el patio (sensor 'Puerta Comedor'); las mascotas entran y salen por ahí."
     where: >
       Interior, cocina con refrigerador con imanes a la izquierda, mesa con
       sillas al centro y una puerta corrediza de vidrio hacia un patio con
@@ -181,6 +229,12 @@ cameras:
 
   cam-cowork:
     name: Cowork
+    toma: "Cámara alta en esquina del cowork del piso 1, gran angular."
+    zonas:
+      - "izquierda: escritorios con monitores"
+      - "primer plano: escritorio en L"
+      - "centro y derecha: escalera de madera y ventanales al fondo"
+    flujo: "Trabajo en escritorios en horario laboral; la escalera conecta con los otros pisos."
     where: >
       Interior, area de coworking del piso 1 con escritorios y monitores,
       puerta/ventanal de vidrio al fondo. Uso esperado: trabajo en horario laboral.
@@ -198,6 +252,12 @@ cameras:
 
   cam-236:
     name: Escaleras P2
+    toma: "Cámara alta en el piso 2, mira el descanso y la escalera desde arriba."
+    zonas:
+      - "centro y abajo: escalera con barandal de vidrio y escalones de madera"
+      - "derecha: ventanal grande y una planta"
+      - "izquierda: pasillo con un mueble y un jarrón"
+    flujo: "Las personas suben o bajan por la escalera; quien se queda en el descanso o el pasillo de noche no es tránsito normal."
     where: >
       Interior, escalera y descanso del piso 2. En la noche la imagen es
       casi negra; de dia es un pasillo/escalera de transito.
@@ -209,3 +269,22 @@ cameras:
     alert_types: [persona_en_suelo, persona_nocturna, objeto_abandonado, acceso_no_autorizado, fuego_humo]
     night_person: alert
     vehicles: false
+  cam-vto:
+    name: Videoportero
+    where: >
+      Exterior, frente al acceso peatonal del inmueble: el videoportero Dahua (VTO) en la reja.
+    toma: "Cámara del videoportero, a la altura de la cara, vista a través de la reja del inmueble (dos barrotes en primer plano)."
+    zonas:
+      - "primer plano: barrotes de la reja"
+      - "atrás: banqueta, autos estacionados y casas de enfrente"
+      - "quien toca el timbre aparece muy cerca, al centro o a la derecha"
+    flujo: "Quien se queda frente al videoportero espera que le abran (visita); quien pasa de largo es tráfico de la calle."
+    focus:
+      - persona que se queda frente al timbre o toca (visita)
+      - persona que intenta abrir la reja o se queda mirando hacia adentro
+      - entrega de paquetes o bultos dejados junto a la reja
+    ignore:
+      - transeuntes que pasan sin detenerse
+      - autos que circulan o ya estacionados
+    alert_types: [merodeo, acceso_no_autorizado, objeto_abandonado, fuego_humo]
+    night_person: note

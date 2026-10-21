@@ -2,6 +2,13 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.38.0 — Prompts por toma de cámara y video real otra vez (2026-10-21)
+
+Cada cámara le dice al modelo desde dónde mira (TOMA), qué hay en cada parte del encuadre (ZONAS) y cómo se mueve normalmente la gente (FLUJO), y se le pide decir dónde ocurre algo y hacia dónde se mueve, empezando por lo más importante. El videoportero recibe su primer perfil. Con preserveVideoUrl activo en OmniRoute, los clips vuelven a mandarse como video (547 tokens contra 1009 de los cuadros en la misma prueba).
+
+- **Prompts · Toma, zonas y flujo**: config/scenes.yml: toma, zonas y flujo para las 11 cámaras, escritos a partir de sus capturas de día. Ejemplo Exterior 1: muro con la puerta peatonal a la izquierda, banqueta al centro, calle a la derecha; el mismo tramo que Exterior 2.
+- **Modelo · Video real**: VLM_VIDEO_AS_FRAMES ahora es false por defecto; true vuelve a mandar cuadros si el gateway deja de aceptar video.
+
 ## v2.37.0 — Identidad en dos etapas: InsightFace + Clef (2026-10-21)
 
 Con el umbral actual (0.45) InsightFace solo reconocía al 12 % de las visitas de la misma persona en otro momento, y por eso se acumulaban cientos de personas 'por revisar'. Ahora, cuando el parecido queda en la zona gris (0.25-0.45), Clef compara la cara de la visita con la mejor cara del candidato al cerrar la visita.

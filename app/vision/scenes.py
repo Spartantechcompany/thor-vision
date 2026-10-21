@@ -53,6 +53,9 @@ class SceneContext:
     known_pets: list = field(default_factory=list)
     cam_night: Optional[tuple] = None       # horario nocturno propio de la camara (todos los dias)
     known_exempt: frozenset = frozenset()    # tipos que NO alertan si hay una persona conocida en cuadro
+    toma: str = ""                           # desde donde mira la camara (altura, angulo, orientacion)
+    zonas: list = field(default_factory=list)   # que hay en cada parte del encuadre
+    flujo: str = ""                          # por donde entra y sale la gente normalmente y que significa cada direccion
 
     def _rule(self, now: Optional[float] = None) -> tuple:
         lt = time.localtime(now or time.time())
@@ -82,6 +85,11 @@ class SceneContext:
         lines = [
             f"CAMARA: {self.name} ({self.cam_id})",
             f"UBICACION: {' '.join(self.where.split())}",
+            *([f"TOMA: {' '.join(self.toma.split())}"] if self.toma else []),
+            *(["ZONAS DEL ENCUADRE:", *[f"- {z}" for z in self.zonas]] if self.zonas else []),
+            *([f"FLUJO NORMAL: {' '.join(self.flujo.split())}"] if self.flujo else []),
+            "Usa la TOMA y las ZONAS para decir en activity DONDE ocurre algo y HACIA DONDE se mueve (p. ej. 'se acerca a la puerta peatonal', 'sube la escalera'). "
+            "Empieza activity por lo mas importante de la escena.",
             f"HORA LOCAL: {lt} ({'NOCTURNO' if night else 'diurno'})",
             "LO QUE IMPORTA:",
             *[f"- {x}" for x in self.focus],
@@ -146,6 +154,9 @@ class Scenes:
                 known_pets=list(raw.get("known_pets") or []),
                 cam_night=tuple(c["night_hours"]) if c.get("night_hours") else None,
                 known_exempt=frozenset(c.get("known_exempt") or []),
+                toma=str(c.get("toma") or ""),
+                zonas=[str(z) for z in (c.get("zonas") or [])],
+                flujo=str(c.get("flujo") or ""),
             )
         logger.info("scenes: %d camaras con contexto de escena", len(self._by_cam))
 

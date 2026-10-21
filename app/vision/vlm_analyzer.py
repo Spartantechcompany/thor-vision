@@ -18,7 +18,7 @@ from app.vision.scenes import normalize_result
 logger = logging.getLogger(__name__)
 VIDEO_MAX_W = int(os.environ.get("VLM_VIDEO_MAX_WIDTH", "640"))
 VIDEO_MAX_H = int(os.environ.get("VLM_VIDEO_MAX_HEIGHT", "360"))
-VIDEO_AS_FRAMES = os.environ.get("VLM_VIDEO_AS_FRAMES", "true").lower() == "true"     # OmniRoute descarta video_url (33 tokens de entrada); los cuadros como imagenes si llegan
+VIDEO_AS_FRAMES = os.environ.get("VLM_VIDEO_AS_FRAMES", "false").lower() == "true"    # OmniRoute ya conserva video_url (preserveVideoUrl, 21-oct): 547 tokens contra 1009 de los cuadros; true vuelve a cuadros
 VIDEO_FRAMES = int(os.environ.get("VLM_VIDEO_FRAMES", "6"))
 
 SYSTEM_PROMPT = (
