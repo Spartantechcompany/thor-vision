@@ -2,6 +2,13 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.36.1 — El vigilante de cuadros ya no tumba el contenedor (2026-10-21)
+
+El vigilante de v2.34.2 liberaba desde otro hilo la captura colgada; con FFmpeg (respaldo de cam-118) eso tumbó el proceso dos veces el 21-oct (01:16 y 01:19, sin apagado ordenado). Ahora solo libera capturas de GStreamer (seguro, probado con el videoportero) y las de FFmpeg llevan tiempos máximos propios de apertura (10 s) y lectura (8 s).
+
+- **Captura · Sin caídas del contenedor**: FFmpeg: CAP_PROP_OPEN_TIMEOUT_MSEC y CAP_PROP_READ_TIMEOUT_MSEC; la lectura colgada regresa sola y el lector reconecta.
+- **Diagnóstico · cam-118 y videoportero**: La red a cam-118 no pierde paquetes; sus fallas y el reinicio del videoportero (01:25) coinciden con la saturación de sesiones RTSP de la madrugada (TV con video en vivo, go2rtc y Thor a la vez). Con el modo ligero en TV y go2rtc como único cliente del videoportero no se han repetido.
+
 ## v2.36.0 — Auditoría: compresión, un bug que llenaba el log, ahorro en pestañas ocultas y autochequeo (2026-10-21)
 
 Pasada adversarial con una batería fija (scripts/audit_battery.py) medida antes y después. Se corrige el borrado del volcado de depuración que fallaba en cada llamada (45 % de los avisos del log), se comprimen páginas y JSON (el panel y la línea de tiempo pesaban 220 y 640 KB), la línea de tiempo se guarda 10 s en caché, el panel deja de consultar con la pestaña oculta y abre los videos escalonados, y hay un nuevo /api/selfcheck.

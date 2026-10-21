@@ -1,5 +1,23 @@
 [
   {
+    "version": "2.36.1",
+    "date": "2026-10-21",
+    "name": "El vigilante de cuadros ya no tumba el contenedor",
+    "summary": "El vigilante de v2.34.2 liberaba desde otro hilo la captura colgada; con FFmpeg (respaldo de cam-118) eso tumbó el proceso dos veces el 21-oct (01:16 y 01:19, sin apagado ordenado). Ahora solo libera capturas de GStreamer (seguro, probado con el videoportero) y las de FFmpeg llevan tiempos máximos propios de apertura (10 s) y lectura (8 s).",
+    "highlights": [
+      {
+        "area": "Captura",
+        "title": "Sin caídas del contenedor",
+        "text": "FFmpeg: CAP_PROP_OPEN_TIMEOUT_MSEC y CAP_PROP_READ_TIMEOUT_MSEC; la lectura colgada regresa sola y el lector reconecta."
+      },
+      {
+        "area": "Diagnóstico",
+        "title": "cam-118 y videoportero",
+        "text": "La red a cam-118 no pierde paquetes; sus fallas y el reinicio del videoportero (01:25) coinciden con la saturación de sesiones RTSP de la madrugada (TV con video en vivo, go2rtc y Thor a la vez). Con el modo ligero en TV y go2rtc como único cliente del videoportero no se han repetido."
+      }
+    ]
+  },
+  {
     "version": "2.36.0",
     "date": "2026-10-21",
     "name": "Auditoría: compresión, un bug que llenaba el log, ahorro en pestañas ocultas y autochequeo",

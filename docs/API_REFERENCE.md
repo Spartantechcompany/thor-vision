@@ -351,6 +351,12 @@ La documentacion interactiva esta en `/docs`. Guia de uso y significado de los d
 |---|---|---|---|---|
 | GET | `/searxng/search` | Searxng Search | `q`, `format` |  |
 
+## selfcheck
+
+| Metodo | Ruta | Resumen | Parametros | Cuerpo |
+|---|---|---|---|---|
+| GET | `/api/selfcheck` | Selfcheck |  |  |
+
 ## snapshot
 
 | Metodo | Ruta | Resumen | Parametros | Cuerpo |
