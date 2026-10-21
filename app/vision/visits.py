@@ -38,6 +38,10 @@ STATIC_IOU = 0.85
 FACE_MIN_AREA = _f("FACE_MIN_AREA", 750.0)
 FACE_MIN_DET = _f("FACE_MIN_DET", 0.7)
 FACE_BLUR_MIN = _f("FACE_BLUR_MIN", 20.0)
+FACE_THUMB_MIN_PX = _f("FACE_THUMB_MIN_PX", 40.0)     # ancho nativo minimo de la cara para guardarla como miniatura (mas chica se ve borrosa)
+FACE_THUMB_SHARP = _f("FACE_THUMB_SHARP", 120.0)     # nitidez minima (varianza del Laplaciano a 64 px): solo corta lo muy desenfocado; lo fino lo juzga Clef
+FACE_CLEF_MIN = _f("FACE_CLEF_MIN", 0.18)            # Clef: por debajo, la cara de la visita no se muestra (barrida, borrosa o no es cara); 0 lo apaga
+SNAP_FACE_BONUS = _f("FACE_SNAP_BONUS", 1.3)          # la captura JPEG de la camara no trae el barrido del video H.264: a igual calidad, gana
 MATCH_THR = _f("SUBJECT_MATCH_THRESHOLD", 0.45)
 KNOWN_MIN_CONF = _f("SUBJECT_KNOWN_MIN_CONF", 0.45)
 FLUSH_S = 10.0
@@ -100,6 +104,11 @@ def _jpeg(img, max_side: int, quality: int) -> Optional[bytes]:
         return buf.tobytes() if ok else None
     except Exception:
         return None
+
+
+def thumb_ok(bbox, sharp: float) -> bool:
+    """Una cara sirve de miniatura si es lo bastante grande en el cuadro original y no esta barrida ni desenfocada."""
+    return float(bbox[2] - bbox[0]) >= FACE_THUMB_MIN_PX and float(sharp or 0.0) >= FACE_THUMB_SHARP
 
 
 def face_yaw(kps) -> float:
@@ -252,6 +261,7 @@ class VisitManager:
         self.zone_cb = None     # callable(cam_id, dict): persona que merodea frente a la puerta peatonal
         self.trips_attend = None    # callable(cam_id) -> bool: un viaje abierto sigue esta camara (sube el fps de YOLO)
         self._id_q: queue.Queue = queue.Queue(maxsize=60)
+        self._fq_q: queue.Queue = queue.Queue(maxsize=60)
         self.verifier = None    # ClefClient: confirma que el recorte de una visita sin cara es una persona real
         self._ver_q: queue.Queue = queue.Queue(maxsize=40)
         self._models = None
@@ -274,6 +284,7 @@ class VisitManager:
         if self.verifier is None:
             threading.Thread(target=self._ver_loop, daemon=True, name="visit-clef").start()
             threading.Thread(target=self._id_loop, daemon=True, name="visit-clef-id").start()
+            threading.Thread(target=self._fq_loop, daemon=True, name="visit-clef-face").start()
         self.verifier = client
 
     def _maybe_verify(self, cam_id, tr: Track) -> None:
@@ -318,6 +329,29 @@ class VisitManager:
                 self._id_check(vid, sid0, cand, sim, face)
             except Exception as exc:        # noqa: BLE001 - la segunda etapa es opcional: nunca debe tumbar el tracker
                 logger.warning("identidad Clef visita=%s: %s", vid, exc)
+
+    def _fq_loop(self) -> None:
+        while True:
+            vid, face = self._fq_q.get()
+            try:
+                self._face_check(vid, face)
+            except Exception as exc:        # noqa: BLE001 - el filtro de calidad es opcional: nunca debe tumbar el tracker
+                logger.warning("calidad de cara visita=%s: %s", vid, exc)
+
+    def _face_check(self, vid, face) -> Optional[float]:
+        """Clef juzga si la cara de la visita se ve bien; si no, se quita la miniatura (la visita conserva cuerpo, escena y embedding)."""
+        p = self.verifier.face_clear(face) if self.verifier is not None else None
+        if p is None:
+            return None
+        if p < FACE_CLEF_MIN:
+            with self.db._lock:
+                self.db._conn.execute("UPDATE person_visits SET face=NULL WHERE id=?", (vid,))
+                self.db._conn.commit()
+            self.stats["face_clef_drop"] = self.stats.get("face_clef_drop", 0) + 1
+        else:
+            self.stats["face_clef_ok"] = self.stats.get("face_clef_ok", 0) + 1
+        logger.info("FACE_Q visita=%s Clef=%.2f %s", vid, p, "quitada" if p < FACE_CLEF_MIN else "ok")
+        return p
 
     def _id_check(self, vid, sid0, cand, sim, face) -> Optional[str]:
         with self.db._lock:
@@ -560,7 +594,7 @@ class VisitManager:
                 area, face, bb, fcrop, score = best
                 mx, my = (bb[2] - bb[0]) * .35, (bb[3] - bb[1]) * .35
                 th = crop[max(0, int(bb[1] - my)):int(bb[3] + my), max(0, int(bb[0] - mx)):int(bb[2] + mx)]
-                jpg = _jpeg(th, 128, 85) if th.size else None
+                jpg = _jpeg(th, 160, 85) if th.size else None
                 name, conf = (self._face_db.recognize(face.embedding) if self._face_db else (None, 0.0))
                 f = SimpleNamespace(bbox=tuple(bb), name=name, confidence=conf, embedding=face.embedding,
                                     det_score=score, sharpness=sharpness(fcrop), area=area,
@@ -582,9 +616,9 @@ class VisitManager:
         area = float(f.area or (bb[2] - bb[0]) * (bb[3] - bb[1]))
         yaw = abs(float(getattr(f, "yaw", 0.0)))
         q = (float(f.det_score) * math.sqrt(area) * max(0.2, min(f.sharpness / 100.0, 1.5))
-             * max(0.15, 1.0 - yaw / 0.6))
+             * max(0.15, 1.0 - yaw / 0.6)) * (SNAP_FACE_BONUS if src == "snap" else 1.0)
         tr.q_src[src] = max(tr.q_src.get(src, 0.0), q)
-        if f.thumb_b64 and q > tr.face_q * 1.1:
+        if f.thumb_b64 and thumb_ok(bb, f.sharpness) and q > tr.face_q * 1.1:
             tr.face, tr.face_q, tr.face_src = base64.b64decode(f.thumb_b64), q, src
             dw, dh = tr.dims
             if dw and dh:        # donde del encuadre salio la mejor cara (centro de la persona seguida), para saber en que zonas conviene captar
@@ -673,6 +707,11 @@ class VisitManager:
                         cam_id, tr.visit_id, qs, qn, qp, tr.snap_n, tr.pre_n, tr.face_src)
         self._flush(tr, time.time(), "closed")
         self.stats["visits_closed"] += 1
+        if tr.face and FACE_CLEF_MIN > 0 and self.verifier is not None and tr.visit_id is not None and not tr.ghost:
+            try:
+                self._fq_q.put_nowait((tr.visit_id, tr.face))
+            except queue.Full:
+                pass
         if tr.gray and tr.face and self.verifier is not None and tr.visit_id is not None and not tr.ghost:
             try:
                 self._id_q.put_nowait((tr.visit_id, tr.subject_id, tr.gray[0], tr.gray[1], tr.face))

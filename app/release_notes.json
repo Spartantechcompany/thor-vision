@@ -1,5 +1,28 @@
 [
   {
+    "version": "2.39.0",
+    "date": "2026-10-21",
+    "name": "Caras nítidas y alertas de día sin \"persona nocturna\"",
+    "summary": "Las miniaturas de rostro ya no se agrandan: se guardan a su tamaño real (máximo 160 px) y se prefiere la captura JPEG de la cámara sobre el cuadro del video. Una cara de menos de 40 px en el cuadro original no se guarda como miniatura, y al cerrar cada visita Clef revisa si la cara se ve bien: si está barrida, borrosa o no es una cara, la visita se queda solo con el cuerpo. Cowork y Sala de Juntas vuelven a su horario: el modo de alerta total del 9 de octubre estaba fijo en la configuración y daba unas 1,200 alertas de \"persona nocturna\" de día; para alertar por toda persona está el botón de armado, y de día esa alerta ahora se llama actividad del armado. En la vista de cámara la línea de tiempo incrustada ya no pide video ni capturas de las 11 cámaras, que dejaban sin conexión a la imagen de la alerta.",
+    "highlights": [
+      {
+        "area": "Personas",
+        "title": "Miniaturas sin zoom",
+        "text": "Recorte a tamaño real (máx. 160 px); mínimo de 40 px de cara (FACE_THUMB_MIN_PX); Clef quita las miniaturas con probabilidad < 0.18 de verse bien (FACE_CLEF_MIN, 0 lo apaga). Log FACE_Q."
+      },
+      {
+        "area": "Alertas",
+        "title": "Horario normal en Cowork y Sala de Juntas",
+        "text": "Sala de Juntas: alerta de 00:00 a 06:00 entre semana y sin alerta nocturna el fin de semana; Cowork: 22:00 a 06:00. Con armado absoluto, una persona de día es actividad_armado, no persona_nocturna."
+      },
+      {
+        "area": "Cámara",
+        "title": "La captura de la alerta carga",
+        "text": "El panel incrustado (?tl=) solo corre la línea de tiempo; el visor pausa la vista en vivo mientras está abierto y avisa si la captura no carga."
+      }
+    ]
+  },
+  {
     "version": "2.38.0",
     "date": "2026-10-21",
     "name": "Prompts por toma de cámara y video real otra vez",

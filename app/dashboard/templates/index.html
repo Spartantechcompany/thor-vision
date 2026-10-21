@@ -9,7 +9,10 @@
 // y se abre la conexion con go2rtc antes de pedir el primer video.
 (() => {
   const si = window.setInterval.bind(window);
-  window.setInterval = (fn, ms, ...a) => si(function(){ if (document.hidden && ms < 60000 && ms !== 1000) return; return fn.apply(this, arguments); }, ms, ...a);
+  // incrustado como linea de tiempo (?tl=, vista de camara): solo corre la linea de tiempo; sin esto las consultas del panel oculto llenaban
+  // las 6 conexiones del navegador y la captura de la alerta no cargaba
+  const TLO = window.__TLO = /[?&]tl=/.test(location.search);
+  window.setInterval = (fn, ms, ...a) => si(function(){ if (ms < 60000 && (TLO || (document.hidden && ms !== 1000))) return; return fn.apply(this, arguments); }, ms, ...a);
   document.addEventListener('visibilitychange', () => { if (document.hidden) return;
     ['refreshVLM', 'refreshPipeline', '_pollDetections', 'loadTimelineEvents'].forEach(n => { try { if (typeof window[n] === 'function') window[n](); } catch (e) {} }); });
   try { const l = document.createElement('link'); l.rel = 'preconnect'; l.href = `${location.protocol}//${location.hostname}:1984`; document.head.appendChild(l); } catch (e) {}
@@ -1433,6 +1436,7 @@ const GO2RTC = `${location.protocol}//${location.hostname}:1984`;
 let LIVE_ON = !LITE && (localStorage.getItem('thor_live_video') ?? '1') === '1';
 if (/[?&]video=0/.test(location.search)) LIVE_ON = false;
 if (/[?&]video=1/.test(location.search)) LIVE_ON = true;
+if (window.__TLO) LIVE_ON = false;
 const _live = {};      // camId -> { pc, on, timer }
 const HEAVY_CAMS = new Set(['cam-189', 'cam-191']);        // 2592x1944 H.264 a 30 fps
 let _heavyOk = null;
@@ -1527,6 +1531,7 @@ function _initLiveVideo(cameras){
 }
 
 function startSnapshotPolling(camId) {
+  if (window.__TLO) return;            // la linea de tiempo incrustada no muestra camaras
   if (_pollers[camId]) _pollers[camId].running = false;
   const state = { running: true, errors: 0 };
   _pollers[camId] = state;

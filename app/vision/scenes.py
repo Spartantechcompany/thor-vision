@@ -74,6 +74,16 @@ class SceneContext:
     def is_night(self, now: Optional[float] = None) -> bool:
         return self._rule(now)[0]
 
+    def by_clock_night(self, now: Optional[float] = None) -> bool:
+        """Noche segun el horario de la camara, sin el modo armado (que vuelve 'noche' cualquier hora)."""
+        lt = time.localtime(now or time.time())
+        weekend = lt.tm_wday >= 5
+        if weekend and self.weekend_mode == "alert_all":
+            return True
+        a, b = (self.weekday_night if (self.weekday_night and not weekend) else (self.cam_night or self.night_hours))
+        h = lt.tm_hour
+        return (h >= a or h < b) if a > b else (a <= h < b)
+
     def night_alert(self, now: Optional[float] = None) -> bool:
         night, mode, _ = self._rule(now)
         return night and mode == "alert"
@@ -250,6 +260,8 @@ def normalize_result(result: dict, scene: SceneContext, yolo_people: Optional[in
         types.remove("persona_nocturna")
         if not types:
             alerts = []
+    if "persona_nocturna" in types and arming.is_absolute() and not scene.by_clock_night():
+        types[types.index("persona_nocturna")] = "actividad_armado"    # de dia la alerta es por el modo armado, no por la hora: no se llama "de noche"
     if scene.known_exempt and types and KNOWN_PRESENT is not None and not arming.is_absolute():
         try:
             known = KNOWN_PRESENT(scene.cam_id)

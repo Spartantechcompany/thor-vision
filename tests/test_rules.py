@@ -61,7 +61,7 @@ def test_visit_records_where_the_best_face_appeared():
     from app.vision.visits import Track, VisitManager
     tr = Track(1, (100, 100, 200, 300), 0.0)
     tr.dims = (1000, 500)
-    f = SimpleNamespace(bbox=(120, 110, 160, 160), area=2000.0, det_score=0.9, sharpness=80.0, yaw=0.0, name=None, confidence=None,
+    f = SimpleNamespace(bbox=(120, 110, 160, 160), area=2000.0, det_score=0.9, sharpness=500.0, yaw=0.0, name=None, confidence=None,
                         embedding=None, thumb_b64="AAAA")
     VisitManager._face_obs(tr, f)
     assert tr.face_xy == "0.150,0.400"

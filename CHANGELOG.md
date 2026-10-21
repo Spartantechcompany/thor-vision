@@ -2,6 +2,14 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.39.0 — Caras nítidas y alertas de día sin "persona nocturna" (2026-10-21)
+
+Las miniaturas de rostro ya no se agrandan: se guardan a su tamaño real (máximo 160 px) y se prefiere la captura JPEG de la cámara sobre el cuadro del video. Una cara de menos de 40 px en el cuadro original no se guarda como miniatura, y al cerrar cada visita Clef revisa si la cara se ve bien: si está barrida, borrosa o no es una cara, la visita se queda solo con el cuerpo. Cowork y Sala de Juntas vuelven a su horario: el modo de alerta total del 9 de octubre estaba fijo en la configuración y daba unas 1,200 alertas de "persona nocturna" de día; para alertar por toda persona está el botón de armado, y de día esa alerta ahora se llama actividad del armado. En la vista de cámara la línea de tiempo incrustada ya no pide video ni capturas de las 11 cámaras, que dejaban sin conexión a la imagen de la alerta.
+
+- **Personas · Miniaturas sin zoom**: Recorte a tamaño real (máx. 160 px); mínimo de 40 px de cara (FACE_THUMB_MIN_PX); Clef quita las miniaturas con probabilidad < 0.18 de verse bien (FACE_CLEF_MIN, 0 lo apaga). Log FACE_Q.
+- **Alertas · Horario normal en Cowork y Sala de Juntas**: Sala de Juntas: alerta de 00:00 a 06:00 entre semana y sin alerta nocturna el fin de semana; Cowork: 22:00 a 06:00. Con armado absoluto, una persona de día es actividad_armado, no persona_nocturna.
+- **Cámara · La captura de la alerta carga**: El panel incrustado (?tl=) solo corre la línea de tiempo; el visor pausa la vista en vivo mientras está abierto y avisa si la captura no carga.
+
 ## v2.38.0 — Prompts por toma de cámara y video real otra vez (2026-10-21)
 
 Cada cámara le dice al modelo desde dónde mira (TOMA), qué hay en cada parte del encuadre (ZONAS) y cómo se mueve normalmente la gente (FLUJO), y se le pide decir dónde ocurre algo y hacia dónde se mueve, empezando por lo más importante. El videoportero recibe su primer perfil. Con preserveVideoUrl activo en OmniRoute, los clips vuelven a mandarse como video (547 tokens contra 1009 de los cuadros en la misma prueba).

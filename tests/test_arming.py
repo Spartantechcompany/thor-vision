@@ -58,3 +58,22 @@ def test_api_toggles_and_logs_an_alert_event(tmp_path, monkeypatch):
     c.post("/api/arming", json={"mode": "absoluto"})                  # repetir no genera otro evento
     assert len(events) == 1 and events[0][2]["alert_types"] == ["estado_armado"] and events[0][3]
     assert c.get("/api/arming").json()["mode"] == "absoluto"
+
+
+def test_daytime_armed_alert_is_not_called_night(tmp_path, monkeypatch):
+    _fresh(tmp_path, monkeypatch)
+    ctx = scenes.SceneContext(cam_id="c", name="Cowork", where="", focus=[], ignore=[], alert_types=frozenset({"persona_nocturna"}),
+                              vehicles=False, night_person="alert")
+    noon = time.mktime((2026, 10, 7, 12, 0, 0, 0, 0, -1))
+    monkeypatch.setattr(scenes.time, "time", lambda: noon)
+    res = lambda: {"people": 1, "relevant": True, "alerts": ["persona"], "alert_types": ["persona_nocturna"], "activity": "una persona"}
+    assert scenes.normalize_result(res(), ctx, yolo_people=1)["alert_types"] == []              # modo normal, de dia: no hay alerta
+    arming.set_mode("absoluto")
+    assert scenes.normalize_result(res(), ctx, yolo_people=1)["alert_types"] == ["actividad_armado"]
+
+
+def test_cowork_and_meeting_room_follow_the_normal_schedule():
+    sc = scenes.Scenes()
+    noon = time.mktime((2026, 10, 7, 12, 0, 0, 0, 0, -1))
+    for cam in ("cam-cowork", "cam-sala-juntas"):
+        assert not sc.get(cam).night_alert(noon)

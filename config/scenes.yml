@@ -133,8 +133,8 @@ cameras:
       - pantallas encendidas, sillas vacias, reflejos de ventanas
     alert_types: [persona_nocturna, acceso_no_autorizado, objeto_abandonado, persona_en_suelo, fuego_humo]
     night_person: alert
-    night_hours: [0, 24]    # MODO ALERTA TOTAL (2026-10-09): cualquier persona a cualquier hora es alerta. Para volver: weekday_night: [0, 6] y weekend_mode: note
-    weekend_mode: alert_all
+    weekday_night: [0, 6]   # entre semana se trabaja tarde: alerta solo de 00:00 a 06:00 (el modo armado absoluto alerta por toda persona a cualquier hora)
+    weekend_mode: note      # fin de semana: uso casual, sin alerta nocturna
     vehicles: false
 
   cam-118:
@@ -246,8 +246,6 @@ cameras:
       - monitores encendidos, luces de standby, reflejos del vidrio
     alert_types: [persona_nocturna, acceso_no_autorizado, objeto_abandonado, persona_en_suelo, fuego_humo]
     night_person: alert
-    night_hours: [0, 24]    # MODO ALERTA TOTAL (2026-10-09): cualquier persona a cualquier hora es alerta. Para volver, borra esta linea
-    weekend_mode: alert_all
     vehicles: false
 
   cam-236:

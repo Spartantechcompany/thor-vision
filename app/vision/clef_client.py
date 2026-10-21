@@ -36,6 +36,11 @@ SAME_FACE_Q = {"same": {"type": "noul", "instructions": "Are these two face phot
                                                     "hairline); ignore lighting, angle, image quality and clothing."}}
 
 
+FACE_CLEAR_Q = {"clear": {"type": "noul", "instructions": "Is this face photo clear enough to recognize the person? Answer false if it is blurry, smeared, "
+                                                      "streaked by video compression, pixelated, too small, too dark, the face is mostly hidden or turned away, "
+                                                      "or it is not a face at all."}}
+
+
 class ClefClient:
     def __init__(self, url: str = URL):
         self.url = url.rstrip("/")
@@ -74,6 +79,14 @@ class ClefClient:
         out = self.decide({"task": "Two face crops from security cameras taken at different times."}, [face_a, face_b], SAME_FACE_Q)
         try:
             return float(out["answers"]["same"]["noul"]) if out else None
+        except (KeyError, TypeError, ValueError):
+            return None
+
+    def face_clear(self, face: bytes) -> Optional[float]:
+        """Probabilidad de que el recorte sea una cara nitida y reconocible (sirve de miniatura), o None si no hay respuesta."""
+        out = self.decide({"task": "Face crop from a security camera, to decide if it is good enough to show as the person's thumbnail."}, [face], FACE_CLEAR_Q)
+        try:
+            return float(out["answers"]["clear"]["noul"]) if out else None
         except (KeyError, TypeError, ValueError):
             return None
 
