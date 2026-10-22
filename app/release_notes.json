@@ -1,5 +1,18 @@
 [
   {
+    "version": "2.43.1",
+    "date": "2026-10-22",
+    "name": "Línea de tiempo y visor más claros",
+    "summary": "Los botones de la línea de tiempo muestran 'Cargando…' al instante y un clic nuevo cancela la carga anterior (con 24 h o más cada cambio tardaba 2-3 s sin ninguna señal y se sentía muerto). El visor de alertas atenúa la imagen mientras carga, avisa si no llegó y reintenta una vez. Las páginas HTML llevan Cache-Control: no-cache para que Safari no conserve copias viejas. Probado en Chromium y WebKit (el motor de Safari): botones, imágenes de capturas y de visitas.",
+    "highlights": [
+      {
+        "area": "Panel",
+        "title": "Cargando y reintento",
+        "text": "tlLoad con AbortController; _vaLightbox con estado de carga/error y un reintento; middleware NoCacheHTML."
+      }
+    ]
+  },
+  {
     "version": "2.43.0",
     "date": "2026-10-21",
     "name": "Viajes por timbre, videoportero unido a la entrada, Clef en los recorridos, calle ligera, identidades consolidadas y resumen de cada viaje",

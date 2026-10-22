@@ -2,6 +2,12 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.43.1 — Línea de tiempo y visor más claros (2026-10-22)
+
+Los botones de la línea de tiempo muestran 'Cargando…' al instante y un clic nuevo cancela la carga anterior (con 24 h o más cada cambio tardaba 2-3 s sin ninguna señal y se sentía muerto). El visor de alertas atenúa la imagen mientras carga, avisa si no llegó y reintenta una vez. Las páginas HTML llevan Cache-Control: no-cache para que Safari no conserve copias viejas. Probado en Chromium y WebKit (el motor de Safari): botones, imágenes de capturas y de visitas.
+
+- **Panel · Cargando y reintento**: tlLoad con AbortController; _vaLightbox con estado de carga/error y un reintento; middleware NoCacheHTML.
+
 ## v2.43.0 — Viajes por timbre, videoportero unido a la entrada, Clef en los recorridos, calle ligera, identidades consolidadas y resumen de cada viaje (2026-10-21)
 
 El viaje del videoportero lo abre el timbre (evento nativo del Dahua), no cualquiera que pase: con los 22 timbrazos de la semana habrían sido 6 alertas de viaje en vez de 248. Quien sale del videoportero y aparece en Garage frontal en menos de 4 minutos queda en el mismo recorrido, así el viaje lleva la cara del videoportero. En el enlazador de recorridos el cuerpo lo juzga Clef (AUC 0.84 contra 0.67 del embedding ReID; en 42 pares con rostro confirmado, precisión 0.64 y recall 0.50, antes 0.40 y 0.14), también para unir pedazos de la misma persona en una cámara. En Exterior 1 y 2 solo quien se acerca a la puerta (o a la zona nueva "seguimiento en calle") abre una visita completa; el resto se cuenta por hora como transeúnte. De noche se consolidan identidades: pares de "Persona #N" parecidos van a Clef y se fusionan solo si Clef e InsightFace coinciden (≥ 0.85 y ≥ 0.40), una fusión por persona por noche; lo demás queda como sugerencia. Al cerrar un viaje con alerta, una sola llamada con video resume quién llegó, por dónde y qué hizo.
