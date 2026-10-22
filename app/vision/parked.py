@@ -124,7 +124,7 @@ class ParkedTracker:
     def _presence(self, cam_id, c, now, win=PRESENCE_WIN_S) -> tuple:
         """(fraccion de cuadros de la camara en los que se vio este vehiculo, cuadros) en la ventana; un auto estacionado sale en casi todos,
         un carril con trafico solo cuando pasa alguien."""
-        start = max(now - win, c["first"])
+        start = max(now - win, c["first"], c.get("mt_start", c["first"]))   # solo el tiempo observado en este proceso (tras reiniciar no hay historial)
         ft = self._ftimes.get(cam_id) or ()
         n = sum(1 for t in ft if t >= start)
         m = sum(1 for t in c.get("mt") or () if t >= start)
@@ -166,12 +166,14 @@ class ParkedTracker:
                     c["hits"] += 1
                     c["zin"] = c.get("zin", 0) + (1 if inz else 0)
                     c["cls"][cls] += 1
-                    c.setdefault("mt", deque(maxlen=4000)).append(now)
+                    if "mt" not in c:
+                        c["mt"], c["mt_start"] = deque(maxlen=4000), now          # recuperado de la base al arrancar: se empieza a medir aqui
+                    c["mt"].append(now)
                     self._maybe_register(cam_id, c, frame, fw, fh, now)
                     self._maybe_read_plate(c, frame, fw, fh, now)
                 else:
                     cands.append({"cls": Counter({cls: 1}), "anchor": b, "first": now, "last": now,
-                                  "hits": 1, "rec": None, "saved": 0.0, "zin": 1 if inz else 0, "mt": deque([now], maxlen=4000)})
+                                  "hits": 1, "rec": None, "saved": 0.0, "zin": 1 if inz else 0, "mt": deque([now], maxlen=4000), "mt_start": now})
             self._gc(cam_id, now)
 
     def _maybe_register(self, cam_id, c, frame, fw, fh, now) -> None:
@@ -388,7 +390,7 @@ class ParkedTracker:
                 continue
             idle = now - c["last"]
             ghost = False
-            if c["rec"] is not None and now - c["first"] > PRESENCE_WIN_S and c.get("mt") is not None:
+            if c["rec"] is not None and c.get("mt") is not None and now - c.get("mt_start", now) > PRESENCE_WIN_S:
                 pres, n = self._presence(cam_id, c, now)
                 ghost = n >= 30 and pres < PRESENCE_GONE
                 if ghost:

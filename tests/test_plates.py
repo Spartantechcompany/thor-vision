@@ -139,3 +139,15 @@ def test_carril_con_trafico_no_se_registra_como_estacionado():
     for i in range(240):                                       # auto quieto: aparece en casi todos los cuadros
         t2.update("cam-191", res(car if i % 10 else []), frame, ts=1000.0 + i)
     assert t2.db._conn.execute("SELECT COUNT(*) FROM parked_vehicles").fetchone()[0] == 1
+
+
+def test_al_reiniciar_un_auto_estacionado_no_se_da_por_ido_sin_observarlo_10_min():
+    db = FakeDB()
+    t = parked.ParkedTracker(db)
+    db._conn.execute("INSERT INTO parked_vehicles (id, cam_id, cls, first_ts, last_ts, state, box) VALUES (7,'cam-191','auto',0,990,'parked','100,100,300,250')")
+    t = parked.ParkedTracker(db)                               # como tras un reinicio: el auto viene de la base, sin historial de presencia
+    frame = np.zeros((400, 600, 3), np.uint8)
+    res = lambda objs: type("R", (), {"objects": objs, "frame_w": 600, "frame_h": 400})()
+    for i in range(60):                                        # 1 min a 1 cuadro/s, visto en casi todos
+        t.update("cam-191", res([{"c": "auto", "b": (100, 100, 300, 250)}] if i % 10 else []), frame, ts=1000.0 + i)
+    assert db._conn.execute("SELECT state FROM parked_vehicles WHERE id=7").fetchone()[0] == "parked"
