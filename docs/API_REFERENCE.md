@@ -395,6 +395,12 @@ La documentacion interactiva esta en `/docs`. Guia de uso y significado de los d
 |---|---|---|---|---|
 | GET | `/stream/{cam_id}` | Stream | `cam_id`* |  |
 
+## street
+
+| Metodo | Ruta | Resumen | Parametros | Cuerpo |
+|---|---|---|---|---|
+| GET | `/api/street/passersby` | Street Passersby | `hours` |  |
+
 ## subjects
 
 | Metodo | Ruta | Resumen | Parametros | Cuerpo |

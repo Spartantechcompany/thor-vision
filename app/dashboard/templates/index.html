@@ -2936,13 +2936,26 @@ function _tlRender(animate){
   _tlLegend();
 }
 
+let _tlAbort = null;
 async function tlLoad(){
   const [since, until] = _tlWin();
+  if (_tlAbort) { try { _tlAbort.abort(); } catch (_) {} }          // un clic nuevo cancela la carga anterior: no se acumulan
+  const ctl = _tlAbort = (typeof AbortController === 'function') ? new AbortController() : null;
+  const sum = document.getElementById('tl-sum'), plot = document.getElementById('tl-plot');
+  if (sum) sum.textContent = 'Cargando…';                           // senal inmediata: con ventanas anchas la carga y el dibujo tardan segundos
+  if (plot) plot.style.opacity = '.45';
   try {
-    const d = await (await fetch(`/api/timeline?since=${since.toFixed(0)}&until=${until.toFixed(0)}${TL_ONLY ? '&cam_id=' + encodeURIComponent(TL_ONLY) : ''}`)).json();
+    const d = await (await fetch(`/api/timeline?since=${since.toFixed(0)}&until=${until.toFixed(0)}${TL_ONLY ? '&cam_id=' + encodeURIComponent(TL_ONLY) : ''}`, ctl ? { signal: ctl.signal } : {})).json();
+    if (ctl && _tlAbort !== ctl) return;
     TL.data = d;
+    await new Promise(r => requestAnimationFrame(() => r()));         // deja pintar "Cargando…" antes del dibujo pesado
     _tlRender(true);
-  } catch (_) { document.getElementById('tl-sum').textContent = 'sin datos'; }
+    if (plot) plot.style.opacity = '';
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+    if (sum) sum.textContent = 'sin datos';
+    if (plot) plot.style.opacity = '';
+  }
 }
 
 function _tlSetSpan(dir){
@@ -3733,9 +3746,22 @@ function _vaLightbox(img, nav){
   nv.hidden = !(nav && nav.list.length > 1);
   if (nav) nv.querySelector('span').textContent = `${nav.i + 1} / ${nav.list.length}`;
   const im = lb.querySelector('img');
+  const cap = lb.querySelector('.va-lb-cap');
+  const base = `${img.hora || ''} · ${img.cam || ''}${(img.personas || []).length ? ' · ' + img.personas.join(', ') : ''} — ${img.url ? '' : '(sin captura) '}${img.texto || ''}`;
+  cap.textContent = base;
   im.style.display = img.url ? '' : 'none';
-  if (img.url) im.src = img.url;
-  lb.querySelector('.va-lb-cap').textContent = `${img.hora || ''} · ${img.cam || ''}${(img.personas || []).length ? ' · ' + img.personas.join(', ') : ''} — ${img.url ? '' : '(sin captura) '}${img.texto || ''}`;
+  if (img.url){
+    im.style.opacity = '.25';                                        // la imagen anterior no se queda: se ve que esta cargando
+    const mine = img.url;
+    im.onload = () => { if (im.dataset.u === mine) im.style.opacity = '1'; };
+    im.onerror = () => {
+      if (im.dataset.u !== mine) return;
+      cap.textContent = base + '  ·  no se pudo cargar la captura';
+      if (!im.dataset.retry){ im.dataset.retry = '1'; setTimeout(() => { if (im.dataset.u === mine) im.src = mine + (mine.includes('?') ? '&' : '?') + 'r=' + Date.now(); }, 1200); }
+    };
+    im.dataset.u = mine; im.dataset.retry = '';
+    im.removeAttribute('src'); im.src = img.url;
+  }
   lb.hidden = false;
 }
 

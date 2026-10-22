@@ -517,6 +517,8 @@ from app.utils.quiet import QuietClosed
 app.add_middleware(QuietClosed)
 from app.utils.gzip_mw import SelectiveGZip
 app.add_middleware(SelectiveGZip)
+from app.utils.nocache_mw import NoCacheHTML
+app.add_middleware(NoCacheHTML)
 
 app.include_router(stream_router)
 app.include_router(status_router)
