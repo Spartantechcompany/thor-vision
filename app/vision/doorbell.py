@@ -22,6 +22,7 @@ class DoorAlerts:
     def __init__(self, db, snapshots, buffers: dict, cam_id: str = "cam-vto", cam_name: str = "Videoportero"):
         self.db, self.snapshots, self.buffers, self.cam_id, self.cam_name = db, snapshots, buffers, cam_id, cam_name
         self._last_ring: dict = {}
+        self.on_ring = None         # callable(ts): el timbre abre un viaje (lo fija main.py)
         self.transit = 0            # visitas que solo pasaron (sin alerta)
         self.grab = None            # callable() -> bytes JPEG; lo fija main.py (snapshot.cgi del videoportero)
 
@@ -65,6 +66,11 @@ class DoorAlerts:
         if now - self._last_ring.get(code, 0) < DEBOUNCE_S:
             return
         self._last_ring[code] = now
+        if self.on_ring is not None:
+            try:
+                self.on_ring(now)
+            except (sqlite3.Error, ValueError, KeyError, TypeError) as exc:      # el viaje es aparte: la alerta del timbre sigue
+                logger.warning("doorbell: no se pudo abrir el viaje del timbre: %s", exc)
         try:
             eid = self._insert("Alguien toco el timbre del videoportero", "Llamada al videoportero", "timbre_videoportero",
                                {"doorbell": {"kind": "ring", "code": code, "action": action, "data": {k: v for k, v in list(data.items())[:6]}}}, "medium")

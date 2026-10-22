@@ -33,10 +33,13 @@ def test_maybe_verify_solo_sin_cara_y_con_cuerpo():
     tr = Track(1, (0, 0, 50, 100), 0.0)
     tr.hits, tr.body, tr.body_q = 6, b"x", 40.0
     m._maybe_verify("cam-191", tr)
+    assert m._ver_q.qsize() == 0                                  # calle, lejos de la puerta: transeunte, no se gasta Clef
+    tr.near = True
+    m._maybe_verify("cam-191", tr)
     assert m._ver_q.qsize() == 1 and tr.ver_pending
     m._maybe_verify("cam-191", tr)                                # ya pendiente
     assert m._ver_q.qsize() == 1
     tr2 = Track(2, (0, 0, 50, 100), 0.0)
-    tr2.hits, tr2.body, tr2.n_face = 6, b"x", 1                   # con cara: ya es una persona
+    tr2.hits, tr2.body, tr2.n_face, tr2.near = 6, b"x", 1, True   # con cara: ya es una persona
     m._maybe_verify("cam-191", tr2)
     assert m._ver_q.qsize() == 1

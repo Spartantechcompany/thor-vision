@@ -7,6 +7,7 @@ Configuracion en config/topology.yml, clave `trips`."""
 import json
 import logging
 import os
+import sqlite3
 import threading
 import time
 from typing import Optional
@@ -20,6 +21,8 @@ PRE_S = float(os.environ.get("TRIP_PRE_S", "30"))           # visitas que ya est
 MIN_PATH_S = float(os.environ.get("TRIP_MIN_PATH_S", "8"))          # duracion minima de un recorrido que pasa por una sola camara
 CHAIN_GAP_S = float(os.environ.get("TRIP_CHAIN_GAP_S", "150"))   # una visita de calle cuenta si ocurre hasta tanto antes/despues de la primera/ultima de adentro
 ENTRY_GAP_S = float(os.environ.get("TRIP_ENTRY_GAP_S", "120"))   # un recorrido solo de adentro cuenta si empieza a lo mucho tanto despues del disparo
+SUMMARY = os.environ.get("TRIP_SUMMARY_ENABLED", "true").lower() == "true"
+SUMMARY_FRAMES = int(os.environ.get("TRIP_SUMMARY_FRAMES", "8"))
 ENTRY_PRE_S = 5.0                                                 # ...y no antes (quien ya estaba adentro no llego por esa puerta)
 
 _SCHEMA = """
@@ -33,6 +36,7 @@ CREATE INDEX IF NOT EXISTS idx_trips_start ON trips(start_ts);
 class Trips:
     def __init__(self, db, snapshots, topo: dict, cam_names: dict):
         self.db, self.snapshots, self.cam_names = db, snapshots, cam_names
+        self.analyzer = None            # VLMAnalyzer: resumen de cada viaje con alerta, en una sola llamada con video
         cfg = (topo or {}).get("trips") or {}
         self.window_s = float(cfg.get("window_s", 300))
         self.triggers = cfg.get("triggers") or {}
@@ -42,6 +46,10 @@ class Trips:
         self._lock = threading.Lock()
         with db._lock:
             db._conn.executescript(_SCHEMA)
+            try:
+                db._conn.execute("ALTER TABLE trips ADD COLUMN summary TEXT")
+            except sqlite3.OperationalError:
+                pass                     # ya existia
             db._conn.commit()
 
     # ── disparo ────────────────────────────────────────────────────────
@@ -59,7 +67,8 @@ class Trips:
                 self.db._conn.commit()
             sess = {"id": cur.lastrowid, "alias": alias, "start": ts, "end": ts + float(trg.get("window_s", self.window_s)),
                     "cams": list(trg.get("cams") or []), "inner": list(trg.get("inner") or []), "label": trg.get("label") or alias, "quiet": bool(trg.get("quiet_if_empty")),
-                    "entry": set(trg.get("entry") or (self.entry & set(trg.get("inner") or [])))}
+                    "entry": set(trg.get("entry") or (self.entry & set(trg.get("inner") or []))),
+                    "entry_gap": float(trg.get("entry_gap_s", ENTRY_GAP_S))}
             self._active.append(sess)
         logger.info("viaje %d abierto por %s (%d camaras, %.0f s)", sess["id"], alias, len(sess["cams"]), sess["end"] - ts)
         return sess["id"]
@@ -94,7 +103,7 @@ class Trips:
     def _direction(self, keep: list, s: Optional[dict] = None) -> str:
         out = lambda v: v[1] in self.street or v[1] == "cam-vto"
         first_out, last_out = out(keep[0]), out(keep[-1])
-        if not any(out(v) for v in keep) and s and keep[0][1] in (s.get("entry") or ()) and s["start"] - ENTRY_PRE_S <= keep[0][2] <= s["start"] + ENTRY_GAP_S:
+        if not any(out(v) for v in keep) and s and keep[0][1] in (s.get("entry") or ()) and s["start"] - ENTRY_PRE_S <= keep[0][2] <= s["start"] + s.get("entry_gap", ENTRY_GAP_S):
             return "entrada"                                  # aparece en la camara de entrada justo despues del disparo (timbre, porton): llego por ahi
         return "entrada" if first_out and not last_out else "salida" if last_out and not first_out else "recorrido"
 
@@ -114,7 +123,7 @@ class Trips:
                 continue                                      # una sola camara y de segundos: parpadeo, no un recorrido
             outside = any(v[1] in self.street or v[1] == "cam-vto" for v in keep)
             entry = s.get("entry") or set()
-            if not outside and (not (s["start"] - ENTRY_PRE_S <= t0 <= s["start"] + ENTRY_GAP_S) or (entry and inner[0][1] not in entry)):
+            if not outside and (not (s["start"] - ENTRY_PRE_S <= t0 <= s["start"] + s.get("entry_gap", ENTRY_GAP_S)) or (entry and inner[0][1] not in entry)):
                 continue                                      # solo de adentro: cuenta si empieza en la camara de entrada justo despues del disparo; si no, ya estaba adentro
             paths.append(keep)
         return sorted(paths, key=lambda p: p[0][2])
@@ -150,11 +159,12 @@ class Trips:
         jid = next((v[8] for v in flat if v[8] is not None), None)
         sev = "medium" if (not paths or "entrada" in dirs) and not who else "low"
         first = [p[0] for p in paths]                      # una miniatura por recorrido
+        face_vid = next((v[0] for p in paths for v in p if v[1] == "cam-vto"), None)       # la cara del videoportero es la mejor del recorrido
         eid = self.db.insert_event("nemotron", (flat[0][1] if flat else (s["cams"] or [None])[0]),
                                    {"schema": 2, "source": "viaje", "people": len(paths), "persons": [], "vehicles": 0, "activity": txt, "scene": "",
                                     "relevant": True, "alerts": [txt], "alert_types": ["viaje_puerta"], "severity": sev, "confidence": "high",
                                     "trip": {"trip_id": s["id"], "alias": s["alias"], "direction": direction, "journey_id": jid, "visits": [v[0] for v in flat],
-                                             "paths": [[v[0] for v in p] for p in paths]}}, people=len(paths), has_alert=True)
+                                             "paths": [[v[0] for v in p] for p in paths], "face_visit": face_vid}}, people=len(paths), has_alert=True)
         mosaic = self._mosaic(first if len(paths) > 1 else paths[0] if paths else [])
         if mosaic is not None and self.snapshots is not None:
             try:
@@ -166,6 +176,55 @@ class Trips:
                                   (s["end"], direction, len(flat), jid, eid, s["id"]))
             self.db._conn.commit()
         logger.info("viaje %d cerrado: %s", s["id"], txt)
+        if paths and self.analyzer is not None and SUMMARY:
+            threading.Thread(target=self._summarize, args=(s, paths, txt, eid), daemon=True, name="trip-summary").start()
+
+    def _summarize(self, s: dict, paths: list, txt: str, eid: int) -> None:
+        """Resumen de la pelicula: los cuadros del recorrido (escena de cada visita, en orden) van como UN video y el modelo cuenta en 1-2 frases quien
+        llego, por donde y que hizo. Se guarda en el evento del viaje (activity) sin tocar la alerta."""
+        frames, labels = [], []
+        for v in sorted({v[0]: v for p in paths for v in p}.values(), key=lambda v: v[2])[:SUMMARY_FRAMES]:
+            img = v[5] or v[4]
+            im = cv2.imdecode(np.frombuffer(img, np.uint8), cv2.IMREAD_COLOR) if img else None
+            if im is None:
+                continue
+            h, w = im.shape[:2]
+            k = min(480 / w, 270 / h)
+            im = cv2.resize(im, (max(2, int(w * k)), max(2, int(h * k))))
+            canvas = np.zeros((270, 480, 3), np.uint8)
+            canvas[:im.shape[0], :im.shape[1]] = im
+            frames.append(canvas)
+            labels.append(f"{time.strftime('%H:%M:%S', time.localtime(v[2]))} {self.cam_names.get(v[1], v[1])}")
+        if len(frames) < 2:
+            return
+        try:
+            from app.vision import vlm_analyzer as va
+            mp4 = self.analyzer._encode_mp4(frames, 1.0)
+            if not mp4:
+                return
+            import base64
+            part = {"type": "video_url", "video_url": {"url": "data:video/mp4;base64," + base64.b64encode(mp4).decode()}}
+            prompt = ("Estos cuadros, en orden, son el recorrido de un evento en un inmueble (" + s["label"] + "): " + "; ".join(labels) +
+                      ". Registro automatico: " + txt + ". Responde SOLO este JSON: {\"resumen\": \"1-2 frases: quien llega o sale, por donde pasa, que hace y "
+                      "si algo es inusual; no inventes nombres ni detalles que no se vean\", \"inusual\": <true|false>}")
+            with va.priority(False):
+                r = self.analyzer._request(part, prompt, self.analyzer.video_timeout, debug_tag=f"trip-{s['id']}")
+            summ = r.get("resumen") if isinstance(r, dict) else None
+            if not isinstance(summ, str) or not summ.strip():
+                return
+            summ = " ".join(summ.split())[:400]
+            with self.db._lock:
+                row = self.db._conn.execute("SELECT data FROM events WHERE id=?", (eid,)).fetchone()
+                if row:
+                    d = json.loads(row[0])
+                    d["summary"], d["summary_unusual"] = summ, bool(r.get("inusual"))
+                    d["activity"] = summ
+                    self.db._conn.execute("UPDATE events SET data=? WHERE id=?", (json.dumps(d, ensure_ascii=False), eid))
+                self.db._conn.execute("UPDATE trips SET summary=? WHERE id=?", (summ, s["id"]))
+                self.db._conn.commit()
+            logger.info("viaje %d resumen: %s", s["id"], summ[:160])
+        except Exception as exc:          # noqa: BLE001 - el resumen es opcional: el viaje ya quedo guardado
+            logger.warning("viaje %s: sin resumen: %s", s["id"], exc)
 
     def _mosaic(self, keep: list):
         tiles = []

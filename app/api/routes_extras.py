@@ -41,6 +41,24 @@ def releases():
     return {"current": ver.VERSION, "releases": data}
 
 
+# ---------------- transeuntes de las camaras de calle (modo ligero: se cuentan, no se guardan como visita)
+@router.get("/api/street/passersby")
+def street_passersby(request: Request, hours: float = 24):
+    db = _db(request)
+    since = time.time() - max(1.0, min(hours, 24 * 31)) * 3600
+    try:
+        with db._lock:
+            rows = db._conn.execute("SELECT hour, cam_id, n FROM street_counts WHERE hour>=? ORDER BY hour", (since - 3600,)).fetchall()
+    except sqlite3.OperationalError:
+        rows = []
+    names = {c.id: c.name for c in request.app.state.config.cameras}
+    tot: dict = {}
+    for _, cam, n in rows:
+        tot[cam] = tot.get(cam, 0) + n
+    return {"hours": hours, "by_hour": [{"hour": h, "cam_id": c, "cam": names.get(c, c), "n": n} for h, c, n in rows],
+            "total": {names.get(c, c): n for c, n in tot.items()}}
+
+
 # ---------------- vehiculos estacionados
 @router.get("/api/vehicles")
 def vehicles(request: Request, state: Optional[str] = None, cam_id: Optional[str] = None,

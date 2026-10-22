@@ -26,6 +26,9 @@ TOPOLOGY = os.environ.get("TOPOLOGY_CONFIG", "/app/config/topology.yml")
 PRE_S = float(os.environ.get("TUYA_PRE_S", "20"))       # un aviso de entrada puede llegar despues de que la camara ya vio a la persona
 ENABLED = os.environ.get("JOURNEYS_ENABLED", "true").lower() == "true"
 LINK_MIN = float(os.environ.get("JOURNEY_LINK_MIN", "0.6"))
+CLEF_LINK = os.environ.get("JOURNEY_CLEF", "true").lower() == "true"
+CLEF_MIN_P = float(os.environ.get("JOURNEY_CLEF_MIN_P", "0.7"))   # Clef: minimo para unir por cuerpo (21-oct, 42 pares con rostro: precision 0.64 / recall 0.50, antes 0.40 / 0.14)
+CLEF_TOP = 3                                                         # solo los 3 candidatos mas cercanos en tiempo van a Clef
 EVERY_S = 20.0
 
 _SCHEMA = """
@@ -76,12 +79,20 @@ def link_score(topo: dict, j: dict, v: dict) -> Optional[float]:
         return 1.0 if v["subject_id"] == j["subject_id"] else None
     colors = bodyid.compatible(v["attrs"], j["attrs"]) if (v["attrs"] and j["attrs"]) else None
     s_col = 0.5 if colors is None else (1.0 if colors else 0.0)
-    return 0.45 * body_score(v["emb"], j["embs"]) + 0.35 * time_score(max(0.0, gap)) + 0.20 * s_col
+    score = 0.45 * body_score(v["emb"], j["embs"]) + 0.35 * time_score(max(0.0, gap)) + 0.20 * s_col
+    door = (topo.get("door_links") or {}).get(j["last_cam"]) or []
+    if (v["cam_id"] in door and -10 <= gap <= float(topo.get("door_link_s", 240))
+            and (j.get("last_dur") or 0) >= float(topo.get("door_min_s", 15))):
+        # quien estuvo frente al videoportero y aparece en la camara de entrada: el cuerpo no sirve (el videoportero ve de cerca la cara y el torso,
+        # Garage frontal ve de arriba el cuerpo entero), asi que deciden la puerta y el tiempo; si dos visitas compiten, queda ambiguo y no se une
+        score = max(score, 0.8)
+    return score
 
 
 class JourneyLinker:
     def __init__(self, db, snapshots=None):
         self.db, self.snapshots = db, snapshots
+        self.clef = None            # ClefClient (lo fija main.py): juzga si dos recortes de cuerpo son la misma persona
         self.topo = load_topology()
         self.stats = {"linked": 0, "new": 0, "ambiguous": 0, "retro": 0, "tuya_matched": 0, "tuya_orphan": 0}
         self._stop = threading.Event()
@@ -165,6 +176,8 @@ class JourneyLinker:
             js = self.db._conn.execute("SELECT id, last_ts, last_cam, subject_id FROM journeys WHERE last_ts>=? AND status='open'", (since,)).fetchall()
             out = []
             for jid, last_ts, last_cam, sid in js:
+                lv = self.db._conn.execute("SELECT COALESCE(end_ts,start_ts)-start_ts, body FROM person_visits WHERE journey_id=? AND cam_id=? ORDER BY start_ts DESC LIMIT 1",
+                                           (jid, last_cam)).fetchone()
                 vs = self.db._conn.execute("SELECT body_emb, attrs FROM person_visits WHERE journey_id=? AND body_emb IS NOT NULL ORDER BY start_ts DESC LIMIT 4", (jid,)).fetchall()
                 embs, attrs = [], {}
                 for blob, at in vs:
@@ -176,7 +189,8 @@ class JourneyLinker:
                             attrs = json.loads(at)
                         except ValueError:
                             attrs = {}
-                out.append({"id": jid, "last_ts": last_ts, "last_cam": last_cam, "subject_id": sid, "embs": embs, "attrs": attrs})
+                out.append({"id": jid, "last_ts": last_ts, "last_cam": last_cam, "subject_id": sid, "embs": embs, "attrs": attrs,
+                            "last_dur": lv[0] if lv else 0.0, "last_body": lv[1] if lv else None})
         return out
 
     def run_once(self, now: Optional[float] = None, window_s: float = 1800.0) -> int:
@@ -184,26 +198,52 @@ class JourneyLinker:
         self._resolve_tuya(now)
         with self.db._lock:
             rows = self.db._conn.execute(
-                "SELECT id, cam_id, start_ts, COALESCE(end_ts,start_ts), subject_id, body_emb, attrs FROM person_visits "
+                "SELECT id, cam_id, start_ts, COALESCE(end_ts,start_ts), subject_id, body_emb, attrs, body FROM person_visits "
                 "WHERE journey_id IS NULL AND status='closed' AND fp=0 AND static=0 AND start_ts>=? AND COALESCE(end_ts,start_ts)<=? ORDER BY start_ts",
                 (now - window_s, now - 8)).fetchall()
         n = 0
-        for vid, cam, a, b, sid, emb, at in rows:
+        for vid, cam, a, b, sid, emb, at, body in rows:
             try:
                 attrs = json.loads(at) if at else {}
             except ValueError:
                 attrs = {}
             v = {"id": vid, "cam_id": cam, "start_ts": a, "end_ts": b, "subject_id": sid,
-                 "emb": (np.frombuffer(emb, np.float32) if emb else None), "attrs": attrs}
+                 "emb": (np.frombuffer(emb, np.float32) if emb else None), "attrs": attrs, "body": body}
             self._link(v)
             n += 1
         return n
 
+    def _clef_score(self, j: dict, v: dict) -> Optional[float]:
+        """Con Clef, el cuerpo lo juzga Clef (no el embedding ReID): 0.35*tiempo + 0.65*p, y p debe ser >= CLEF_MIN_P. None = sin Clef."""
+        if self.clef is None or not CLEF_LINK or not v.get("body") or not j.get("last_body"):
+            return None
+        if not self.clef.available():
+            return None
+        p = self.clef.same_body(j["last_body"], v["body"])
+        if p is None:
+            return None
+        self.stats["clef_calls"] = self.stats.get("clef_calls", 0) + 1
+        if p < CLEF_MIN_P:
+            return 0.0
+        return 0.35 * time_score(max(0.0, v["start_ts"] - j["last_ts"])) + 0.65 * p
+
     def _link(self, v: dict) -> None:
-        cands = []
+        cands, pending = [], []
         for j in self._active(v["start_ts"] + 1):
             s = link_score(self.topo, j, v)
-            if s is not None and s >= LINK_MIN:
+            if s is None:
+                continue
+            door = v["cam_id"] in ((self.topo.get("door_links") or {}).get(j["last_cam"]) or [])
+            if s >= 0.999 or (door and s >= 0.8):
+                cands.append((s, j))                    # misma identidad por rostro, o la regla de la puerta: no hace falta Clef
+            else:
+                pending.append((s, j))
+        pending.sort(key=lambda t: t[1]["last_ts"], reverse=True)     # los mas recientes primero
+        for i, (s, j) in enumerate(pending):
+            cs = self._clef_score(j, v) if i < CLEF_TOP else None
+            if cs is not None:
+                s = cs
+            if s >= LINK_MIN:
                 cands.append((s, j))
         cands.sort(key=lambda t: -t[0])
         jid = None

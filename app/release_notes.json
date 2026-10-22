@@ -1,5 +1,38 @@
 [
   {
+    "version": "2.43.0",
+    "date": "2026-10-21",
+    "name": "Viajes por timbre, videoportero unido a la entrada, Clef en los recorridos, calle ligera, identidades consolidadas y resumen de cada viaje",
+    "summary": "El viaje del videoportero lo abre el timbre (evento nativo del Dahua), no cualquiera que pase: con los 22 timbrazos de la semana habrían sido 6 alertas de viaje en vez de 248. Quien sale del videoportero y aparece en Garage frontal en menos de 4 minutos queda en el mismo recorrido, así el viaje lleva la cara del videoportero. En el enlazador de recorridos el cuerpo lo juzga Clef (AUC 0.84 contra 0.67 del embedding ReID; en 42 pares con rostro confirmado, precisión 0.64 y recall 0.50, antes 0.40 y 0.14), también para unir pedazos de la misma persona en una cámara. En Exterior 1 y 2 solo quien se acerca a la puerta (o a la zona nueva \"seguimiento en calle\") abre una visita completa; el resto se cuenta por hora como transeúnte. De noche se consolidan identidades: pares de \"Persona #N\" parecidos van a Clef y se fusionan solo si Clef e InsightFace coinciden (≥ 0.85 y ≥ 0.40), una fusión por persona por noche; lo demás queda como sugerencia. Al cerrar un viaje con alerta, una sola llamada con video resume quién llegó, por dónde y qué hizo.",
+    "highlights": [
+      {
+        "area": "Viajes",
+        "title": "Disparo por timbre",
+        "text": "Disparador vto-timbre en topology.yml (entry_gap_s 300); DoorAlerts.on_ring abre el viaje."
+      },
+      {
+        "area": "Recorridos",
+        "title": "Videoportero → Garage frontal y Clef",
+        "text": "door_links, door_link_s=240, door_min_s=15; JOURNEY_CLEF, JOURNEY_CLEF_MIN_P=0.7 (3 candidatos por visita)."
+      },
+      {
+        "area": "Personas",
+        "title": "Calle ligera",
+        "text": "VISIT_STREET_LIGHT_CAMS; zona seguimiento_calle; /api/street/passersby."
+      },
+      {
+        "area": "Personas",
+        "title": "Consolidación de identidades",
+        "text": "app/vision/consolidate.py, 03:00 cada noche; POST /api/people/consolidate?dry=1. En prueba: 19 de 250 pares se fusionarían; con la regla doble, 15."
+      },
+      {
+        "area": "Viajes",
+        "title": "Resumen de la película",
+        "text": "TRIP_SUMMARY_ENABLED; la escena de cada visita del recorrido como un video de hasta 8 cuadros; queda en el evento (activity/summary) y en trips.summary."
+      }
+    ]
+  },
+  {
     "version": "2.42.0",
     "date": "2026-10-21",
     "name": "Matrículas confiables, sin autos fantasma y viajes sin ruido",

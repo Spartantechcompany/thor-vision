@@ -105,6 +105,8 @@ async def lifespan(app: FastAPI):
         from app.vision.clef_client import ClefClient
         app.state.clef = ClefClient()
         visit_manager.set_verifier(app.state.clef)
+        from app.vision import consolidate
+        app.state.consolidate_stop = consolidate.start_nightly(db, visit_manager, app.state.clef)    # une de noche los "Persona #N" que son la misma
 
     vision_queue = VisionQueue(
         store    = detection_store,
@@ -282,9 +284,6 @@ async def lifespan(app: FastAPI):
                 _yr.on_visit(cam_id, v)                      # modo sin VLM: persona nocturna y merodeo por reglas sobre la visita confirmada
             except Exception as exc:                         # noqa: BLE001 - una regla con error no debe frenar el armado ni los viajes
                 logger.warning("yolo_rules: %s", exc)
-        _tr = getattr(app.state, "trips", None)
-        if _tr is not None and cam_id == "cam-vto" and (v["last_ts"] - v["first_ts"] >= 4 or v.get("name")):
-            _tr.start("vto-visita", v["first_ts"])          # alguien llego al videoportero: se sigue su recorrido hacia adentro
         from app.vision import arming
         if not arming.is_absolute():
             return
@@ -358,6 +357,7 @@ async def lifespan(app: FastAPI):
         app.state.iot.start()
         from app.vision.journeys import JourneyLinker
         app.state.journeys = JourneyLinker(db, snapshots)
+        app.state.journeys.clef = getattr(app.state, "clef", None)          # Clef juzga el cuerpo al unir visitas en un recorrido
         app.state.journeys.cam_names = {c.id: c.name for c in config.cameras}
         app.state.journeys.start()
 
@@ -369,6 +369,9 @@ async def lifespan(app: FastAPI):
         if os.environ.get("TRIPS_ENABLED", "true").lower() == "true":
             from app.vision.trips import Trips
             app.state.trips = Trips(db, snapshots, app.state.journeys.topo, app.state.journeys.cam_names)
+            app.state.trips.analyzer = getattr(app.state, "vlm_analyzer", None)          # resumen de cada viaje con video
+            if getattr(app.state, "doorbell", None) is not None:
+                app.state.doorbell.on_ring = lambda ts, _t=app.state.trips: _t.start("vto-timbre", ts)   # el viaje del videoportero lo abre el timbre, no quien pasa
             app.state.trips_stop = app.state.trips.start_sweeper()
             if visit_manager is not None:
                 visit_manager.trips_attend = app.state.trips.attending

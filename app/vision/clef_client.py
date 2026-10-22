@@ -36,6 +36,10 @@ SAME_FACE_Q = {"same": {"type": "noul", "instructions": "Are these two face phot
                                                     "hairline); ignore lighting, angle, image quality and clothing."}}
 
 
+SAME_BODY_Q = {"same": {"type": "noul", "instructions": "Are these two security-camera crops the same person? Compare clothing (colors, garments, patterns), "
+                                                    "body build, hair and accessories; ignore pose, camera angle, lighting and image quality."}}
+
+
 FACE_CLEAR_Q = {"clear": {"type": "noul", "instructions": "Is this face photo clear enough to recognize the person? Answer false if it is blurry, smeared, "
                                                       "streaked by video compression, pixelated, too small, too dark, the face is mostly hidden or turned away, "
                                                       "or it is not a face at all."}}
@@ -77,6 +81,15 @@ class ClefClient:
     def same_person(self, face_a: bytes, face_b: bytes) -> Optional[float]:
         """Probabilidad de que dos rostros sean la misma persona (solo rasgos de la cara), o None si no hay respuesta."""
         out = self.decide({"task": "Two face crops from security cameras taken at different times."}, [face_a, face_b], SAME_FACE_Q)
+        try:
+            return float(out["answers"]["same"]["noul"]) if out else None
+        except (KeyError, TypeError, ValueError):
+            return None
+
+    def same_body(self, body_a: bytes, body_b: bytes) -> Optional[float]:
+        """Probabilidad de que dos recortes de cuerpo sean la misma persona (ropa, complexion, pelo). AUC 0.84 en empleados con nombre,
+        contra 0.67 del embedding ReID (21-oct); o None si no hay respuesta."""
+        out = self.decide({"task": "Two body crops from security cameras at different times; decide if it is the same person."}, [body_a, body_b], SAME_BODY_Q)
         try:
             return float(out["answers"]["same"]["noul"]) if out else None
         except (KeyError, TypeError, ValueError):

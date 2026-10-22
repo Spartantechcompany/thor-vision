@@ -31,10 +31,15 @@ trips:                                 # viajes disparados por un evento: se reg
       cams: [cam-189, cam-191, cam-228, cam-118, cam-236, cam-113, cam-120]
       inner: [cam-228, cam-118, cam-236, cam-113, cam-120]
       window_s: 420
-    vto-visita:                        # alguien llego al videoportero: se sigue hacia adentro; sin entrada no se alerta
-      label: "Visita en el videoportero"
+    vto-timbre:                        # alguien toco el timbre del videoportero (evento nativo del Dahua): se sigue hacia adentro; sin entrada no se alerta
+      label: "Tocaron el timbre del videoportero"
       cams: [cam-vto, cam-120, cam-113, cam-228, cam-236]
       inner: [cam-120, cam-113, cam-228, cam-236]
-      window_s: 240
-      min_gap_s: 90
+      window_s: 300
+      entry_gap_s: 300                 # quien toca espera a que le abran: puede aparecer en Garage frontal varios minutos despues
+      min_gap_s: 90                    # Invite y CallNoAnswered del mismo timbrazo abren un solo viaje
       quiet_if_empty: true
+door_links:                            # camara de la puerta -> camara donde aparece quien entra por ella (une sus visitas en un mismo recorrido)
+  cam-vto: [cam-228]
+door_link_s: 240                       # quien sale del videoportero aparece en la de entrada a lo mucho tanto despues
+door_min_s: 15                         # solo visitas al videoportero de al menos tanto (los que pasan de largo no entran)

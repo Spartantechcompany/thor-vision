@@ -87,3 +87,35 @@ def test_dedupe_drops_boxes_contained_in_a_bigger_one():
     from app.vision.visits import _dedupe
     big, inner, other = (100, 100, 200, 300), (110, 110, 190, 200), (400, 100, 480, 300)
     assert _dedupe([big, inner, other]) == [big, other]
+
+
+DOOR = dict(TOPO, door_links={"cam-vto": ["cam-228"]}, door_link_s=240, door_min_s=15)
+
+
+def test_quien_sale_del_videoportero_y_aparece_en_garage_frontal_se_une():
+    j = journey(last_cam="cam-vto", last_ts=100.0, embs=[vec(0)], attrs={}, last_dur=40.0)
+    v = visit(cam_id="cam-228", start_ts=160.0, emb=vec(5), attrs={})          # el cuerpo no se parece: el videoportero ve de cerca, Garage frontal de arriba
+    assert jy.link_score(DOOR, j, v) >= 0.8
+    assert jy.link_score(DOOR, dict(j, last_dur=5.0), v) < jy.LINK_MIN          # paso de largo frente al videoportero: no
+    assert jy.link_score(DOOR, j, visit(cam_id="cam-228", start_ts=500.0, emb=vec(5), attrs={})) is None    # demasiado tarde
+
+
+class FakeClef:
+    def __init__(self, p): self.p, self.calls = p, 0
+    def available(self): return True
+    def same_body(self, a, b):
+        self.calls += 1
+        return self.p
+
+
+def test_clef_decide_el_cuerpo_cuando_hay_recortes():
+    jl = jy.JourneyLinker.__new__(jy.JourneyLinker)
+    jl.topo, jl.stats = TOPO, {}
+    j = journey(last_body=b"a")
+    v = visit(emb=vec(5), attrs={}, body=b"b")                                  # el embedding no se parece, pero Clef dice que si
+    jl.clef = FakeClef(0.9)
+    assert jl._clef_score(j, v) >= jy.LINK_MIN
+    jl.clef = FakeClef(0.5)
+    assert jl._clef_score(j, v) == 0.0                                           # por debajo del minimo de Clef: no se une
+    jl.clef = None
+    assert jl._clef_score(j, v) is None                                          # sin Clef: se usa el puntaje de siempre

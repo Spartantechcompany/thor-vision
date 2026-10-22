@@ -66,6 +66,16 @@ def _subject_rows(db, where="", args=(), limit=200) -> list:
     return rows
 
 
+@router.post("/api/people/consolidate")
+def people_consolidate(request: Request, dry: int = 1, max_calls: int = 200):
+    """Corre la consolidacion de identidades ahora. dry=1 (por defecto) solo cuenta lo que haria; dry=0 fusiona y deja sugerencias."""
+    from app.vision import consolidate
+    clef = getattr(request.app.state, "clef", None)
+    if clef is None:
+        raise HTTPException(503, "Clef no disponible")
+    return consolidate.run(_db(request), getattr(request.app.state, "visits", None), clef, dry=bool(dry), max_calls=max(1, min(max_calls, 1000)))
+
+
 @router.get("/api/people/overview")
 def overview(request: Request):
     db = _db(request)

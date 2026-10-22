@@ -2,6 +2,16 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.43.0 — Viajes por timbre, videoportero unido a la entrada, Clef en los recorridos, calle ligera, identidades consolidadas y resumen de cada viaje (2026-10-21)
+
+El viaje del videoportero lo abre el timbre (evento nativo del Dahua), no cualquiera que pase: con los 22 timbrazos de la semana habrían sido 6 alertas de viaje en vez de 248. Quien sale del videoportero y aparece en Garage frontal en menos de 4 minutos queda en el mismo recorrido, así el viaje lleva la cara del videoportero. En el enlazador de recorridos el cuerpo lo juzga Clef (AUC 0.84 contra 0.67 del embedding ReID; en 42 pares con rostro confirmado, precisión 0.64 y recall 0.50, antes 0.40 y 0.14), también para unir pedazos de la misma persona en una cámara. En Exterior 1 y 2 solo quien se acerca a la puerta (o a la zona nueva "seguimiento en calle") abre una visita completa; el resto se cuenta por hora como transeúnte. De noche se consolidan identidades: pares de "Persona #N" parecidos van a Clef y se fusionan solo si Clef e InsightFace coinciden (≥ 0.85 y ≥ 0.40), una fusión por persona por noche; lo demás queda como sugerencia. Al cerrar un viaje con alerta, una sola llamada con video resume quién llegó, por dónde y qué hizo.
+
+- **Viajes · Disparo por timbre**: Disparador vto-timbre en topology.yml (entry_gap_s 300); DoorAlerts.on_ring abre el viaje.
+- **Recorridos · Videoportero → Garage frontal y Clef**: door_links, door_link_s=240, door_min_s=15; JOURNEY_CLEF, JOURNEY_CLEF_MIN_P=0.7 (3 candidatos por visita).
+- **Personas · Calle ligera**: VISIT_STREET_LIGHT_CAMS; zona seguimiento_calle; /api/street/passersby.
+- **Personas · Consolidación de identidades**: app/vision/consolidate.py, 03:00 cada noche; POST /api/people/consolidate?dry=1. En prueba: 19 de 250 pares se fusionarían; con la regla doble, 15.
+- **Viajes · Resumen de la película**: TRIP_SUMMARY_ENABLED; la escena de cada visita del recorrido como un video de hasta 8 cuadros; queda en el evento (activity/summary) y en trips.summary.
+
 ## v2.42.0 — Matrículas confiables, sin autos fantasma y viajes sin ruido (2026-10-21)
 
 Matrículas: solo se dan por buenas con 2 lecturas iguales de confianza ≥ 0.7, 3 de ≥ 0.6 o una de ≥ 0.85; lo demás queda "por confirmar" con un botón para confirmarlo (las 7 lecturas viejas poco seguras pasaron a por confirmar). Se sigue leyendo cada 10 min mientras el auto siga ahí (antes se dejaba de intentar a los 20 min). El mismo auto se enlaza por placa, tolerando las confusiones típicas del OCR: partido en la misma cámara se fusiona, visto a la vez por Exterior 1 y 2 queda como gemelo, y si vuelve otro día se cuentan sus visitas. Estacionados: un auto solo se registra si aparece en al menos la mitad de los cuadros, y uno registrado que en 10 min aparece en menos del 15% se da por ido: eran carriles con tráfico que quedaban 'estacionados' durante horas. Viajes: un recorrido solo cuenta si pasa por la puerta o la calle, o si empieza en la cámara de entrada a lo mucho 2 min después del disparo. Reprocesando la semana, las alertas de viaje del videoportero bajan de 248 a 80: el 92% eran personas que ya estaban adentro.

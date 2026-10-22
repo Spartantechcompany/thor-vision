@@ -11,6 +11,7 @@ import logging
 import math
 import os
 import queue
+import sqlite3
 import threading
 import time
 from typing import Optional
@@ -47,6 +48,9 @@ KNOWN_MIN_CONF = _f("SUBJECT_KNOWN_MIN_CONF", 0.45)
 FLUSH_S = 10.0
 EMB_CAP_OLD, EMB_CAP_NEW = 30, 5
 STREET_EXTRA = {c.strip() for c in os.environ.get("DOORBELL_CAMS", "cam-vto").split(",") if c.strip()}
+# Camaras de calle en modo ligero: solo quien se acerca a la puerta o a la banqueta propia (zona seguimiento_calle) abre una visita completa;
+# el resto se cuenta como transeunte (street_counts por hora), sin verificacion de Clef, sin capturas, sin VLM y sin fila en person_visits.
+LIGHT_CAMS = {c.strip() for c in os.environ.get("VISIT_STREET_LIGHT_CAMS", "cam-189,cam-191").split(",") if c.strip()}
 FACE_MAX_YAW = _f("FACE_MAX_YAW", 0.45)
 SNAP_ENABLED = os.environ.get("FACE_SNAPSHOT_ENABLED", "true").lower() == "true"
 SNAP_MIN_INTERVAL_S = _f("FACE_SNAPSHOT_INTERVAL_S", 1.5)
@@ -287,8 +291,26 @@ class VisitManager:
             threading.Thread(target=self._fq_loop, daemon=True, name="visit-clef-face").start()
         self.verifier = client
 
+    @staticmethod
+    def _full(cam_id, tr: Track) -> bool:
+        """En las camaras de calle en modo ligero, solo los tracks que se acercaron a la puerta se tratan como visita completa."""
+        return cam_id not in LIGHT_CAMS or bool(getattr(tr, "near", False))
+
+    def _passerby(self, cam_id, ts: float) -> None:
+        hour = ts - ts % 3600
+        self.stats["passersby"] = self.stats.get("passersby", 0) + 1
+        try:
+            with self.db._lock:
+                self.db._conn.execute("CREATE TABLE IF NOT EXISTS street_counts (hour REAL NOT NULL, cam_id TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (hour, cam_id))")
+                self.db._conn.execute("INSERT INTO street_counts (hour, cam_id, n) VALUES (?,?,1) ON CONFLICT(hour, cam_id) DO UPDATE SET n=n+1", (hour, cam_id))
+                self.db._conn.commit()
+        except sqlite3.Error as exc:
+            logger.debug("street_counts: %s", exc)
+
     def _maybe_verify(self, cam_id, tr: Track) -> None:
         """Pide a Clef confirmar (en segundo plano) que el recorte es una persona; las visitas con cara ya estan confirmadas."""
+        if not self._full(cam_id, tr):
+            return
         if (self.verifier is None or not tr.body or tr.n_face >= 1 or tr.hits < VERIFY_MIN_HITS or tr.ver_pending or cam_id == "cam-vto"
                 or (tr.person_p is not None and tr.body_q <= tr.ver_q * 1.6)):
             return
@@ -420,7 +442,7 @@ class VisitManager:
             return True
         for tr in list(self._tracks.get(cam_id, ())):
             if (not tr.good_face and not tr.static and now - tr.last_ts < 6.0
-                    and now - tr.first_ts < HUNT_MAX_S):
+                    and now - tr.first_ts < HUNT_MAX_S and self._full(cam_id, tr)):
                 return True
         return False
 
@@ -437,6 +459,9 @@ class VisitManager:
             new_track = self._next_tid.get(cam_id, 0) != tid0
             for tr, pb in zip(det_tracks, persons):
                 tr.observe(pb, ots)
+                if cam_id in LIGHT_CAMS and not getattr(tr, "near", False) and frame is not None:
+                    nd = zones_mod.near_door(cam_id, pb, frame.shape[1], frame.shape[0])
+                    tr.near = True if nd is None else nd
                 if src == "pre":
                     tr.pre_n += 1
                 else:
@@ -548,6 +573,8 @@ class VisitManager:
             tr.scene = _scene_with_box(frame, (x1, y1, x2, y2), others)
 
     def _maybe_snapshot(self, cam_id, tr: Track, pb, frame, now: float) -> None:
+        if not self._full(cam_id, tr):
+            return
         g = self._grabbers.get(cam_id)
         if (g is None or not g.usable() or tr.good_face or tr.static
                 or tr.snap_n >= SNAP_MAX_PER_VISIT or now - tr.last_snap < SNAP_MIN_INTERVAL_S
@@ -637,8 +664,10 @@ class VisitManager:
         for tr in tracks:
             closed = now - tr.last_ts > MAX_GAP_S
             try:
-                if tr.visit_id is None and (tr.hits >= MIN_HITS or tr.n_face >= 1):
+                if tr.visit_id is None and (tr.hits >= MIN_HITS or tr.n_face >= 1) and self._full(cam_id, tr):
                     self._open_visit(cam_id, tr)
+                elif closed and tr.visit_id is None and cam_id in LIGHT_CAMS and tr.hits >= MIN_HITS:
+                    self._passerby(cam_id, tr.first_ts)          # paso por la calle sin acercarse: solo se cuenta
                 if tr.visit_id is not None:
                     if closed:
                         self._close_visit(cam_id, tr)

@@ -6,6 +6,8 @@ Tipos:
   estacionamiento  solo se registran vehiculos estacionados dentro de estas zonas (si la camara tiene alguna)
   puerta_peatonal  frente a la puerta peatonal: una persona real que se queda ahi DOOR_DWELL_S segundos es merodeo (alerta con captura)
   nota             texto fijo para el VLM: "esto siempre esta ahi, no lo describas ni alertes por ello"
+  seguimiento_calle  en las camaras de calle, solo quien entra aqui (banqueta propia, frente a la puerta) se registra como visita completa;
+                   el resto se cuenta como transeunte. Sin esta zona se usa la puerta peatonal con un margen alrededor
 
 Se guardan en data/zones.json (se relee solo cuando cambia el archivo).
 """
@@ -14,11 +16,12 @@ import logging
 import os
 import threading
 import time
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 PATH = os.environ.get("ZONES_PATH", "/app/data/zones.json")
-TYPES = ("ignorar_objetos", "ignorar_todo", "estacionamiento", "nota", "puerta_peatonal")
+TYPES = ("ignorar_objetos", "ignorar_todo", "estacionamiento", "nota", "puerta_peatonal", "seguimiento_calle")
 MAX_ZONES_PER_CAM = 30
 MAX_POINTS = 60
 
@@ -161,3 +164,21 @@ def filter_detections(cam_id: str, persons: list, objects: list, w: int, h: int)
 
 def notes(cam_id: str) -> list:
     return [(z["name"], z["text"]) for z in get(cam_id) if z["type"] == "nota" and z["text"]]
+
+
+def near_door(cam_id: str, box, w: int, h: int, grow: float = 2.0) -> Optional[bool]:
+    """Camaras de calle: la persona esta en la zona de seguimiento (o, sin ella, en la puerta peatonal agrandada `grow` veces alrededor de su centro).
+    None si la camara no tiene ninguna de las dos zonas (no se filtra)."""
+    zs = get(cam_id)
+    if any(z["type"] == "seguimiento_calle" for z in zs):
+        return contains(cam_id, ("seguimiento_calle",), box, w, h, min_overlap=0.2)
+    doors = [z["pts"] for z in zs if z["type"] == "puerta_peatonal"]
+    if not doors:
+        return None
+    x, y = _base_point(box, w, h)
+    for pts in doors:
+        cx, cy = sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts)
+        big = [(cx + (px - cx) * grow, cy + (py - cy) * grow) for px, py in pts]
+        if point_in_polygon(x, y, big) or overlap_frac(box, big, w, h) >= 0.2:
+            return True
+    return False
