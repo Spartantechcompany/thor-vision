@@ -3210,14 +3210,14 @@ function initVehicles(){
         document.querySelectorAll('#veh-tabs .hist-range').forEach(x => x.classList.toggle('on', x.dataset.st === ''));
         return load();
       }
-      document.getElementById('veh-note').textContent = `Cámaras: ${d.tracked_cams.join(', ')} · se registra un vehículo quieto más de ${Math.round(d.min_parked_s / 60)} min · la placa se lee sola en los autos de la zona de estacionamiento y se puede corregir a mano`;
+      document.getElementById('veh-note').textContent = `Cámaras: ${d.tracked_cams.join(', ')} · se registra un vehículo quieto más de ${Math.round(d.min_parked_s / 60)} min · la placa se lee sola en los autos de la zona de estacionamiento; las lecturas poco seguras quedan por confirmar y todas se pueden corregir a mano`;
       document.getElementById('veh-body').innerHTML = d.vehicles.length ? d.vehicles.map(v => `<tr>
         <td>${v.has_thumb ? `<img class="veh-img" data-vid="${v.id}" style="cursor:zoom-in" title="Ver llegada y salida" src="/api/vehicles/${v.id}/image" loading="lazy" alt="">` : ''}</td>
         <td>${_escapeHtml(v.cam)}</td><td>${_escapeHtml(v.cls)}${v.in_zone ? ' <small class="conn-ok" title="Dentro del polígono de estacionamiento: con alertas y lectura de placa">en polígono</small>' : ' <small class="muted" title="Fuera del polígono: solo informativo">informativo</small>'}</td>
         <td>${_escapeHtml(new Date(v.first_ts * 1000).toLocaleString('es-MX', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', hour12:false }))}</td>
         <td>${dur(v.duration_s)}</td>
         <td>${v.state === 'parked' ? '<span class="conn-ok">estacionado</span>' : '<span class="conn-warn">se fue</span>'}</td>
-        <td><input class="veh-plate" data-id="${v.id}" value="${_escapeHtml(v.plate || '')}" placeholder="sin placa" maxlength="12" aria-label="Placa">${v.plate_src === 'auto' ? ` <small class="conn-ok" title="Lectura automática">auto ${Math.round((v.plate_conf || 0) * 100)}%</small>` : ''}${v.has_plate_img ? ` <img class="veh-img" style="height:26px;width:auto" src="/api/vehicles/${v.id}/plate" alt="Recorte de la placa">` : ''}</td></tr>`).join('')
+        <td><input class="veh-plate" data-id="${v.id}" value="${_escapeHtml(v.plate || '')}" placeholder="${v.plate_guess ? '¿' + _escapeHtml(v.plate_guess) + '?' : 'sin placa'}" maxlength="12" aria-label="Placa">${(v.plate_src || '').startsWith('auto') ? ` <small class="conn-ok" title="Lectura automática">auto ${Math.round((v.plate_conf || 0) * 100)}%</small>` : ''}${!v.plate && v.plate_guess ? ` <button type="button" class="set-btn veh-ok" data-id="${v.id}" data-p="${_escapeHtml(v.plate_guess)}" title="Lectura poco segura (${Math.round((v.plate_guess_conf || 0) * 100)}%): revisa el recorte y confírmala o escribe la correcta">Confirmar ${_escapeHtml(v.plate_guess)}</button>` : ''}${v.has_plate_img ? ` <img class="veh-img" style="height:26px;width:auto" src="/api/vehicles/${v.id}/plate" alt="Recorte de la placa">` : ''}${v.twin_id ? ` <small class="muted" title="El mismo auto, visto a la vez por la otra cámara de calle">también en la otra cámara</small>` : ''}${v.other_visits ? ` <small class="conn-warn" title="Otras veces que se registró esta placa en los últimos 30 días">vino ${v.other_visits + 1} veces · última ${_escapeHtml(new Date(v.last_other_visit * 1000).toLocaleDateString('es-MX', { day:'2-digit', month:'short' }))}</small>` : ''}</td></tr>`).join('')
         : '<tr><td colspan="7" style="padding:14px;color:var(--text-secondary)">Sin vehículos registrados todavía.</td></tr>';
     } catch (e) { document.getElementById('veh-note').textContent = 'Error al leer /api/vehicles'; }
   }
@@ -3238,6 +3238,11 @@ function initVehicles(){
   document.getElementById('veh-tabs')?.addEventListener('click', e => {
     const b = e.target.closest('[data-st]'); if (!b) return;
     state = b.dataset.st; document.querySelectorAll('#veh-tabs .hist-range').forEach(x => x.classList.toggle('on', x === b)); load();
+  });
+  document.getElementById('veh-body')?.addEventListener('click', async e => {
+    const b = e.target.closest('.veh-ok'); if (!b) return;
+    const r = await fetch(`/api/vehicles/${b.dataset.id}`, { method:'PATCH', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ plate: b.dataset.p }) });
+    if (r.ok) load();
   });
   document.getElementById('veh-body')?.addEventListener('change', async e => {
     const inp = e.target.closest('.veh-plate'); if (!inp) return;

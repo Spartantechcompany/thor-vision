@@ -93,6 +93,7 @@ def vehicle_patch(vid: int, body: VehiclePatch, request: Request):
         args.append(1.0 if p else None)
         sets.append("plate_src=?")
         args.append("manual" if p else None)
+        sets.append("plate_guess=NULL")
     if body.note is not None:
         sets.append("note=?")
         args.append(body.note.strip()[:200] or None)
@@ -103,6 +104,12 @@ def vehicle_patch(vid: int, body: VehiclePatch, request: Request):
         db._conn.commit()
     if not cur.rowcount:
         raise HTTPException(404)
+    pt = getattr(request.app.state, "parked", None)
+    if body.plate and pt is not None:
+        try:
+            pt.link(vid)                      # una placa escrita o confirmada a mano tambien enlaza al mismo auto en otros registros
+        except sqlite3.Error:
+            pass
     return {"ok": True}
 
 

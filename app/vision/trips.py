@@ -19,6 +19,8 @@ ENABLED = os.environ.get("TRIPS_ENABLED", "true").lower() == "true"
 PRE_S = float(os.environ.get("TRIP_PRE_S", "30"))           # visitas que ya estaban en cuadro justo antes del disparo
 MIN_PATH_S = float(os.environ.get("TRIP_MIN_PATH_S", "8"))          # duracion minima de un recorrido que pasa por una sola camara
 CHAIN_GAP_S = float(os.environ.get("TRIP_CHAIN_GAP_S", "150"))   # una visita de calle cuenta si ocurre hasta tanto antes/despues de la primera/ultima de adentro
+ENTRY_GAP_S = float(os.environ.get("TRIP_ENTRY_GAP_S", "120"))   # un recorrido solo de adentro cuenta si empieza a lo mucho tanto despues del disparo
+ENTRY_PRE_S = 5.0                                                 # ...y no antes (quien ya estaba adentro no llego por esa puerta)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS trips (
@@ -35,6 +37,7 @@ class Trips:
         self.window_s = float(cfg.get("window_s", 300))
         self.triggers = cfg.get("triggers") or {}
         self.street = set((topo or {}).get("street") or [])
+        self.entry = set((topo or {}).get("entry_cams") or [])       # por donde se entra desde la calle (topology.yml entry_cams; un disparador puede traer su propio entry)
         self._active: list = []
         self._lock = threading.Lock()
         with db._lock:
@@ -55,7 +58,8 @@ class Trips:
                 cur = self.db._conn.execute("INSERT INTO trips (start_ts, alias, label) VALUES (?,?,?)", (ts, alias, trg.get("label") or alias))
                 self.db._conn.commit()
             sess = {"id": cur.lastrowid, "alias": alias, "start": ts, "end": ts + float(trg.get("window_s", self.window_s)),
-                    "cams": list(trg.get("cams") or []), "inner": list(trg.get("inner") or []), "label": trg.get("label") or alias, "quiet": bool(trg.get("quiet_if_empty"))}
+                    "cams": list(trg.get("cams") or []), "inner": list(trg.get("inner") or []), "label": trg.get("label") or alias, "quiet": bool(trg.get("quiet_if_empty")),
+                    "entry": set(trg.get("entry") or (self.entry & set(trg.get("inner") or [])))}
             self._active.append(sess)
         logger.info("viaje %d abierto por %s (%d camaras, %.0f s)", sess["id"], alias, len(sess["cams"]), sess["end"] - ts)
         return sess["id"]
@@ -87,9 +91,11 @@ class Trips:
                 f"SELECT id, cam_id, start_ts, end_ts, body, scene, subject_id, known_name, journey_id FROM person_visits WHERE cam_id IN ({q}) AND fp=0 AND static=0 "
                 f"AND start_ts<=? AND end_ts>=? ORDER BY start_ts", (*s["cams"], s["end"], s["start"] - PRE_S)).fetchall()
 
-    def _direction(self, keep: list) -> str:
+    def _direction(self, keep: list, s: Optional[dict] = None) -> str:
         out = lambda v: v[1] in self.street or v[1] == "cam-vto"
         first_out, last_out = out(keep[0]), out(keep[-1])
+        if not any(out(v) for v in keep) and s and keep[0][1] in (s.get("entry") or ()) and s["start"] - ENTRY_PRE_S <= keep[0][2] <= s["start"] + ENTRY_GAP_S:
+            return "entrada"                                  # aparece en la camara de entrada justo despues del disparo (timbre, porton): llego por ahi
         return "entrada" if first_out and not last_out else "salida" if last_out and not first_out else "recorrido"
 
     def _paths(self, s: dict, vs: list) -> list:
@@ -106,6 +112,10 @@ class Trips:
             keep = sorted([v for v in g if v[1] in s["inner"] or t0 - CHAIN_GAP_S <= v[3] <= t0 or t1 <= v[2] <= t1 + CHAIN_GAP_S], key=lambda v: v[2])
             if len({v[1] for v in keep}) < 2 and sum(v[3] - v[2] for v in keep) < MIN_PATH_S:
                 continue                                      # una sola camara y de segundos: parpadeo, no un recorrido
+            outside = any(v[1] in self.street or v[1] == "cam-vto" for v in keep)
+            entry = s.get("entry") or set()
+            if not outside and (not (s["start"] - ENTRY_PRE_S <= t0 <= s["start"] + ENTRY_GAP_S) or (entry and inner[0][1] not in entry)):
+                continue                                      # solo de adentro: cuenta si empieza en la camara de entrada justo despues del disparo; si no, ya estaba adentro
             paths.append(keep)
         return sorted(paths, key=lambda p: p[0][2])
 
@@ -121,7 +131,7 @@ class Trips:
                 self.db._conn.execute("UPDATE trips SET end_ts=?, direction=?, n_visits=0, status='closed' WHERE id=?", (s["end"], "sin personas captadas", s["id"]))
                 self.db._conn.commit()
             return
-        dirs = [self._direction(p) for p in paths]
+        dirs = [self._direction(p, s) for p in paths]
         if not paths:
             direction, txt = "sin personas captadas", f"{s['label']}: sin personas captadas · ninguna cámara vio a alguien"
         elif len(paths) == 1:

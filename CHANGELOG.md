@@ -2,6 +2,14 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.42.0 — Matrículas confiables, sin autos fantasma y viajes sin ruido (2026-10-21)
+
+Matrículas: solo se dan por buenas con 2 lecturas iguales de confianza ≥ 0.7, 3 de ≥ 0.6 o una de ≥ 0.85; lo demás queda "por confirmar" con un botón para confirmarlo (las 7 lecturas viejas poco seguras pasaron a por confirmar). Se sigue leyendo cada 10 min mientras el auto siga ahí (antes se dejaba de intentar a los 20 min). El mismo auto se enlaza por placa, tolerando las confusiones típicas del OCR: partido en la misma cámara se fusiona, visto a la vez por Exterior 1 y 2 queda como gemelo, y si vuelve otro día se cuentan sus visitas. Estacionados: un auto solo se registra si aparece en al menos la mitad de los cuadros, y uno registrado que en 10 min aparece en menos del 15% se da por ido: eran carriles con tráfico que quedaban 'estacionados' durante horas. Viajes: un recorrido solo cuenta si pasa por la puerta o la calle, o si empieza en la cámara de entrada a lo mucho 2 min después del disparo. Reprocesando la semana, las alertas de viaje del videoportero bajan de 248 a 80: el 92% eran personas que ya estaban adentro.
+
+- **Vehículos · Placas por confirmar y enlazadas**: plates.vote/guess/similar; columnas plate_guess, plate_guess_conf, merged_into, twin_id; /api/vehicles trae plate_guess, twin_id y other_visits.
+- **Vehículos · Sin fantasmas de tráfico**: PARKED_PRESENCE_MIN=0.5, PARKED_PRESENCE_GONE=0.15 (ventana de 10 min), PLATES_SLOW_S=600.
+- **Viajes · Solo quien llega por la puerta**: TRIP_ENTRY_GAP_S=120 y la cámara de entrada de topology.yml (entry_cams): quien aparece ahí tras el timbre cuenta como entrada.
+
 ## v2.41.0 — Prompt compacto medido (2026-10-21)
 
 El texto fijo de cada cámara baja de ~970 a ~750 tokens (-22%, unos 13% menos por llamada): esquema JSON más corto, descripciones breves de cada código de alerta y sin frases repetidas. Se midió antes de activarlo con scripts/prompt_ab.py: las mismas imágenes y clips de las 10 cámaras con el prompt actual (dos veces, para medir cuánto varía el modelo por sí solo) y con el compacto. Sobre 40 entradas con cuadros limpios, el modelo coincide consigo mismo en 97% de personas y 100% de alertas, y el compacto en 97% y 95%; las 3 diferencias fueron casos ambiguos y en el único claro (una persona de pie en Cowork) acertó el compacto. VLM_PROMPT_COMPACT=false vuelve al texto anterior.

@@ -1,5 +1,28 @@
 [
   {
+    "version": "2.42.0",
+    "date": "2026-10-21",
+    "name": "Matrículas confiables, sin autos fantasma y viajes sin ruido",
+    "summary": "Matrículas: solo se dan por buenas con 2 lecturas iguales de confianza ≥ 0.7, 3 de ≥ 0.6 o una de ≥ 0.85; lo demás queda \"por confirmar\" con un botón para confirmarlo (las 7 lecturas viejas poco seguras pasaron a por confirmar). Se sigue leyendo cada 10 min mientras el auto siga ahí (antes se dejaba de intentar a los 20 min). El mismo auto se enlaza por placa, tolerando las confusiones típicas del OCR: partido en la misma cámara se fusiona, visto a la vez por Exterior 1 y 2 queda como gemelo, y si vuelve otro día se cuentan sus visitas. Estacionados: un auto solo se registra si aparece en al menos la mitad de los cuadros, y uno registrado que en 10 min aparece en menos del 15% se da por ido: eran carriles con tráfico que quedaban 'estacionados' durante horas. Viajes: un recorrido solo cuenta si pasa por la puerta o la calle, o si empieza en la cámara de entrada a lo mucho 2 min después del disparo. Reprocesando la semana, las alertas de viaje del videoportero bajan de 248 a 80: el 92% eran personas que ya estaban adentro.",
+    "highlights": [
+      {
+        "area": "Vehículos",
+        "title": "Placas por confirmar y enlazadas",
+        "text": "plates.vote/guess/similar; columnas plate_guess, plate_guess_conf, merged_into, twin_id; /api/vehicles trae plate_guess, twin_id y other_visits."
+      },
+      {
+        "area": "Vehículos",
+        "title": "Sin fantasmas de tráfico",
+        "text": "PARKED_PRESENCE_MIN=0.5, PARKED_PRESENCE_GONE=0.15 (ventana de 10 min), PLATES_SLOW_S=600."
+      },
+      {
+        "area": "Viajes",
+        "title": "Solo quien llega por la puerta",
+        "text": "TRIP_ENTRY_GAP_S=120 y la cámara de entrada de topology.yml (entry_cams): quien aparece ahí tras el timbre cuenta como entrada."
+      }
+    ]
+  },
+  {
     "version": "2.41.0",
     "date": "2026-10-21",
     "name": "Prompt compacto medido",
