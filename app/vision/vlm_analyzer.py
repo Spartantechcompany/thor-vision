@@ -14,6 +14,7 @@ from typing import List, Optional
 import cv2
 import numpy as np
 
+from app.vision import scenes as _scenes
 from app.vision.scenes import normalize_result
 
 logger = logging.getLogger(__name__)
@@ -485,7 +486,7 @@ class VLMAnalyzer:
             # Deshabilitar thinking mode — fuerza respuesta directa en content
             "chat_template_kwargs": {"enable_thinking": False},
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": _scenes.SYSTEM_COMPACT if _scenes.COMPACT else SYSTEM_PROMPT},
                 {
                     "role": "user",
                     # (fijo, variable): el texto fijo va antes del medio para que el servidor lo reutilice de su cache de prefijos

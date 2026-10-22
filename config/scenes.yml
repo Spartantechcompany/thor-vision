@@ -32,6 +32,21 @@ alert_catalog:
   animal:                  "animal (perro, gato, etc.) dentro de un area interior que NO es una de las mascotas conocidas"
   uso_telefono_exterior:   "persona en el exterior (calle, banqueta, moto o auto estacionado) mirando o usando su telefono celular"
 
+# Descripciones cortas de cada codigo para el prompt compacto (VLM_PROMPT_COMPACT); si falta una, se usa la larga de arriba
+alert_catalog_short:
+  persona_en_suelo:        "persona caida o inmovil en el piso"
+  acceso_no_autorizado:    "persona entrando o forzando puerta/reja de zona restringida"
+  merodeo:                 "persona que se detiene frente al muro/reja/puerta, mira hacia adentro o vuelve a pasar (pasar de largo NO)"
+  persona_nocturna:        "persona de noche donde no deberia haber nadie"
+  vehiculo_detenido:       "vehiculo que se detiene o permanece frente al acceso"
+  manipulacion_vehiculo:   "persona forzando o abriendo un vehiculo ajeno (recargarse NO)"
+  grupo_inusual:           "3 o mas personas donde normalmente hay 0-1"
+  objeto_abandonado:       "bulto o bolsa sin dueno visible"
+  fuego_humo:              "fuego, humo o chispas"
+  puerta_abierta:          "puerta, porton o reja que deberia estar cerrada, abierta"
+  animal:                  "animal en interior que NO es mascota conocida"
+  uso_telefono_exterior:   "persona en exterior mirando o usando su celular"
+
 cameras:
   cam-189:
     name: Exterior 1

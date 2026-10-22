@@ -92,3 +92,17 @@ def test_texto_fijo_no_cambia_con_la_hora():
     s1, d1 = ctx.render_parts(time.mktime((2026, 10, 7, 12, 0, 0, 0, 0, -1)))
     s2, d2 = ctx.render_parts(time.mktime((2026, 10, 7, 23, 30, 0, 0, 0, -1)))
     assert s1 == s2 and "HORA LOCAL" not in s1 and "12:00" in d1 and "REGLA NOCTURNA" in d2
+
+
+def test_prompt_compacto_es_mas_corto_y_conserva_esquema_y_codigos():
+    sc = scenes.Scenes()
+    for cam in ("cam-189", "cam-cowork", "cam-215"):
+        c = sc.get(cam)
+        full = "\n".join(c.render_parts(video=True, compact=False))
+        short = "\n".join(c.render_parts(video=True, compact=True))
+        assert len(short) < len(full) * 0.85
+        for code in c.alert_types:
+            assert code in short                                                    # ningun codigo permitido se pierde
+        for k in ("people", "persons", "vehicles", "activity", "scene", "relevant", "alerts", "alert_types", "severity", "confidence"):
+            assert f'"{k}"' in short                                                # el esquema JSON sigue completo
+        assert "IGNORA" in short and "LO QUE IMPORTA" in short and c.where.split()[0] in short

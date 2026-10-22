@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 SCENES_PATH = os.environ.get("SCENES_PATH", "/app/config/scenes.yml")
 
+# Prompt compacto (VLM_PROMPT_COMPACT=false lo apaga): mismo esquema y mismas reglas con menos palabras; medido con scripts/prompt_ab.py (21-oct, 40 entradas)
+COMPACT = os.environ.get("VLM_PROMPT_COMPACT", "true").lower() == "true"
+
 SEVERITIES = ("none", "low", "medium", "high")
 CONFIDENCES = ("low", "medium", "high")
 
@@ -36,6 +39,19 @@ SCHEMA_INSTRUCTIONS = (
 )
 
 
+SCHEMA_COMPACT = (
+    'Responde SOLO este JSON, todos los campos:\n'
+    '{"people": <int visibles>, "persons": [{"desc": "ropa/rasgos", "action": "que hace", "where": "zona"}], '
+    '"vehicles": <int en movimiento o recien llegados>, '
+    '"activity": "UNA frase factual del estado actual: que hacen personas/vehiculos; si no hay, el lugar y su estado (nunca \'Sin actividad relevante\')", '
+    '"scene": "luz/visibilidad, max 8 palabras", "relevant": <true solo si ocurre algo de LO QUE IMPORTA>, '
+    '"alerts": ["frase corta"], "alert_types": ["codigo"], "severity": "none|low|medium|high", "confidence": "low|medium|high"}\n'
+    'Cuenta solo lo visible; si esta oscuro o borroso escribe "no distinguible"; alerts vacio si nada es relevante y nunca por algo de IGNORA; '
+    'no menciones detectores; severity high solo con persona en el suelo, acceso forzado o fuego/humo.'
+)
+SYSTEM_COMPACT = "Analista de camaras de seguridad: describe solo lo visible, sin especular. Responde solo un objeto JSON valido."
+
+
 @dataclass
 class SceneContext:
     cam_id: str
@@ -47,6 +63,7 @@ class SceneContext:
     night_person: str
     vehicles: bool
     catalog: dict = field(default_factory=dict)
+    catalog_short: dict = field(default_factory=dict)
     night_hours: tuple = (22, 6)
     weekday_night: Optional[tuple] = None   # horario nocturno propio de lunes a viernes
     weekend_mode: Optional[str] = None      # "note" = fin de semana sin alerta nocturna
@@ -88,26 +105,29 @@ class SceneContext:
         night, mode, _ = self._rule(now)
         return night and mode == "alert"
 
-    def render_parts(self, now: Optional[float] = None, video: bool = False) -> tuple:
+    def render_parts(self, now: Optional[float] = None, video: bool = False, compact: Optional[bool] = None) -> tuple:
         """(fijo, variable). El texto fijo de la camara va antes del video/imagen y es identico en cada llamada (el servidor lo reutiliza
         de su cache de prefijos); la hora, las reglas de horario y el tipo de medio van despues."""
         now = now or time.time()
+        cp = COMPACT if compact is None else compact
         night, mode, weekend = self._rule(now)
         lt = time.strftime("%H:%M", time.localtime(now))
+        cat = (lambda c: self.catalog_short.get(c) or self.catalog.get(c, c)) if cp else (lambda c: self.catalog.get(c, c))
         lines = [
             f"CAMARA: {self.name} ({self.cam_id})",
             f"UBICACION: {' '.join(self.where.split())}",
             *([f"TOMA: {' '.join(self.toma.split())}"] if self.toma else []),
             *(["ZONAS DEL ENCUADRE:", *[f"- {z}" for z in self.zonas]] if self.zonas else []),
             *([f"FLUJO NORMAL: {' '.join(self.flujo.split())}"] if self.flujo else []),
-            "Usa la TOMA y las ZONAS para decir en activity DONDE ocurre algo y HACIA DONDE se mueve (p. ej. 'se acerca a la puerta peatonal', 'sube la escalera'). "
-            "Empieza activity por lo mas importante de la escena.",
+            ("En activity di DONDE ocurre algo y HACIA DONDE va, lo mas importante primero." if cp else
+             "Usa la TOMA y las ZONAS para decir en activity DONDE ocurre algo y HACIA DONDE se mueve (p. ej. 'se acerca a la puerta peatonal', 'sube la escalera'). "
+             "Empieza activity por lo mas importante de la escena."),
             "LO QUE IMPORTA:",
             *[f"- {x}" for x in self.focus],
             "IGNORA (es normal, NO generes alerta):",
             *[f"- {x}" for x in self.ignore],
-            "CODIGOS DE ALERTA PERMITIDOS (usa solo estos en alert_types):",
-            *[f"- {c}: {self.catalog.get(c, c)}" for c in sorted(self.alert_types)],
+            "ALERTAS PERMITIDAS (alert_types):" if cp else "CODIGOS DE ALERTA PERMITIDOS (usa solo estos en alert_types):",
+            *[f"- {c}: {cat(c)}" for c in sorted(self.alert_types)],
         ]
         if self.known_pets and "animal" in self.alert_types:
             lines.append("MASCOTAS CONOCIDAS (son de la casa, NO son alerta animal; nombralas como mascota): "
@@ -121,7 +141,7 @@ class SceneContext:
         if fixed:
             head += "\nELEMENTOS FIJOS DE ESTA ESCENA (siempre estan ahi: NO los describas ni alertes por ellos):\n" + \
                 "\n".join(f"- {n + ': ' if n else ''}{t}" for n, t in fixed)
-        static = f"{head}\n\n{SCHEMA_INSTRUCTIONS}"
+        static = f"{head}\n\n{SCHEMA_COMPACT if cp else SCHEMA_INSTRUCTIONS}"
         dyn = [f"HORA LOCAL: {lt} ({'NOCTURNO' if night else 'diurno'})"]
         if weekend and self.weekend_mode == "note":
             dyn.append("FIN DE SEMANA: el uso casual de esta area es normal; no generes persona_nocturna.")
@@ -165,6 +185,7 @@ class Scenes:
                 night_person=c.get("night_person", "note"),
                 vehicles=bool(c.get("vehicles", False)),
                 catalog=catalog,
+                catalog_short={k: str(v) for k, v in (raw.get("alert_catalog_short") or {}).items()},
                 night_hours=nh,
                 weekday_night=tuple(c["weekday_night"]) if c.get("weekday_night") else None,
                 weekend_mode=c.get("weekend_mode"),

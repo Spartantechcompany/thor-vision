@@ -2,6 +2,13 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.41.0 — Prompt compacto medido (2026-10-21)
+
+El texto fijo de cada cámara baja de ~970 a ~750 tokens (-22%, unos 13% menos por llamada): esquema JSON más corto, descripciones breves de cada código de alerta y sin frases repetidas. Se midió antes de activarlo con scripts/prompt_ab.py: las mismas imágenes y clips de las 10 cámaras con el prompt actual (dos veces, para medir cuánto varía el modelo por sí solo) y con el compacto. Sobre 40 entradas con cuadros limpios, el modelo coincide consigo mismo en 97% de personas y 100% de alertas, y el compacto en 97% y 95%; las 3 diferencias fueron casos ambiguos y en el único claro (una persona de pie en Cowork) acertó el compacto. VLM_PROMPT_COMPACT=false vuelve al texto anterior.
+
+- **Modelo · Prompt compacto**: scenes.yml: alert_catalog_short; scenes.py: SCHEMA_COMPACT y render_parts(compact=). Promedio 970 -> 752 tokens de texto; el esquema y todos los códigos de alerta se conservan (prueba).
+- **Herramientas · Prueba A/B de prompts**: scripts/prompt_ab.py (dentro del contenedor). Usa cuadros limpios de go2rtc: /api/snapshot dibuja encima los chips de detección y el texto del último análisis, y el modelo los lee, lo que falsea la comparación.
+
 ## v2.40.0 — Escena completa con menos llamadas (2026-10-21)
 
 El modelo veía clips de apenas 1 a 2 segundos (30 cuadros seguidos del búfer) y el servidor solo tomaba ~4 cuadros de ellos. Ahora cada clip es la escena de los últimos 16 s en 8 cuadros a 480x270 (un cuadro cada 2 s, ~530 tokens, casi lo mismo que antes), esperando 4 s tras el inicio del movimiento para que la acción entre. Si la escena no cambió desde el último análisis (mismas personas en el mismo lugar, mismos objetos, imagen casi igual) no se llama al modelo; se vuelve a mirar a los 5 minutos. thor-vision manda como mucho 2 peticiones a la vez y, cuando el gateway contesta 503 por capacidad, abre una pausa común: la rutina espera y solo pasan las prioritarias (noche en zonas de alerta, armado, videoportero, personas en la calle). El texto fijo de cada cámara va antes del video para que el servidor lo reutilice de su caché, y la foto del heartbeat va a 640x360.
