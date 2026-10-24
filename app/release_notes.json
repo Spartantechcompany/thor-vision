@@ -1,5 +1,23 @@
 [
   {
+    "version": "2.45.0",
+    "date": "2026-10-24",
+    "name": "Focos por red local, horarios y casas separadas",
+    "summary": "La página IoT es solo de la casa Patricio 10: los equipos de Coworking540 (Ahuehuete, Barra, Ceiba, Encino, Sabila, Co Working, Pasillo Entrada, Security Camera...) se sacaron y nunca entran en los controles de grupo ni en los horarios. Los equipos con más de 90 días desconectados van a una sección 'Retirados' al final y no cuentan como fallas. Nuevo panel de focos: brillo, color y blanco (cálido/neutro/frío) de todos los focos a la vez o de cada uno, y horarios (hora, días, focos, color o brillo) que se guardan en el servicio de control y se pueden probar al momento. Todo va por la red local porque el proyecto de la nube de Tuya agotó su cupo de equipos controlables. Las direcciones de los focos salen de la lista de clientes del UDM.",
+    "highlights": [
+      {
+        "area": "IoT",
+        "title": "Retirados",
+        "text": "isRetired: desconectado y sin datos de la nube hace más de 90 días, o retired: true en iot.yml."
+      },
+      {
+        "area": "IoT",
+        "title": "Control local y horarios",
+        "text": "lan_bulbs.py + video_service.py (oapc-devops): /bulbs, /schedules; solo focos listados en iot.yml."
+      }
+    ]
+  },
+  {
     "version": "2.44.1",
     "date": "2026-10-24",
     "name": "Todo el inventario de Tuya",

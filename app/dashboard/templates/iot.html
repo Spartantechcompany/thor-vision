@@ -62,12 +62,46 @@ h3{margin:22px 0 8px;font-size:14px}.box{background:var(--panel);border:1px soli
 .kid i{width:8px;height:8px;border-radius:50%;background:var(--bad);box-shadow:0 0 0 2px rgba(239,83,80,.18)}.kid.on i{background:var(--accent);box-shadow:0 0 6px var(--accent)}.kid .when{color:var(--muted);font-size:11.5px}
 .seen{font-size:12px;color:var(--muted);line-height:1.5}.seen b{color:var(--text);font-weight:600}
 .sumbar{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 6px}.sumbar .b{font-size:13px;padding:3px 12px}
+
+.bp{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:6px 0 14px}.bp h3{margin:0 0 8px}
+.bp .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:6px 0}.bp label{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.bp input[type=range]{width:180px;accent-color:var(--accent)}.bp input[type=color]{width:40px;height:30px;border:1px solid var(--line);border-radius:6px;background:transparent;padding:0}
+.bp button,.bp select,.bp input[type=time],.bp input[type=text]{min-height:34px;padding:5px 12px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer;font:inherit}
+.bp button:hover{border-color:var(--accent)}.bp button.pri{border-color:var(--accent);color:var(--accent)}.bp .msg{font-size:12.5px;color:var(--muted)}
+.sw{display:inline-block;width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.3);vertical-align:-2px}
+.sch{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px;margin:6px 0}.sch.off{opacity:.55}.sch .meta{font-size:12px;color:var(--muted)}
+.days{display:flex;gap:4px}.days label{border:1px solid var(--line);border-radius:6px;padding:2px 8px;cursor:pointer}.days input{display:none}.days input:checked+span{color:var(--accent);font-weight:700}
+.bl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:12px}.bl input[type=range]{width:110px;accent-color:var(--accent)}.bl input[type=color]{width:30px;height:24px;border:1px solid var(--line);border-radius:5px;background:transparent;padding:0}
+.bl button{min-height:26px;padding:2px 8px;border-radius:7px;border:1px solid var(--line);background:transparent;color:inherit;cursor:pointer;font-size:12px}.bl button:hover{border-color:var(--accent)}.lan{font-size:11px;border-radius:999px;padding:0 8px;border:1px solid var(--line);color:var(--muted)}.lan.ok{color:var(--accent);border-color:var(--accent)}
+details.ret{margin-top:22px}details.ret>summary{cursor:pointer;color:var(--muted);font-size:14px;padding:6px 0}details.ret .sc{opacity:.55}
 </style>
 </head>
 <body>
-<header><a href="/">← Dashboard</a><h1>Dispositivos IoT (Tuya)</h1><span id="st" class="b"></span><span class="muted" style="margin-left:auto">Estado por MQTT · luces y cortinas con control (queda registro)</span></header>
+<header><a href="/">← Dashboard</a><h1>Dispositivos IoT (Tuya)</h1><span class="b" title="La casa Coworking540 tiene su propia cuenta de equipos y no se mezcla aquí">Casa Patricio 10</span><span id="st" class="b"></span><span class="muted" style="margin-left:auto">Estado por MQTT · luces y cortinas con control (queda registro)</span></header>
 <main>
   <div id="sumbar" class="sumbar"></div>
+  <div class="bp" id="bulbpanel">
+    <h3>Focos: brillo, color y horarios <span class="muted" style="font-weight:400;font-size:12px">(por la red local: no depende del cupo de la nube de Tuya)</span></h3>
+    <div class="row"><b style="font-size:13px">Todos los focos</b>
+      <label>Brillo <input type="range" id="bp-br" min="1" max="100" value="100"><span id="bp-brv">100%</span></label>
+      <button data-bp="br" class="pri">Aplicar brillo</button>
+      <label>Color <input type="color" id="bp-col" value="#ff7a00"></label><button data-bp="col" class="pri">Aplicar color</button>
+      <button data-bp="warm">Blanco cálido</button><button data-bp="neutral">Blanco neutro</button><button data-bp="cold">Blanco frío</button>
+      <button data-bp="on">Encender todos</button><button data-bp="off">Apagar todos</button></div>
+    <div class="msg" id="bp-msg"></div>
+    <div style="margin-top:10px"><b style="font-size:13px">Horarios</b> <span class="muted" style="font-size:12px">cambian brillo o color a la hora que elijas</span>
+      <div id="sch-list"></div>
+      <details style="margin-top:8px"><summary style="cursor:pointer;color:var(--accent);font-size:13px">+ Nuevo horario</summary>
+        <div class="row"><input type="text" id="sc-name" placeholder="Nombre (ej. Noche morada)" maxlength="40"><input type="time" id="sc-time" value="19:00">
+          <span class="days" id="sc-days"></span></div>
+        <div class="row"><label>Focos <select id="sc-who"><option value="all">Todos</option></select></label>
+          <label>Acción <select id="sc-kind"><option value="colour">Color</option><option value="white">Blanco (temperatura)</option><option value="bright">Solo brillo</option><option value="on">Encender</option><option value="off">Apagar</option></select></label>
+          <label id="sc-colw">Color <input type="color" id="sc-col" value="#8a2be2"></label>
+          <label id="sc-whw" hidden>Temperatura <input type="range" id="sc-wh" min="0" max="100" value="20"> cálido ⇄ frío</label>
+          <label id="sc-brw">Brillo <input type="range" id="sc-br" min="1" max="100" value="60"><span id="sc-brv">60%</span></label>
+          <button class="pri" id="sc-add">Guardar horario</button></div>
+        <div class="msg" id="sc-msg"></div></details></div>
+  </div>
   <div id="sensors"></div>
   <h3>Video de las cámaras Tuya <span class="muted" style="font-weight:400">(bajo demanda; consume la cuota de la nube)</span></h3>
   <div id="usage" class="box"></div>
@@ -216,7 +250,7 @@ function card(x){
   const bat = x.battery != null ? `<span class="bat" style="color:${x.battery <= 15 ? 'var(--bad)' : x.battery <= 30 ? 'var(--warn)' : 'var(--muted)'}"><i style="--p:${Math.max(4, Math.min(100, x.battery)) * 0.18}px"></i>${x.battery}%</span>` : '';
   return `<div class="sc ${state}" data-did="${esc(x.device_id)}"><div class="top">${icon}<div><div class="nm">${esc(x.name)}</div><div class="muted" style="font-size:12px">${esc(TYPE_LABEL(x))}</div><div class="stt">${label}</div></div></div>
     <div class="muted sinfo" style="font-size:12.5px">${infoLine(x, known, light, cam, bat)}</div>
-  ${ctl(x)}<div class="muted cmsg" style="font-size:12px"></div></div>`;
+  ${ctl(x)}${bulbRow(x)}<div class="muted cmsg" style="font-size:12px"></div></div>`;
 }
 function infoLine(x, known, light, cam, bat){
   const i = x.info || {};
@@ -238,21 +272,29 @@ function patchCard(el, x){
   });
 }
 let _sig = '';
+const RETIRE_S = 90 * 86400;
+const isRetired = x => x.retired === true || (x.online === false && x.info && x.info.update_time && (Date.now() / 1000 - x.info.update_time) > RETIRE_S);
+const sigOf = x => x.device_id + x.type + (x.gangs || '') + (x.gang_names || []).join(',') + (isRetired(x) ? 'R' : '');
+// controles de cada foco: brillo, color y blanco (por la red local); el estado "red local" sale de /bulbs
+const bulbRow = x => (x.type === 'foco' && x.cloud !== false && x.online !== false) ? `<div class="bl" data-b="${esc(x.device_id)}"><input type="range" min="1" max="100" value="100" title="Brillo" aria-label="Brillo de ${esc(x.name)}"><span class="bv">100%</span><input type="color" value="#ff7a00" title="Color" aria-label="Color de ${esc(x.name)}"><button data-bl="warm">Cálido</button><button data-bl="cold">Frío</button><span class="lan">red local…</span></div>` : '';
 async function tick(){
   try {
     const d = await (await fetch('/api/iot/devices')).json();
     const s = d.status || {};
     $('#st').className = 'b ' + (s.connected ? 'ok' : 'bad'); $('#st').textContent = s.connected ? 'MQTT conectado' : ('MQTT: ' + (s.error || 'sin conexión'));
-    const on = d.devices.filter(x => x.online === true || (x.online == null && x.last_ts && Date.now() / 1000 - x.last_ts < 7200 && x.cloud !== false)).length;
-    const off = d.devices.filter(x => x.online === false).length, nop = d.devices.filter(x => x.cloud === false).length;
-    $('#sumbar').innerHTML = `<span class="b ok">${on} conectados</span><span class="b bad">${off} desconectados</span>${nop ? `<span class="b warn">${nop} sin permiso en la nube</span>` : ''}<span class="b">${d.devices.length} en total</span>`;
-    const sec = (t, f) => { const l = d.devices.filter(f); return l.length ? `<h3 class="sech">${t} <span class="muted" style="font-weight:400">${l.length}</span></h3><div class="sgrid">${l.map(card).join('')}</div>` : ''; };
+    const on = d.devices.filter(x => !isRetired(x) && x.online === true || (x.online == null && x.last_ts && Date.now() / 1000 - x.last_ts < 7200 && x.cloud !== false)).length;
+    const off = d.devices.filter(x => x.online === false && !isRetired(x)).length, nop = d.devices.filter(x => x.cloud === false).length, nret = d.devices.filter(isRetired).length;
+    $('#sumbar').innerHTML = `<span class="b ok">${on} conectados</span><span class="b bad">${off} desconectados</span>${nret ? `<span class="b" style="color:var(--muted)">${nret} retirados</span>` : ''}${nop ? `<span class="b warn">${nop} sin permiso en la nube</span>` : ''}<span class="b">${d.devices.length} en total</span>`;
+    const live = d.devices.filter(x => !isRetired(x)), ret = d.devices.filter(isRetired);
+    const sec = (t, f) => { const l = live.filter(f); return l.length ? `<h3 class="sech">${t} <span class="muted" style="font-weight:400">${l.length}</span></h3><div class="sgrid">${l.map(card).join('')}</div>` : ''; };
     const GW = ['gateway', 'panel', 'alarm'];
-    const sig = d.devices.map(x => x.device_id + x.type + (x.gangs || '') + (x.gang_names || []).join(',')).join('|');
+    const sig = d.devices.map(sigOf).join('|');
+    window._devs = d.devices;
     if (sig !== _sig || !document.querySelector('#sensors .sc')) {          // la lista cambio: se dibuja completa
       _sig = sig;
       $('#sensors').innerHTML = sec('Puertas de enlace y paneles', x => GW.includes(x.kind)) + sec('Cámaras Tuya', x => x.kind === 'camera') + sec('Sensores de puertas, ventanas y garage', x => ['door', 'window', 'garage'].includes(x.kind))
-        + sec('Focos', x => x.kind === 'light' && x.type === 'foco') + sec('Interruptores y enchufes', x => x.kind === 'light' && x.type !== 'foco') + sec('Cortinas', x => x.kind === 'curtain');
+        + sec('Focos', x => x.kind === 'light' && x.type === 'foco') + sec('Interruptores y enchufes', x => x.kind === 'light' && x.type !== 'foco') + sec('Cortinas', x => x.kind === 'curtain')
+        + (ret.length ? `<details class="ret"><summary>Retirados · ${ret.length} <span class="muted">(desconectados hace más de 90 días; parecen equipos viejos)</span></summary><div class="sgrid">${ret.map(card).join('')}</div></details>` : '');
     } else {
       d.devices.forEach(x => { const el = document.querySelector(`.sc[data-did="${CSS.escape(x.device_id)}"]`); if (el) patchCard(el, x); });
     }
@@ -260,6 +302,76 @@ async function tick(){
     $('#ev').innerHTML = e.length ? e.map(r => `<div class="ev"><span class="muted">${when(r.ts)}</span> · <b>${esc(r.name)}</b> · ${esc(LABEL[r.code] || r.code)}${r.value && typeof r.value === 'object' ? '' : ' = ' + esc(JSON.stringify(r.value))} <span class="muted">(${esc(r.source)})</span></div>`).join('') : 'Sin eventos todavía.';
   } catch (er) { $('#st').className = 'b bad'; $('#st').textContent = 'sin respuesta'; }
 }
+
+// ── focos: brillo, color y horarios (servicio de control, red local) ──
+const bulbIds = () => (window._devs || []).filter(x => x.type === 'foco' && x.cloud !== false && x.online !== false && !isRetired(x)).map(x => x.device_id);
+async function bulbs(ids, action, msgEl){
+  msgEl.textContent = 'Enviando…';
+  try {
+    const r = await fetch(SVC + '/bulbs', {method: 'POST', body: JSON.stringify({ids, action})}); const j = await r.json();
+    msgEl.textContent = j.result + (j.detail ? ' · ' + Object.entries(j.detail).filter(([, v]) => v !== 'local').map(([k, v]) => k + ': ' + v).slice(0, 4).join(' · ') : '');
+  } catch (e) { msgEl.textContent = 'Servicio de control no disponible'; }
+}
+document.addEventListener('input', e => {
+  if (e.target.id === 'bp-br') $('#bp-brv').textContent = e.target.value + '%';
+  if (e.target.id === 'sc-br') $('#sc-brv').textContent = e.target.value + '%';
+  if (e.target.closest('.bl') && e.target.type === 'range') e.target.parentElement.querySelector('.bv').textContent = e.target.value + '%';
+  if (e.target.id === 'sc-kind') { const k = e.target.value; $('#sc-colw').hidden = k !== 'colour'; $('#sc-whw').hidden = k !== 'white'; $('#sc-brw').hidden = !['colour', 'white', 'bright'].includes(k); }
+});
+document.addEventListener('change', e => {                       // al soltar el control de un foco se envia
+  const row = e.target.closest('.bl'); if (!row) return;
+  const id = row.dataset.b, msg = row.closest('.sc').querySelector('.cmsg');
+  if (e.target.type === 'range') bulbs([id], {brightness: +e.target.value}, msg);
+  else if (e.target.type === 'color') bulbs([id], {colour: e.target.value, brightness: +row.querySelector('input[type=range]').value}, msg);
+});
+document.addEventListener('click', e => {
+  const bl = e.target.closest('[data-bl]');
+  if (bl) { const row = bl.closest('.bl'); bulbs([row.dataset.b], {white: bl.dataset.bl === 'warm' ? 0 : 100, brightness: +row.querySelector('input[type=range]').value}, row.closest('.sc').querySelector('.cmsg')); return; }
+  const bp = e.target.closest('[data-bp]'); if (!bp) return;
+  const k = bp.dataset.bp, ids = bulbIds(), msg = $('#bp-msg'), br = +$('#bp-br').value;
+  if (!ids.length) { msg.textContent = 'No hay focos en línea'; return; }
+  if (!confirm(`¿Aplicar a ${ids.length} focos en línea?`)) return;
+  const act = k === 'br' ? {brightness: br} : k === 'col' ? {colour: $('#bp-col').value, brightness: br} : k === 'warm' ? {white: 0, brightness: br} : k === 'neutral' ? {white: 50, brightness: br} : k === 'cold' ? {white: 100, brightness: br} : {on: k === 'on'};
+  bulbs(ids, act, msg);
+});
+const DIAS = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
+const actTxt = a => [a.on === true ? 'encender' : a.on === false ? 'apagar' : '', a.colour ? `color <i class="sw" style="background:${esc(a.colour)}"></i>` : '', a.white != null ? `blanco ${a.white < 34 ? 'cálido' : a.white > 66 ? 'frío' : 'neutro'}` : '', a.brightness != null ? `brillo ${a.brightness}%` : ''].filter(Boolean).join(' · ');
+async function schedLoad(){
+  if (!SVC) return;
+  try {
+    const d = await (await fetch(SVC + '/schedules')).json(); const nm = Object.fromEntries((window._devs || []).map(x => [x.device_id, x.name]));
+    $('#sch-list').innerHTML = d.schedules.length ? d.schedules.map(i => `<div class="sch ${i.enabled ? '' : 'off'}"><div><b>${esc(i.name)}</b> · ${esc(i.time)} <span class="meta">· ${i.days.length === 7 ? 'todos los días' : i.days.map(x => DIAS[x]).join(', ')} · ${i.ids === 'all' ? 'todos los focos' : i.ids.map(x => esc(nm[x] || x)).join(', ')}</span><div class="meta">${actTxt(i.action)}</div></div>
+      <div><button data-sa="run" data-id="${esc(i.id)}">Probar</button> <button data-sa="tog" data-id="${esc(i.id)}" data-v="${!i.enabled}">${i.enabled ? 'Pausar' : 'Activar'}</button> <button data-sa="del" data-id="${esc(i.id)}">Borrar</button></div></div>`).join('') : '<div class="muted" style="font-size:12.5px">Sin horarios todavía.</div>';
+  } catch (e) { $('#sch-list').innerHTML = '<div class="muted" style="font-size:12.5px">Servicio de horarios no disponible</div>'; }
+}
+document.addEventListener('click', async e => {
+  const sa = e.target.closest('[data-sa]'); if (sa) {
+    const id = sa.dataset.id, m = $('#sc-msg');
+    if (sa.dataset.sa === 'del') { if (!confirm('¿Borrar este horario?')) return; await fetch(SVC + '/schedules/' + id, {method: 'DELETE'}); }
+    else if (sa.dataset.sa === 'tog') await fetch(SVC + '/schedules/' + id + '/toggle', {method: 'POST', body: JSON.stringify({enabled: sa.dataset.v === 'true'})});
+    else if (sa.dataset.sa === 'run') { if (!confirm('Esto cambia los focos ahora mismo. ¿Probar?')) return; m.textContent = 'Probando…'; const j = await (await fetch(SVC + '/schedules/' + id + '/run', {method: 'POST', body: '{}'})).json(); m.textContent = 'Resultado: ' + j.result; }
+    schedLoad(); return;
+  }
+  if (e.target.id !== 'sc-add') return;
+  const k = $('#sc-kind').value, br = +$('#sc-br').value, a = k === 'colour' ? {colour: $('#sc-col').value, brightness: br} : k === 'white' ? {white: +$('#sc-wh').value, brightness: br} : k === 'bright' ? {brightness: br} : {on: k === 'on'};
+  const who = $('#sc-who').value, days = [...document.querySelectorAll('#sc-days input:checked')].map(i => +i.value);
+  const body = {name: $('#sc-name').value || 'Horario', time: $('#sc-time').value, days, ids: who === 'all' ? 'all' : [who], action: a, enabled: true};
+  const r = await fetch(SVC + '/schedules', {method: 'POST', body: JSON.stringify(body)}); const j = await r.json();
+  $('#sc-msg').textContent = j.ok ? 'Horario guardado' : 'No se pudo: ' + j.result; if (j.ok) { $('#sc-name').value = ''; schedLoad(); }
+});
+async function lanPoll(){                                         // que focos responden por la red local (el servicio tarda unos segundos)
+  if (!SVC) return;
+  try {
+    const d = await (await fetch(SVC + '/bulbs')).json();
+    d.bulbs.forEach(b => { const el = document.querySelector(`.bl[data-b="${CSS.escape(b.id)}"]`); if (!el) return;
+      const c = el.querySelector('.lan'); c.textContent = b.reachable ? 'red local ✓' : 'sin red local'; c.className = 'lan' + (b.reachable ? ' ok' : ''); c.title = b.reachable ? (b.ip || '') : (b.msg || '');
+      if (b.reachable) { const r = el.querySelector('input[type=range]'); r.value = b.brightness || 100; el.querySelector('.bv').textContent = (b.brightness || 100) + '%'; if (b.colour) el.querySelector('input[type=color]').value = b.colour; } });
+  } catch (e) {}
+}
+function fillWho(){ const sel = $('#sc-who'); if (!sel || !window._devs) return; const cur = sel.value;
+  sel.innerHTML = '<option value="all">Todos</option>' + (window._devs || []).filter(x => x.type === 'foco' && !isRetired(x)).map(x => `<option value="${esc(x.device_id)}">${esc(x.name)}</option>`).join(''); sel.value = cur || 'all'; }
+$('#sc-days').innerHTML = 'LMXJVSD'.split('').map((d, i) => `<label><input type="checkbox" value="${i}" checked><span>${d}</span></label>`).join('');
+setInterval(() => { fillWho(); }, 30000);
 let SVC = '';
 const LABEL = { ipc_motion: 'Movimiento detectado', ipc_bang: 'Ruido fuerte detectado', dp239: 'Aviso de movimiento' };
 async function usage(){
@@ -280,6 +392,7 @@ async function initVideo(){
   $('#cams').innerHTML = d.devices.filter(x => x.kind === 'camera').map(x => `<div class="cam" data-id="${esc(x.device_id)}"><b>${esc(x.name)}</b>
     <img alt="" src=""><div><button data-a="snap">Captura ahora</button><button data-a="live">En vivo</button><button data-a="stop">Detener</button></div><div class="muted msg"></div></div>`).join('');
   usage(); setInterval(usage, 15000);
+  setTimeout(() => { fillWho(); schedLoad(); lanPoll(); }, 1500); setInterval(schedLoad, 30000); setInterval(lanPoll, 90000);
 }
 async function sendGang(g){
   if (g.classList.contains('dis') || g.classList.contains('busy')) return;

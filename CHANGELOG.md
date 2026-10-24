@@ -2,6 +2,13 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.45.0 — Focos por red local, horarios y casas separadas (2026-10-24)
+
+La página IoT es solo de la casa Patricio 10: los equipos de Coworking540 (Ahuehuete, Barra, Ceiba, Encino, Sabila, Co Working, Pasillo Entrada, Security Camera...) se sacaron y nunca entran en los controles de grupo ni en los horarios. Los equipos con más de 90 días desconectados van a una sección 'Retirados' al final y no cuentan como fallas. Nuevo panel de focos: brillo, color y blanco (cálido/neutro/frío) de todos los focos a la vez o de cada uno, y horarios (hora, días, focos, color o brillo) que se guardan en el servicio de control y se pueden probar al momento. Todo va por la red local porque el proyecto de la nube de Tuya agotó su cupo de equipos controlables. Las direcciones de los focos salen de la lista de clientes del UDM.
+
+- **IoT · Retirados**: isRetired: desconectado y sin datos de la nube hace más de 90 días, o retired: true en iot.yml.
+- **IoT · Control local y horarios**: lan_bulbs.py + video_service.py (oapc-devops): /bulbs, /schedules; solo focos listados en iot.yml.
+
 ## v2.44.1 — Todo el inventario de Tuya (2026-10-24)
 
 La página IoT mostraba 29 de los 50 equipos de la cuenta: faltaban 21 (todos los interruptores de coworking, Sala de Juntas, Oficina, Podcast, pasillos y jardín, y cinco focos), ahora están todos, con su número real de botones. Arriba hay un resumen de conectados, desconectados y sin permiso. El Gateway Site lista sus equipos hijos con su estado y cuándo se vio cada uno; cada tarjeta muestra lo que sabe la nube (último dato, fecha de activación, IP de salida). Los equipos sin permiso en la nube (Garage Entrada anterior, Escalera Piso 1, cortina, Gateway 2do Piso) quedan marcados y sin control. El rechazo 'controllable device pool quota is insufficient' de Tuya se explica en español. El puente publica info y children en cada sincronización.

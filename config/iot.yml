@@ -1,3 +1,5 @@
+# CASA: solo "Patricio 10" (id 153519480). La casa "Coworking540" (id 195128033: Ahuehuete, Barra, Ceiba, Encino, Sabila, Co Working, Pasillo Entrada, Security Camera...) tiene su propia cuenta
+# de equipos y NO se mezcla aqui: no entra en esta pagina, ni en los controles de focos, ni en los horarios.
 # Dispositivos Tuya que thor-vision vigila por MQTT (el puente tuya_bridge publica en oxm/tuya/<id>/status).
 # cam: camara de thor-vision de la que se toma la captura cuando el dispositivo cambia (confirmed: false = suposicion por confirmar).
 # open_code/open_value: que cambio significa "abierto". Los ids no son secretos.
@@ -10,7 +12,6 @@ devices:
   eb73fc0af524735e99irh8: {type: contacto, name: "Cocina Ventana",            kind: window, cam: cam-215,       confirmed: false, alias: window-cocina, related: [cam-215], open_code: doorcontact_state, open_value: true}
   ebd376c2d51a16859eizkw: {type: contacto, name: "Oficina Adm ventana",       kind: window, cam: null,          confirmed: false, alias: window-oficina-adm, open_code: doorcontact_state, open_value: true}
   eb841b85892ac7f25fjb5d: {type: porton, name: "Garage (portón)",     kind: garage, cam: cam-228,       confirmed: true, alias: garage-abre, related: [cam-228, cam-118, cam-189, cam-191, tuya-garaje], role: "Garage: la Tuya del garage, Garage frontal y posterior, y Exterior 1 y 2", open_code: doorcontact_state, open_value: true}
-  eb2d6b38b8299a0a85gosq: {type: camara, name: "Security Camera (Tuya)",    kind: camera, cam: null, alias: tuya-security}
   eb0ba0012624a25aeaessh: {type: camara, name: "Jardin camara (Tuya)",      kind: camera, cam: null, alias: tuya-jardin, related: [cam-120, cam-215], role: "Entre Acceso Site y la cocina (jardin)"}
   ebe7b3e437b01b584813lw: {type: camara, name: "Camara garaje (Tuya)",      kind: camera, cam: null, alias: tuya-garaje, related: [cam-228], role: "Punto ciego del garage: anticipa la entrada a Garage frontal"}
   eb52f2fa3d249b00fbdq4u: {type: camara, name: "Camara Escaleras P2 (Tuya)", kind: camera, cam: cam-236, confirmed: true, alias: tuya-escaleras-p2, related: [cam-236, cam-113], role: "Escaleras del segundo piso: anticipa a Escaleras P2"}
@@ -32,24 +33,14 @@ devices:
   eb89e49ed3a132abcchbsj: {type: enchufe, name: "Arbol de Navidad",   kind: light, cam: null}
   ebcbbdf4e2c9da083f2snj: {type: cortina, name: "Cortina S.J derecho", kind: curtain, cam: null, cloud: false}   # sin permiso en la nube
 # Resto del inventario de la cuenta (devices.json, 50 equipos): interruptores y focos que no tenian ficha. cam solo donde el nombre lo dice.
-  ebd1231cac05b8bef7sol8: {type: interruptor, gangs: 2, name: "Co Working",                kind: light, cam: null, cams: [cam-cowork]}
   ebf612ece9218f73a3inp6: {type: interruptor, gangs: 2, name: "SW coworking",              kind: light, cam: null, cams: [cam-cowork]}
   eb3e525b86838408bd08ck: {type: interruptor, gangs: 2, name: "Sala Co Work",              kind: light, cam: null, cams: [cam-cowork]}
-  eb0d153e46c582b9c6bqtb: {type: interruptor, gangs: 2, name: "Interruptor tactil area de cowork", kind: light, cam: null, cams: [cam-cowork]}
   ebc09edc8ea0a31c58phg1: {type: interruptor, gangs: 2, name: "Sala de Juntas",           kind: light, cam: null, cams: [cam-sala-juntas]}
   ebc2572ec2a0b269e7z2mu: {type: interruptor, gangs: 1, name: "Oficina abraham",           kind: light, cam: null}
   eb2ad9cd2cbb6477a8wtwc: {type: interruptor, gangs: 2, name: "Oficina administracion",    kind: light, cam: null}
   eb55e5a044af020e37sgul: {type: interruptor, gangs: 1, name: "Podcast",                   kind: light, cam: null}
   eb3b36fc46d264b8aaqvok: {type: interruptor, gangs: 1, name: "Pasillo 2piso",             kind: light, cam: null}
-  eb7e3c2280f2c82e8efwje: {type: interruptor, gangs: 1, name: "Pasillo Entrada",           kind: light, cam: null}
-  eb6af9d6b3fd32d100f7qn: {type: interruptor, gangs: 1, name: "Barra",                     kind: light, cam: null}
-  ebe123497bad8efc20dzot: {type: interruptor, gangs: 2, name: "Ahuehuete",                 kind: light, cam: null}
-  eb84071c764de5f5ecxscg: {type: interruptor, gangs: 2, name: "Ceiba",                     kind: light, cam: null}
-  ebbe976616b1588154gj6k: {type: interruptor, gangs: 1, name: "ceiba (1 boton)",           kind: light, cam: null}
-  ebc64fdff9d5971abeztfv: {type: interruptor, gangs: 2, name: "Encino",                    kind: light, cam: null}
-  eb269855472ea6a7302eco: {type: interruptor, gangs: 2, name: "Sabila",                    kind: light, cam: null}
-  eb5e5d997cfdc737aaawzm: {type: interruptor, gangs: 1, name: "Escalera Piso 1",           kind: light, cam: null, cloud: false}   # la nube del proyecto no tiene permiso sobre este equipo
-  eb4279cc5d4926b265whj2: {type: interruptor, gangs: 3, name: "Garage Entrada (anterior)", kind: light, cam: null, cloud: false}   # sustituido por Garage Switch; sin permiso en la nube
+  eb4279cc5d4926b265whj2: {type: interruptor, gangs: 3, name: "Garage Entrada (anterior)", kind: light, cam: null, cloud: false, retired: true}   # sustituido por Garage Switch; sin permiso en la nube
   eb38c39786db62fcf7hhb4: {type: foco, name: "Administracion 1",   kind: light, cam: null}
   eba03b28a2b533e42bqbk9: {type: foco, name: "Foco Televisor",     kind: light, cam: null}
   eb0df8bc26b9aab5ceqbjh: {type: foco, name: "Foco pizarron 4",    kind: light, cam: null}
