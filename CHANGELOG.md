@@ -2,6 +2,13 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.44.1 — Todo el inventario de Tuya (2026-10-24)
+
+La página IoT mostraba 29 de los 50 equipos de la cuenta: faltaban 21 (todos los interruptores de coworking, Sala de Juntas, Oficina, Podcast, pasillos y jardín, y cinco focos), ahora están todos, con su número real de botones. Arriba hay un resumen de conectados, desconectados y sin permiso. El Gateway Site lista sus equipos hijos con su estado y cuándo se vio cada uno; cada tarjeta muestra lo que sabe la nube (último dato, fecha de activación, IP de salida). Los equipos sin permiso en la nube (Garage Entrada anterior, Escalera Piso 1, cortina, Gateway 2do Piso) quedan marcados y sin control. El rechazo 'controllable device pool quota is insufficient' de Tuya se explica en español. El puente publica info y children en cada sincronización.
+
+- **IoT · 52 equipos en iot.yml**: 23 interruptores, 13 focos, 5 sensores, 4 cámaras, gateways, panel, alarma, cortina, enchufe, abre-garage.
+- **IoT · Hijos del gateway**: tuya_bridge: /v1.0/devices/{gw}/sub-devices; listener: children e info; página: lista con estado y último dato.
+
 ## v2.44.0 — IoT en 3D: cada apagador es una palanca (2026-10-24)
 
 La página IoT dibuja cada interruptor como una placa de pared en SVG con una palanca por botón físico: tres apagadores son tres palancas independientes que se tocan directamente, sin botones de texto, y el estado dice cuántos están encendidos ('1 de 3 encendidos'). Los focos son un bulbo con halo y los enchufes un botón con domo, con brillo, sombra y animación suave (se respeta 'reducir movimiento'). Las palancas se mueven con animación al cambiar el estado en vez de redibujarse cada 5 s, responden al teclado y vuelven a su lugar si la orden falla. Inventario de Tuya al día: 5 focos nuevos (Podcast 1, 2 y 3, pizarrón y televisor 2) y 'Garage Switch' reemplaza al 'Garage Entrada' viejo, que ya no tiene permiso en la nube. El puente relee iot.yml en cada sincronización, así que un dispositivo nuevo entra sin reiniciarlo. Opcional: gang_names en iot.yml pone nombre a cada botón.

@@ -57,11 +57,17 @@ h3{margin:22px 0 8px;font-size:14px}.box{background:var(--panel);border:1px soli
 .dev3d .dome{transition:transform .2s;transform-box:fill-box;transform-origin:center}.dev3d .gang:active .dome{transform:scale(.94)}
 .sc .stt small{font-size:12px;font-weight:600;color:var(--muted);margin-left:4px}
 @media (prefers-reduced-motion:reduce){.dev3d svg,.dev3d *{animation:none!important;transition:none!important}}
+
+.kids{display:grid;gap:4px;margin-top:6px;font-size:12.5px}.kid{display:grid;grid-template-columns:10px 1fr auto;gap:8px;align-items:center;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.02)}
+.kid i{width:8px;height:8px;border-radius:50%;background:var(--bad);box-shadow:0 0 0 2px rgba(239,83,80,.18)}.kid.on i{background:var(--accent);box-shadow:0 0 6px var(--accent)}.kid .when{color:var(--muted);font-size:11.5px}
+.seen{font-size:12px;color:var(--muted);line-height:1.5}.seen b{color:var(--text);font-weight:600}
+.sumbar{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 6px}.sumbar .b{font-size:13px;padding:3px 12px}
 </style>
 </head>
 <body>
 <header><a href="/">← Dashboard</a><h1>Dispositivos IoT (Tuya)</h1><span id="st" class="b"></span><span class="muted" style="margin-left:auto">Estado por MQTT · luces y cortinas con control (queda registro)</span></header>
 <main>
+  <div id="sumbar" class="sumbar"></div>
   <div id="sensors"></div>
   <h3>Video de las cámaras Tuya <span class="muted" style="font-weight:400">(bajo demanda; consume la cuota de la nube)</span></h3>
   <div id="usage" class="box"></div>
@@ -113,7 +119,7 @@ const ago = ts => { if (!ts) return '—'; const s = Date.now() / 1000 - ts; ret
 let _gid = 0;
 const sw3d = x => Array.from({length: Math.max(1, Math.min(4, +x.gangs || 1))}, (_, i) => `switch_${i + 1}`);
 const gangState = (x, c) => { const sw = x.switches || {}; return (c in sw) ? (sw[c] ? 'on' : 'off') : 'unk'; };
-const gangDis = x => x.online === false;
+const gangDis = x => x.online === false || x.cloud === false;
 // Placa de pared con una palanca por boton fisico: cada palanca es un apagador distinto y se toca directamente
 function plateSvg(x){
   const codes = sw3d(x), n = codes.length, id = 'p' + (++_gid), gw = 46, gap = 6, pad = 14, W = pad * 2 + n * gw + (n - 1) * gap, H = 128;
@@ -213,7 +219,10 @@ function card(x){
   ${ctl(x)}<div class="muted cmsg" style="font-size:12px"></div></div>`;
 }
 function infoLine(x, known, light, cam, bat){
-  return `${known && !cam ? (light ? (x.open ? 'encendida ' : 'apagada ') : (x.open ? 'abierta ' : 'cerrada ')) + ago(x.since) + ' · ' : ''}último mensaje ${ago(x.last_ts)} ${bat ? '· ' : ''}${bat}`;
+  const i = x.info || {};
+  const cloud = x.cloud === false ? '<br><span style="color:var(--warn)">Sin permiso en la nube de Tuya: no se puede leer ni controlar desde aquí</span>' : (i.update_time ? `<br>Nube: último dato ${ago(i.update_time)}${i.active_time ? ' · activado ' + new Date(i.active_time * 1000).toLocaleDateString('es-MX', {day: '2-digit', month: 'short', year: '2-digit'}) : ''}${i.ip ? ' · IP de salida ' + esc(i.ip) : ''}` : '');
+  const kids = (x.children && x.children.length) ? `<div class="kids">${x.children.slice().sort((a, b) => (b.online - a.online) || String(a.name).localeCompare(String(b.name))).map(k => `<div class="kid ${k.online ? 'on' : ''}"><i></i><span>${esc(k.name)} <span class="muted">· ${esc(({kg: 'interruptor', mcs: 'sensor', dj: 'foco'})[k.category] || k.category || '')}</span></span><span class="when">${k.online ? 'en línea' : 'sin conexión'} · visto ${ago(k.update_time)}</span></div>`).join('')}</div><div class="seen">${x.children.filter(k => k.online).length} de ${x.children.length} hijos en línea</div>` : (x.type === 'gateway' && x.cloud !== false ? '<br><span class="muted">La nube no devuelve sus equipos hijos</span>' : '');
+  return `${known && !cam ? (light ? (x.open ? 'encendida ' : 'apagada ') : (x.open ? 'abierta ' : 'cerrada ')) + ago(x.since) + ' · ' : ''}último mensaje ${ago(x.last_ts)} ${bat ? '· ' : ''}${bat}${cloud}${kids}`;
 }
 // Actualiza una tarjeta existente sin rehacerla: asi las palancas se mueven con animacion en vez de reaparecer
 function patchCard(el, x){
@@ -234,6 +243,9 @@ async function tick(){
     const d = await (await fetch('/api/iot/devices')).json();
     const s = d.status || {};
     $('#st').className = 'b ' + (s.connected ? 'ok' : 'bad'); $('#st').textContent = s.connected ? 'MQTT conectado' : ('MQTT: ' + (s.error || 'sin conexión'));
+    const on = d.devices.filter(x => x.online === true || (x.online == null && x.last_ts && Date.now() / 1000 - x.last_ts < 7200 && x.cloud !== false)).length;
+    const off = d.devices.filter(x => x.online === false).length, nop = d.devices.filter(x => x.cloud === false).length;
+    $('#sumbar').innerHTML = `<span class="b ok">${on} conectados</span><span class="b bad">${off} desconectados</span>${nop ? `<span class="b warn">${nop} sin permiso en la nube</span>` : ''}<span class="b">${d.devices.length} en total</span>`;
     const sec = (t, f) => { const l = d.devices.filter(f); return l.length ? `<h3 class="sech">${t} <span class="muted" style="font-weight:400">${l.length}</span></h3><div class="sgrid">${l.map(card).join('')}</div>` : ''; };
     const GW = ['gateway', 'panel', 'alarm'];
     const sig = d.devices.map(x => x.device_id + x.type + (x.gangs || '') + (x.gang_names || []).join(',')).join('|');
@@ -283,7 +295,8 @@ async function sendGang(g){
     setTimeout(tick, 3500);
   } catch (er) {
     g.classList.remove('on', 'off'); g.classList.add(wasOn ? 'on' : 'off'); g.setAttribute('aria-checked', String(wasOn)); g.dataset.v = String(!wasOn);   // vuelve a como estaba
-    msg.textContent = 'No se pudo: ' + (er.message || 'servicio de control no disponible');
+    const m = String(er.message || '');
+    msg.textContent = /pool quota/i.test(m) ? 'Tuya rechazó la orden: el proyecto de la nube ya alcanzó su cupo de equipos controlables y este no entró. Se puede leer, pero no controlar desde aquí.' : 'No se pudo: ' + (m || 'servicio de control no disponible');
   }
   setTimeout(() => g.classList.remove('busy'), 1200);
 }

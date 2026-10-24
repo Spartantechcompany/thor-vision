@@ -30,7 +30,31 @@ devices:
   eb506cdc6a1492ce168s5e: {type: foco, name: "Foco pizarron",      kind: light, cam: null}
   ebf14527f611754f07vckk: {type: foco, name: "Foco televisor 2",   kind: light, cam: null}
   eb89e49ed3a132abcchbsj: {type: enchufe, name: "Arbol de Navidad",   kind: light, cam: null}
-  ebcbbdf4e2c9da083f2snj: {type: cortina, name: "Cortina S.J derecho", kind: curtain, cam: null}
+  ebcbbdf4e2c9da083f2snj: {type: cortina, name: "Cortina S.J derecho", kind: curtain, cam: null, cloud: false}   # sin permiso en la nube
+# Resto del inventario de la cuenta (devices.json, 50 equipos): interruptores y focos que no tenian ficha. cam solo donde el nombre lo dice.
+  ebd1231cac05b8bef7sol8: {type: interruptor, gangs: 2, name: "Co Working",                kind: light, cam: null, cams: [cam-cowork]}
+  ebf612ece9218f73a3inp6: {type: interruptor, gangs: 2, name: "SW coworking",              kind: light, cam: null, cams: [cam-cowork]}
+  eb3e525b86838408bd08ck: {type: interruptor, gangs: 2, name: "Sala Co Work",              kind: light, cam: null, cams: [cam-cowork]}
+  eb0d153e46c582b9c6bqtb: {type: interruptor, gangs: 2, name: "Interruptor tactil area de cowork", kind: light, cam: null, cams: [cam-cowork]}
+  ebc09edc8ea0a31c58phg1: {type: interruptor, gangs: 2, name: "Sala de Juntas",           kind: light, cam: null, cams: [cam-sala-juntas]}
+  ebc2572ec2a0b269e7z2mu: {type: interruptor, gangs: 1, name: "Oficina abraham",           kind: light, cam: null}
+  eb2ad9cd2cbb6477a8wtwc: {type: interruptor, gangs: 2, name: "Oficina administracion",    kind: light, cam: null}
+  eb55e5a044af020e37sgul: {type: interruptor, gangs: 1, name: "Podcast",                   kind: light, cam: null}
+  eb3b36fc46d264b8aaqvok: {type: interruptor, gangs: 1, name: "Pasillo 2piso",             kind: light, cam: null}
+  eb7e3c2280f2c82e8efwje: {type: interruptor, gangs: 1, name: "Pasillo Entrada",           kind: light, cam: null}
+  eb6af9d6b3fd32d100f7qn: {type: interruptor, gangs: 1, name: "Barra",                     kind: light, cam: null}
+  ebe123497bad8efc20dzot: {type: interruptor, gangs: 2, name: "Ahuehuete",                 kind: light, cam: null}
+  eb84071c764de5f5ecxscg: {type: interruptor, gangs: 2, name: "Ceiba",                     kind: light, cam: null}
+  ebbe976616b1588154gj6k: {type: interruptor, gangs: 1, name: "ceiba (1 boton)",           kind: light, cam: null}
+  ebc64fdff9d5971abeztfv: {type: interruptor, gangs: 2, name: "Encino",                    kind: light, cam: null}
+  eb269855472ea6a7302eco: {type: interruptor, gangs: 2, name: "Sabila",                    kind: light, cam: null}
+  eb5e5d997cfdc737aaawzm: {type: interruptor, gangs: 1, name: "Escalera Piso 1",           kind: light, cam: null, cloud: false}   # la nube del proyecto no tiene permiso sobre este equipo
+  eb4279cc5d4926b265whj2: {type: interruptor, gangs: 3, name: "Garage Entrada (anterior)", kind: light, cam: null, cloud: false}   # sustituido por Garage Switch; sin permiso en la nube
+  eb38c39786db62fcf7hhb4: {type: foco, name: "Administracion 1",   kind: light, cam: null}
+  eba03b28a2b533e42bqbk9: {type: foco, name: "Foco Televisor",     kind: light, cam: null}
+  eb0df8bc26b9aab5ceqbjh: {type: foco, name: "Foco pizarron 4",    kind: light, cam: null}
+  ebc4106ab18bcdebbcpp4w: {type: foco, name: "Garaje 1",           kind: light, cam: null}
+  eb1f20509a53c4f8fbcvkx: {type: foco, name: "Garaje 2",           kind: light, cam: null}
 # Puertas de enlace y otros equipos Tuya (solo se muestran; el estado en linea sale de la nube cada 10 min)
   eba79e7bdb4f7a75be0rmj: {type: gateway, name: "Gateway Site", kind: gateway, cam: null, role: "Puerta de enlace Zigbee cableada: de ella dependen los sensores de puertas y ventanas"}
   eb3224a86b884ecc07hcls: {type: gateway, name: "Gateway 2do Piso", kind: gateway, cam: null, cloud: false, role: "Puerta de enlace Zigbee del segundo piso (el proyecto de la nube no tiene permiso sobre este equipo)"}

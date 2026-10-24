@@ -93,6 +93,10 @@ class IotListener:
         if dev is not None and not changes and "online" in msg:         # gateways y equipos sin sensores: solo informan si estan en linea (sincronizacion de la nube)
             st0 = self.state.setdefault(dev_id, {"open": None, "since": None, "battery": None, "last_ts": None})
             st0["online"], st0["last_ts"] = bool(msg["online"]), float(msg.get("ts") or time.time())
+            if msg.get("info"):
+                st0["info"] = msg["info"]
+            if msg.get("children") is not None:
+                st0["children"] = msg["children"]
             return
         if dev is None or not changes:
             return
@@ -102,6 +106,10 @@ class IotListener:
         st["last_ts"] = ts
         if "online" in msg:
             st["online"] = bool(msg["online"])
+        if msg.get("info"):
+            st["info"] = msg["info"]                          # lo que la nube sabe del equipo: ultimo dato, activacion, IP de salida
+        if msg.get("children") is not None:
+            st["children"] = msg["children"]                  # puerta de enlace: sus equipos hijos y si estan en linea
         retained = retained or msg.get("source") == "cloud-sync"      # el puente publica el estado de la nube cada 10 min: se registra como sincronizacion, nunca como evento ni alerta
         source = "sync" if retained else "event"
         for code, value in changes.items():
@@ -440,7 +448,8 @@ class IotListener:
                         "cam_name": self.cam_names.get(dev.get("cam") or "", None), "confirmed": bool(dev.get("confirmed")),
                         "open": st.get("open"), "since": st.get("since"), "battery": st.get("battery"), "last_ts": st.get("last_ts"), "online": st.get("online"),
                         "alias": dev.get("alias"), "role": dev.get("role"), "switches": st.get("sw"), "percent": st.get("percent"),
-                        "type": dev.get("type"), "gangs": dev.get("gangs"), "gang_names": dev.get("gang_names"),
+                        "type": dev.get("type"), "gangs": dev.get("gangs"), "gang_names": dev.get("gang_names"), "cloud": dev.get("cloud", True),
+                        "info": st.get("info"), "children": st.get("children"),
                         "related": [{"id": c, "name": self.cam_names.get(c) or (self.devices_by_alias.get(c) or c)} for c in (dev.get("related") or [])]})
         return out
 

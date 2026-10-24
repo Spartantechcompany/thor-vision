@@ -1,5 +1,23 @@
 [
   {
+    "version": "2.44.1",
+    "date": "2026-10-24",
+    "name": "Todo el inventario de Tuya",
+    "summary": "La página IoT mostraba 29 de los 50 equipos de la cuenta: faltaban 21 (todos los interruptores de coworking, Sala de Juntas, Oficina, Podcast, pasillos y jardín, y cinco focos), ahora están todos, con su número real de botones. Arriba hay un resumen de conectados, desconectados y sin permiso. El Gateway Site lista sus equipos hijos con su estado y cuándo se vio cada uno; cada tarjeta muestra lo que sabe la nube (último dato, fecha de activación, IP de salida). Los equipos sin permiso en la nube (Garage Entrada anterior, Escalera Piso 1, cortina, Gateway 2do Piso) quedan marcados y sin control. El rechazo 'controllable device pool quota is insufficient' de Tuya se explica en español. El puente publica info y children en cada sincronización.",
+    "highlights": [
+      {
+        "area": "IoT",
+        "title": "52 equipos en iot.yml",
+        "text": "23 interruptores, 13 focos, 5 sensores, 4 cámaras, gateways, panel, alarma, cortina, enchufe, abre-garage."
+      },
+      {
+        "area": "IoT",
+        "title": "Hijos del gateway",
+        "text": "tuya_bridge: /v1.0/devices/{gw}/sub-devices; listener: children e info; página: lista con estado y último dato."
+      }
+    ]
+  },
+  {
     "version": "2.44.0",
     "date": "2026-10-24",
     "name": "IoT en 3D: cada apagador es una palanca",
