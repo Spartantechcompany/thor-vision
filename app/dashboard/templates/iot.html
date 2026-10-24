@@ -24,6 +24,39 @@ h3{margin:22px 0 8px;font-size:14px}.box{background:var(--panel);border:1px soli
 .chips{display:flex;flex-wrap:wrap;gap:6px}.chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 9px;color:var(--text);text-decoration:none}a.chip:hover{border-color:var(--accent)}
 .bat{display:inline-flex;align-items:center;gap:5px;font-size:12px}.bat i{display:inline-block;width:22px;height:10px;border:1.5px solid currentColor;border-radius:3px;position:relative}.bat i:after{content:"";position:absolute;left:1px;top:1px;bottom:1px;width:var(--p);background:currentColor;border-radius:1px}
 .ctl{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.ctl button{min-height:36px;padding:6px 12px;border-radius:8px;border:1px solid var(--line,#394057);background:transparent;color:inherit;cursor:pointer}.ctl button.on{border-color:var(--warn);color:var(--warn)}.ctl button:disabled{opacity:.5}
+
+/* ── controles 3D en SVG (interruptores, focos, enchufes) ── */
+.dev3d{display:flex;justify-content:center;align-items:flex-end;padding:6px 0 2px;perspective:520px;min-height:112px}
+.dev3d svg{display:block;overflow:visible;filter:drop-shadow(0 12px 12px rgba(0,0,0,.55));transition:transform .35s cubic-bezier(.2,.8,.2,1),filter .35s;transform-origin:50% 90%}
+.sc:hover .dev3d svg{transform:translateY(-3px) rotateX(7deg);filter:drop-shadow(0 18px 16px rgba(0,0,0,.6))}
+.dev3d svg text{font:600 8.5px system-ui,-apple-system,sans-serif;fill:#8b949e;text-anchor:middle;pointer-events:none}
+.dev3d .gang{cursor:pointer;outline:none}.dev3d .gang.dis{cursor:not-allowed;opacity:.45}
+.dev3d .gang:focus-visible .well{stroke:var(--accent);stroke-width:2}
+.dev3d .gang:hover:not(.dis) .rk-hi{filter:brightness(1.12)}
+.dev3d .gang.busy{opacity:.7}
+.dev3d .rk-top,.dev3d .rk-bot{transform-box:fill-box;transition:transform .22s cubic-bezier(.3,1.5,.5,1)}
+.dev3d .rk-top{transform-origin:50% 100%}.dev3d .rk-bot{transform-origin:50% 0}
+.dev3d .gang.on .rk-top{transform:scaleY(1.12)}.dev3d .gang.on .rk-bot{transform:scaleY(.84)}
+.dev3d .gang.off .rk-top{transform:scaleY(.84)}.dev3d .gang.off .rk-bot{transform:scaleY(1.12)}
+.dev3d .hi{opacity:0;transition:opacity .22s}.dev3d .gang.on .rk-top .hi{opacity:1}.dev3d .gang.off .rk-bot .hi{opacity:1}
+.dev3d .led{fill:#3a4254;transition:fill .25s}.dev3d .gang.on .led{fill:#8fe000;filter:drop-shadow(0 0 4px #76B900);animation:ledp 2.4s ease-in-out infinite}
+@keyframes ledp{0%,100%{opacity:.85}50%{opacity:1}}
+.dev3d .sheen{animation:sheen 7s ease-in-out infinite}
+@keyframes sheen{0%,62%{transform:translateX(-130%) skewX(-18deg)}100%{transform:translateX(160%) skewX(-18deg)}}
+/* foco */
+.dev3d .glow{opacity:0;transition:opacity .35s}.dev3d .gang.on .glow{opacity:1;animation:glowp 3s ease-in-out infinite}
+@keyframes glowp{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+.dev3d .glow{transform-box:fill-box;transform-origin:center}
+.dev3d .glass-on{opacity:0;transition:opacity .35s}.dev3d .gang.on .glass-on{opacity:1}
+.dev3d .rays{opacity:0;transition:opacity .35s;transform-box:fill-box;transform-origin:center}.dev3d .gang.on .rays{opacity:.9;animation:rays 9s linear infinite}
+@keyframes rays{to{transform:rotate(360deg)}}
+.dev3d .fil{stroke:#6b7385;transition:stroke .3s}.dev3d .gang.on .fil{stroke:#fff6c8;filter:drop-shadow(0 0 3px #ffd34d)}
+/* enchufe: boton de encendido con domo */
+.dev3d .ring-on{opacity:0;transition:opacity .3s}.dev3d .gang.on .ring-on{opacity:1;animation:glowp 2.6s ease-in-out infinite}
+.dev3d .pw{stroke:#7b8497;transition:stroke .3s}.dev3d .gang.on .pw{stroke:#b6ff3a;filter:drop-shadow(0 0 3px #76B900)}
+.dev3d .dome{transition:transform .2s;transform-box:fill-box;transform-origin:center}.dev3d .gang:active .dome{transform:scale(.94)}
+.sc .stt small{font-size:12px;font-weight:600;color:var(--muted);margin-left:4px}
+@media (prefers-reduced-motion:reduce){.dev3d svg,.dev3d *{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
@@ -77,28 +110,125 @@ const iconFor = (x, open) => {
   return ICON[x.type] || ICON[x.kind + (open ? '_open' : '')] || ICON.door;
 };
 const ago = ts => { if (!ts) return '—'; const s = Date.now() / 1000 - ts; return s < 90 ? 'ahora' : s < 3600 ? 'hace ' + Math.round(s / 60) + ' min' : s < 86400 ? 'hace ' + Math.round(s / 3600) + ' h' : 'hace ' + Math.round(s / 86400) + ' d'; };
+let _gid = 0;
+const sw3d = x => Array.from({length: Math.max(1, Math.min(4, +x.gangs || 1))}, (_, i) => `switch_${i + 1}`);
+const gangState = (x, c) => { const sw = x.switches || {}; return (c in sw) ? (sw[c] ? 'on' : 'off') : 'unk'; };
+const gangDis = x => x.online === false;
+// Placa de pared con una palanca por boton fisico: cada palanca es un apagador distinto y se toca directamente
+function plateSvg(x){
+  const codes = sw3d(x), n = codes.length, id = 'p' + (++_gid), gw = 46, gap = 6, pad = 14, W = pad * 2 + n * gw + (n - 1) * gap, H = 128;
+  const names = x.gang_names || [];
+  const gangs = codes.map((c, i) => {
+    const gx = pad + i * (gw + gap), st = gangState(x, c), nm = String(names[i] || (n > 1 ? 'Botón ' + (i + 1) : '')).slice(0, 11);
+    const half = (y, cls) => `<g class="${cls}"><rect x="${gx + 4}" y="${y}" width="${gw - 8}" height="32" rx="6" fill="url(#${id}lo)"/><rect class="hi rk-hi" x="${gx + 4}" y="${y}" width="${gw - 8}" height="32" rx="6" fill="url(#${id}hi)"/></g>`;
+    return `<g class="gang ${st}${gangDis(x) ? ' dis' : ''}" role="switch" tabindex="0" aria-label="${esc(x.name)} ${esc(nm || 'botón')}" aria-checked="${st === 'on'}" data-d="${esc(x.device_id)}" data-c="${c}" data-v="${st !== 'on'}">
+      <rect class="well" x="${gx}" y="16" width="${gw}" height="72" rx="9" fill="url(#${id}well)" stroke="#07090d" stroke-width="1.5"/>
+      <rect x="${gx + 1}" y="17" width="${gw - 2}" height="70" rx="8" fill="none" stroke="rgba(255,255,255,.07)"/>
+      ${half(20, 'rk-top')}${half(52, 'rk-bot')}
+      <rect x="${gx + 6}" y="51" width="${gw - 12}" height="2" rx="1" fill="rgba(0,0,0,.45)"/>
+      <circle class="led" cx="${gx + gw / 2}" cy="99" r="3.2"/>
+      <text x="${gx + gw / 2}" y="119">${esc(nm)}</text></g>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="${Math.min(240, W * 1.35)}" role="group" aria-label="${esc(x.name)}">
+    <defs>
+      <linearGradient id="${id}plate" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a4357"/><stop offset=".5" stop-color="#252c3b"/><stop offset="1" stop-color="#171c27"/></linearGradient>
+      <linearGradient id="${id}well" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#05070a"/><stop offset="1" stop-color="#1c2230"/></linearGradient>
+      <linearGradient id="${id}hi" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7f9fc"/><stop offset="1" stop-color="#b9c2d0"/></linearGradient>
+      <linearGradient id="${id}lo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b6578"/><stop offset="1" stop-color="#2f3646"/></linearGradient>
+      <linearGradient id="${id}sh" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".16"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+      <clipPath id="${id}cp"><rect x="2" y="2" width="${W - 4}" height="106" rx="14"/></clipPath>
+    </defs>
+    <rect x="2" y="2" width="${W - 4}" height="106" rx="14" fill="url(#${id}plate)" stroke="rgba(255,255,255,.22)"/>
+    <rect x="5" y="5" width="${W - 10}" height="100" rx="11" fill="none" stroke="rgba(0,0,0,.45)"/>
+    <g clip-path="url(#${id}cp)" pointer-events="none"><rect class="sheen" x="0" y="0" width="${W * .35}" height="110" fill="url(#${id}sh)"/></g>
+    ${gangs}</svg>`;
+}
+// Foco: bulbo de vidrio con halo; se enciende tocandolo
+function bulbSvg(x){
+  const id = 'b' + (++_gid), c = sw3d({gangs: 1})[0].replace('switch_1', 'switch_led'), st = gangState(x, c);
+  return `<svg viewBox="0 0 80 104" width="92" role="group" aria-label="${esc(x.name)}">
+    <defs>
+      <radialGradient id="${id}g" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffd34d" stop-opacity=".85"/><stop offset=".6" stop-color="#ffb300" stop-opacity=".3"/><stop offset="1" stop-color="#ffb300" stop-opacity="0"/></radialGradient>
+      <radialGradient id="${id}off" cx=".38" cy=".3" r=".8"><stop offset="0" stop-color="#4a5368"/><stop offset="1" stop-color="#232937"/></radialGradient>
+      <radialGradient id="${id}on" cx=".38" cy=".3" r=".8"><stop offset="0" stop-color="#fffbe0"/><stop offset=".55" stop-color="#ffd34d"/><stop offset="1" stop-color="#ff9f1a"/></radialGradient>
+      <linearGradient id="${id}base" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4b5263"/><stop offset=".5" stop-color="#aeb6c4"/><stop offset="1" stop-color="#4b5263"/></linearGradient>
+    </defs>
+    <g class="gang ${st}${gangDis(x) ? ' dis' : ''}" role="switch" tabindex="0" aria-label="${esc(x.name)}" aria-checked="${st === 'on'}" data-d="${esc(x.device_id)}" data-c="${c}" data-v="${st !== 'on'}">
+      <circle class="glow" cx="40" cy="40" r="38" fill="url(#${id}g)"/>
+      <g class="rays" stroke="#ffd34d" stroke-width="2.4" stroke-linecap="round"><path d="M40 -2v-4M40 86v4M-2 40h-4M86 40h4M10 10l-3-3M70 70l3 3M70 10l3-3M10 70l-3 3" transform="translate(0 0)"/></g>
+      <path d="M40 8c-15 0-26 11-26 26 0 10 5 16 10 22 3 4 4 6 4 11h24c0-5 1-7 4-11 5-6 10-12 10-22C66 19 55 8 40 8z" fill="url(#${id}off)" stroke="rgba(255,255,255,.18)"/>
+      <path class="glass-on" d="M40 8c-15 0-26 11-26 26 0 10 5 16 10 22 3 4 4 6 4 11h24c0-5 1-7 4-11 5-6 10-12 10-22C66 19 55 8 40 8z" fill="url(#${id}on)"/>
+      <path d="M26 20c4-6 11-9 17-9" stroke="rgba(255,255,255,.55)" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path class="fil" d="M33 66V46l7 9 7-9v20" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="28" y="70" width="24" height="8" rx="2" fill="url(#${id}base)"/><rect x="29" y="79" width="22" height="7" rx="2" fill="url(#${id}base)"/><path d="M31 74.5h18M31 83h18" stroke="rgba(0,0,0,.35)"/><path d="M34 86h12l-2 6H36z" fill="#3a4254"/>
+    </g></svg>`;
+}
+// Enchufe: boton de encendido con domo
+function plugSvg(x){
+  const id = 'u' + (++_gid), c = 'switch_1', st = gangState(x, c);
+  return `<svg viewBox="0 0 80 86" width="88" role="group" aria-label="${esc(x.name)}">
+    <defs>
+      <radialGradient id="${id}d" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="#5a647a"/><stop offset=".6" stop-color="#2b3243"/><stop offset="1" stop-color="#171c27"/></radialGradient>
+      <linearGradient id="${id}r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8d97aa"/><stop offset="1" stop-color="#2a3142"/></linearGradient>
+      <radialGradient id="${id}g" cx=".5" cy=".5" r=".5"><stop offset=".55" stop-color="#76B900" stop-opacity=".0"/><stop offset=".8" stop-color="#8fe000" stop-opacity=".85"/><stop offset="1" stop-color="#76B900" stop-opacity="0"/></radialGradient>
+    </defs>
+    <g class="gang ${st}${gangDis(x) ? ' dis' : ''}" role="switch" tabindex="0" aria-label="${esc(x.name)}" aria-checked="${st === 'on'}" data-d="${esc(x.device_id)}" data-c="${c}" data-v="${st !== 'on'}">
+      <circle class="ring-on" cx="40" cy="40" r="39" fill="url(#${id}g)"/>
+      <circle cx="40" cy="40" r="32" fill="url(#${id}r)" stroke="rgba(255,255,255,.25)"/>
+      <g class="dome"><circle class="well" cx="40" cy="40" r="26" fill="url(#${id}d)" stroke="#07090d" stroke-width="1.5"/>
+      <path d="M27 31c4-7 13-10 22-6" stroke="rgba(255,255,255,.28)" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path class="pw" d="M40 27v13M31.5 33.5a13 13 0 1 0 17 0" fill="none" stroke-width="3.2" stroke-linecap="round"/></g>
+      <circle class="led" cx="40" cy="79" r="3"/></g></svg>`;
+}
+const GANG_TYPES = ['interruptor', 'foco', 'enchufe'];
 const ctl = (x) => {
-  if (x.kind === 'light') {
-    const sw = Object.entries(x.switches || {});
-    return `<div class="ctl">${sw.map(([c, on], i) => `<button data-d="${esc(x.device_id)}" data-c="${esc(c)}" data-v="${!on}" class="${on ? 'on' : ''}">${sw.length > 1 ? (c === 'switch_led' ? 'Foco' : 'Botón ' + c.replace('switch_', '')) + ' · ' : ''}${on ? 'Apagar' : 'Encender'}</button>`).join('') || '<span class="muted" style="font-size:12px">sin estado de la nube todavía</span>'}</div>`;
+  if (x.kind === 'light' && GANG_TYPES.includes(x.type)) {
+    const svg = x.type === 'interruptor' ? plateSvg(x) : x.type === 'foco' ? bulbSvg(x) : plugSvg(x);
+    return `<div class="dev3d">${svg}</div>`;
   }
+  if (x.kind === 'light') return '';
   if (x.kind === 'curtain') return `<div class="ctl"><button data-d="${esc(x.device_id)}" data-c="control" data-v="open">Abrir</button><button data-d="${esc(x.device_id)}" data-c="control" data-v="stop">Detener</button><button data-d="${esc(x.device_id)}" data-c="control" data-v="close">Cerrar</button></div>`;
   return '';
 };
+// Estado en palabras: un interruptor de varios botones dice cuantos estan encendidos, no "encendida/apagada" de golpe
+function sumLabel(x){
+  if (x.kind === 'light' && x.type === 'interruptor') {
+    const st = sw3d(x).map(c => gangState(x, c)), on = st.filter(v => v === 'on').length, unk = st.filter(v => v === 'unk').length;
+    if (unk === st.length) return 'Sin datos';
+    return on === 0 ? 'Todos apagados' : on === st.length ? 'Todos encendidos' : `${on} de ${st.length} encendidos`;
+  }
+  return null;
+}
 function card(x){
   const cam = x.kind === 'camera';
   const light = x.kind === 'light';
   const known = x.open !== null && x.open !== undefined;
   const info = ['gateway', 'panel', 'alarm'].includes(x.kind);          // solo informan si estan en linea
   const state = info ? (x.online === true ? 'closed' : x.online === false ? 'off' : 'nodata') : cam ? (x.last_ts ? 'closed' : 'nodata') : (x.online === false ? 'off' : (known ? (x.open ? 'open' : 'closed') : 'nodata'));
-  const label = info ? (x.online === true ? 'En línea' : x.online === false ? 'Sin conexión' : 'Sin datos (la nube no lo reporta)') : cam ? (x.last_ts ? 'Activa' : 'Sin datos') : (x.online === false ? 'Sin conexión' : (known ? (light ? (x.open ? 'ENCENDIDA' : 'Apagada') : (x.open ? 'ABIERTA' : 'Cerrada')) : 'Sin datos'));
-  const icon = iconFor(x, state === 'open');
+  const label = sumLabel(x) && x.online !== false ? sumLabel(x) : info ? (x.online === true ? 'En línea' : x.online === false ? 'Sin conexión' : 'Sin datos (la nube no lo reporta)') : cam ? (x.last_ts ? 'Activa' : 'Sin datos') : (x.online === false ? 'Sin conexión' : (known ? (light ? (x.open ? 'ENCENDIDA' : 'Apagada') : (x.open ? 'ABIERTA' : 'Cerrada')) : 'Sin datos'));
+  const icon = (light && GANG_TYPES.includes(x.type)) ? '' : iconFor(x, state === 'open');
   const bat = x.battery != null ? `<span class="bat" style="color:${x.battery <= 15 ? 'var(--bad)' : x.battery <= 30 ? 'var(--warn)' : 'var(--muted)'}"><i style="--p:${Math.max(4, Math.min(100, x.battery)) * 0.18}px"></i>${x.battery}%</span>` : '';
-  const rel = (x.related || []).map(r => /^(cam-)/.test(r.id) ? `<a class="chip" href="/camara/${esc(r.id)}" title="Abrir la vista de esta cámara">${esc(r.name)}</a>` : `<span class="chip">${esc(r.name)}</span>`).join('');
-  return `<div class="sc ${state}"><div class="top">${icon}<div><div class="nm">${esc(x.name)}</div><div class="muted" style="font-size:12px">${esc(TYPE_LABEL(x))}</div><div class="stt">${label}</div></div></div>
-    <div class="muted" style="font-size:12.5px">${known && !cam ? (light ? (x.open ? 'encendida ' : 'apagada ') : (x.open ? 'abierta ' : 'cerrada ')) + ago(x.since) + ' · ' : ''}último mensaje ${ago(x.last_ts)} ${bat ? '· ' : ''}${bat}</div>
+  return `<div class="sc ${state}" data-did="${esc(x.device_id)}"><div class="top">${icon}<div><div class="nm">${esc(x.name)}</div><div class="muted" style="font-size:12px">${esc(TYPE_LABEL(x))}</div><div class="stt">${label}</div></div></div>
+    <div class="muted sinfo" style="font-size:12.5px">${infoLine(x, known, light, cam, bat)}</div>
   ${ctl(x)}<div class="muted cmsg" style="font-size:12px"></div></div>`;
 }
+function infoLine(x, known, light, cam, bat){
+  return `${known && !cam ? (light ? (x.open ? 'encendida ' : 'apagada ') : (x.open ? 'abierta ' : 'cerrada ')) + ago(x.since) + ' · ' : ''}último mensaje ${ago(x.last_ts)} ${bat ? '· ' : ''}${bat}`;
+}
+// Actualiza una tarjeta existente sin rehacerla: asi las palancas se mueven con animacion en vez de reaparecer
+function patchCard(el, x){
+  const tmp = document.createElement('div'); tmp.innerHTML = card(x);
+  const n = tmp.firstElementChild;
+  el.className = n.className;
+  el.querySelector('.stt').textContent = n.querySelector('.stt').textContent;
+  el.querySelector('.sinfo').innerHTML = n.querySelector('.sinfo').innerHTML;
+  const have = new Map([...el.querySelectorAll('.gang')].map(g => [g.dataset.c, g]));
+  n.querySelectorAll('.gang').forEach(g => {
+    const cur = have.get(g.dataset.c); if (!cur || cur.classList.contains('busy')) return;
+    cur.setAttribute('class', g.getAttribute('class')); cur.setAttribute('aria-checked', g.getAttribute('aria-checked')); cur.dataset.v = g.dataset.v;
+  });
+}
+let _sig = '';
 async function tick(){
   try {
     const d = await (await fetch('/api/iot/devices')).json();
@@ -106,8 +236,14 @@ async function tick(){
     $('#st').className = 'b ' + (s.connected ? 'ok' : 'bad'); $('#st').textContent = s.connected ? 'MQTT conectado' : ('MQTT: ' + (s.error || 'sin conexión'));
     const sec = (t, f) => { const l = d.devices.filter(f); return l.length ? `<h3 class="sech">${t} <span class="muted" style="font-weight:400">${l.length}</span></h3><div class="sgrid">${l.map(card).join('')}</div>` : ''; };
     const GW = ['gateway', 'panel', 'alarm'];
-    $('#sensors').innerHTML = sec('Puertas de enlace y paneles', x => GW.includes(x.kind)) + sec('Cámaras Tuya', x => x.kind === 'camera') + sec('Sensores de puertas, ventanas y garage', x => ['door', 'window', 'garage'].includes(x.kind))
-      + sec('Focos', x => x.kind === 'light' && x.type === 'foco') + sec('Interruptores y enchufes', x => x.kind === 'light' && x.type !== 'foco') + sec('Cortinas', x => x.kind === 'curtain');
+    const sig = d.devices.map(x => x.device_id + x.type + (x.gangs || '') + (x.gang_names || []).join(',')).join('|');
+    if (sig !== _sig || !document.querySelector('#sensors .sc')) {          // la lista cambio: se dibuja completa
+      _sig = sig;
+      $('#sensors').innerHTML = sec('Puertas de enlace y paneles', x => GW.includes(x.kind)) + sec('Cámaras Tuya', x => x.kind === 'camera') + sec('Sensores de puertas, ventanas y garage', x => ['door', 'window', 'garage'].includes(x.kind))
+        + sec('Focos', x => x.kind === 'light' && x.type === 'foco') + sec('Interruptores y enchufes', x => x.kind === 'light' && x.type !== 'foco') + sec('Cortinas', x => x.kind === 'curtain');
+    } else {
+      d.devices.forEach(x => { const el = document.querySelector(`.sc[data-did="${CSS.escape(x.device_id)}"]`); if (el) patchCard(el, x); });
+    }
     const e = (await (await fetch('/api/iot/events?limit=40')).json()).events;
     $('#ev').innerHTML = e.length ? e.map(r => `<div class="ev"><span class="muted">${when(r.ts)}</span> · <b>${esc(r.name)}</b> · ${esc(LABEL[r.code] || r.code)}${r.value && typeof r.value === 'object' ? '' : ' = ' + esc(JSON.stringify(r.value))} <span class="muted">(${esc(r.source)})</span></div>`).join('') : 'Sin eventos todavía.';
   } catch (er) { $('#st').className = 'b bad'; $('#st').textContent = 'sin respuesta'; }
@@ -133,7 +269,27 @@ async function initVideo(){
     <img alt="" src=""><div><button data-a="snap">Captura ahora</button><button data-a="live">En vivo</button><button data-a="stop">Detener</button></div><div class="muted msg"></div></div>`).join('');
   usage(); setInterval(usage, 15000);
 }
+async function sendGang(g){
+  if (g.classList.contains('dis') || g.classList.contains('busy')) return;
+  const card = g.closest('.sc'), msg = card.querySelector('.cmsg');
+  const wasOn = g.classList.contains('on'), v = g.dataset.v === 'true';
+  g.classList.add('busy'); g.classList.remove('on', 'off', 'unk'); g.classList.add(v ? 'on' : 'off'); g.setAttribute('aria-checked', String(v)); g.dataset.v = String(!v);   // se mueve al instante
+  msg.textContent = 'Enviando…';
+  try {
+    const r = await fetch(SVC + '/control/' + g.dataset.d, {method: 'POST', body: JSON.stringify({code: g.dataset.c, value: v})});
+    const j = await r.json();
+    if (j.ok) { msg.textContent = 'Enviado'; setTimeout(() => { if (msg.textContent === 'Enviado') msg.textContent = ''; }, 4000); }
+    else throw new Error(j.result || 'rechazado');
+    setTimeout(tick, 3500);
+  } catch (er) {
+    g.classList.remove('on', 'off'); g.classList.add(wasOn ? 'on' : 'off'); g.setAttribute('aria-checked', String(wasOn)); g.dataset.v = String(!wasOn);   // vuelve a como estaba
+    msg.textContent = 'No se pudo: ' + (er.message || 'servicio de control no disponible');
+  }
+  setTimeout(() => g.classList.remove('busy'), 1200);
+}
+document.addEventListener('keydown', e => { const g = e.target.closest && e.target.closest('.gang'); if (g && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); sendGang(g); } });
 document.addEventListener('click', async e => {
+  const gg = e.target.closest('.gang'); if (gg) { sendGang(gg); return; }
   const cb = e.target.closest('.ctl button');
   if (cb) {
     const msg = cb.closest('.sc').querySelector('.cmsg'); cb.disabled = true; msg.textContent = 'Enviando…';

@@ -2,6 +2,13 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.44.0 — IoT en 3D: cada apagador es una palanca (2026-10-24)
+
+La página IoT dibuja cada interruptor como una placa de pared en SVG con una palanca por botón físico: tres apagadores son tres palancas independientes que se tocan directamente, sin botones de texto, y el estado dice cuántos están encendidos ('1 de 3 encendidos'). Los focos son un bulbo con halo y los enchufes un botón con domo, con brillo, sombra y animación suave (se respeta 'reducir movimiento'). Las palancas se mueven con animación al cambiar el estado en vez de redibujarse cada 5 s, responden al teclado y vuelven a su lugar si la orden falla. Inventario de Tuya al día: 5 focos nuevos (Podcast 1, 2 y 3, pizarrón y televisor 2) y 'Garage Switch' reemplaza al 'Garage Entrada' viejo, que ya no tiene permiso en la nube. El puente relee iot.yml en cada sincronización, así que un dispositivo nuevo entra sin reiniciarlo. Opcional: gang_names en iot.yml pone nombre a cada botón.
+
+- **IoT · Placas 3D con palanca por botón**: plateSvg/bulbSvg/plugSvg en iot.html; sendGang con actualización optimista y reversa; patchCard actualiza sin rehacer.
+- **IoT · Inventario al día**: 29 dispositivos en iot.yml (8 focos, 5 interruptores); tuya_bridge.cloud_sync relee la lista en cada ciclo.
+
 ## v2.43.1 — Línea de tiempo y visor más claros (2026-10-22)
 
 Los botones de la línea de tiempo muestran 'Cargando…' al instante y un clic nuevo cancela la carga anterior (con 24 h o más cada cambio tardaba 2-3 s sin ninguna señal y se sentía muerto). El visor de alertas atenúa la imagen mientras carga, avisa si no llegó y reintenta una vez. Las páginas HTML llevan Cache-Control: no-cache para que Safari no conserve copias viejas. Probado en Chromium y WebKit (el motor de Safari): botones, imágenes de capturas y de visitas.

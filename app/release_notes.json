@@ -1,5 +1,23 @@
 [
   {
+    "version": "2.44.0",
+    "date": "2026-10-24",
+    "name": "IoT en 3D: cada apagador es una palanca",
+    "summary": "La página IoT dibuja cada interruptor como una placa de pared en SVG con una palanca por botón físico: tres apagadores son tres palancas independientes que se tocan directamente, sin botones de texto, y el estado dice cuántos están encendidos ('1 de 3 encendidos'). Los focos son un bulbo con halo y los enchufes un botón con domo, con brillo, sombra y animación suave (se respeta 'reducir movimiento'). Las palancas se mueven con animación al cambiar el estado en vez de redibujarse cada 5 s, responden al teclado y vuelven a su lugar si la orden falla. Inventario de Tuya al día: 5 focos nuevos (Podcast 1, 2 y 3, pizarrón y televisor 2) y 'Garage Switch' reemplaza al 'Garage Entrada' viejo, que ya no tiene permiso en la nube. El puente relee iot.yml en cada sincronización, así que un dispositivo nuevo entra sin reiniciarlo. Opcional: gang_names en iot.yml pone nombre a cada botón.",
+    "highlights": [
+      {
+        "area": "IoT",
+        "title": "Placas 3D con palanca por botón",
+        "text": "plateSvg/bulbSvg/plugSvg en iot.html; sendGang con actualización optimista y reversa; patchCard actualiza sin rehacer."
+      },
+      {
+        "area": "IoT",
+        "title": "Inventario al día",
+        "text": "29 dispositivos en iot.yml (8 focos, 5 interruptores); tuya_bridge.cloud_sync relee la lista en cada ciclo."
+      }
+    ]
+  },
+  {
     "version": "2.43.1",
     "date": "2026-10-22",
     "name": "Línea de tiempo y visor más claros",
