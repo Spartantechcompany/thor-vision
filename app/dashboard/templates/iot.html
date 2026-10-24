@@ -392,7 +392,7 @@ async function initVideo(){
   $('#cams').innerHTML = d.devices.filter(x => x.kind === 'camera').map(x => `<div class="cam" data-id="${esc(x.device_id)}"><b>${esc(x.name)}</b>
     <img alt="" src=""><div><button data-a="snap">Captura ahora</button><button data-a="live">En vivo</button><button data-a="stop">Detener</button></div><div class="muted msg"></div></div>`).join('');
   usage(); setInterval(usage, 15000);
-  setTimeout(() => { fillWho(); schedLoad(); lanPoll(); }, 1500); setInterval(schedLoad, 30000); setInterval(lanPoll, 90000);
+  setTimeout(() => { fillWho(); schedLoad(); lanPoll(); }, 1500); setInterval(schedLoad, 30000); setInterval(lanPoll, 600000);
 }
 async function sendGang(g){
   if (g.classList.contains('dis') || g.classList.contains('busy')) return;
