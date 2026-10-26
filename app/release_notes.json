@@ -1,5 +1,349 @@
 [
   {
+    "version": "2.45.0",
+    "date": "2026-10-24",
+    "name": "Focos por red local, horarios y casas separadas",
+    "summary": "La página IoT es solo de la casa Patricio 10: los equipos de Coworking540 (Ahuehuete, Barra, Ceiba, Encino, Sabila, Co Working, Pasillo Entrada, Security Camera...) se sacaron y nunca entran en los controles de grupo ni en los horarios. Los equipos con más de 90 días desconectados van a una sección 'Retirados' al final y no cuentan como fallas. Nuevo panel de focos: brillo, color y blanco (cálido/neutro/frío) de todos los focos a la vez o de cada uno, y horarios (hora, días, focos, color o brillo) que se guardan en el servicio de control y se pueden probar al momento. Todo va por la red local porque el proyecto de la nube de Tuya agotó su cupo de equipos controlables. Las direcciones de los focos salen de la lista de clientes del UDM.",
+    "highlights": [
+      {
+        "area": "IoT",
+        "title": "Retirados",
+        "text": "isRetired: desconectado y sin datos de la nube hace más de 90 días, o retired: true en iot.yml."
+      },
+      {
+        "area": "IoT",
+        "title": "Control local y horarios",
+        "text": "lan_bulbs.py + video_service.py (oapc-devops): /bulbs, /schedules; solo focos listados en iot.yml."
+      }
+    ]
+  },
+  {
+    "version": "2.44.1",
+    "date": "2026-10-24",
+    "name": "Todo el inventario de Tuya",
+    "summary": "La página IoT mostraba 29 de los 50 equipos de la cuenta: faltaban 21 (todos los interruptores de coworking, Sala de Juntas, Oficina, Podcast, pasillos y jardín, y cinco focos), ahora están todos, con su número real de botones. Arriba hay un resumen de conectados, desconectados y sin permiso. El Gateway Site lista sus equipos hijos con su estado y cuándo se vio cada uno; cada tarjeta muestra lo que sabe la nube (último dato, fecha de activación, IP de salida). Los equipos sin permiso en la nube (Garage Entrada anterior, Escalera Piso 1, cortina, Gateway 2do Piso) quedan marcados y sin control. El rechazo 'controllable device pool quota is insufficient' de Tuya se explica en español. El puente publica info y children en cada sincronización.",
+    "highlights": [
+      {
+        "area": "IoT",
+        "title": "52 equipos en iot.yml",
+        "text": "23 interruptores, 13 focos, 5 sensores, 4 cámaras, gateways, panel, alarma, cortina, enchufe, abre-garage."
+      },
+      {
+        "area": "IoT",
+        "title": "Hijos del gateway",
+        "text": "tuya_bridge: /v1.0/devices/{gw}/sub-devices; listener: children e info; página: lista con estado y último dato."
+      }
+    ]
+  },
+  {
+    "version": "2.44.0",
+    "date": "2026-10-24",
+    "name": "IoT en 3D: cada apagador es una palanca",
+    "summary": "La página IoT dibuja cada interruptor como una placa de pared en SVG con una palanca por botón físico: tres apagadores son tres palancas independientes que se tocan directamente, sin botones de texto, y el estado dice cuántos están encendidos ('1 de 3 encendidos'). Los focos son un bulbo con halo y los enchufes un botón con domo, con brillo, sombra y animación suave (se respeta 'reducir movimiento'). Las palancas se mueven con animación al cambiar el estado en vez de redibujarse cada 5 s, responden al teclado y vuelven a su lugar si la orden falla. Inventario de Tuya al día: 5 focos nuevos (Podcast 1, 2 y 3, pizarrón y televisor 2) y 'Garage Switch' reemplaza al 'Garage Entrada' viejo, que ya no tiene permiso en la nube. El puente relee iot.yml en cada sincronización, así que un dispositivo nuevo entra sin reiniciarlo. Opcional: gang_names en iot.yml pone nombre a cada botón.",
+    "highlights": [
+      {
+        "area": "IoT",
+        "title": "Placas 3D con palanca por botón",
+        "text": "plateSvg/bulbSvg/plugSvg en iot.html; sendGang con actualización optimista y reversa; patchCard actualiza sin rehacer."
+      },
+      {
+        "area": "IoT",
+        "title": "Inventario al día",
+        "text": "29 dispositivos en iot.yml (8 focos, 5 interruptores); tuya_bridge.cloud_sync relee la lista en cada ciclo."
+      }
+    ]
+  },
+  {
+    "version": "2.43.1",
+    "date": "2026-10-22",
+    "name": "Línea de tiempo y visor más claros",
+    "summary": "Los botones de la línea de tiempo muestran 'Cargando…' al instante y un clic nuevo cancela la carga anterior (con 24 h o más cada cambio tardaba 2-3 s sin ninguna señal y se sentía muerto). El visor de alertas atenúa la imagen mientras carga, avisa si no llegó y reintenta una vez. Las páginas HTML llevan Cache-Control: no-cache para que Safari no conserve copias viejas. Probado en Chromium y WebKit (el motor de Safari): botones, imágenes de capturas y de visitas.",
+    "highlights": [
+      {
+        "area": "Panel",
+        "title": "Cargando y reintento",
+        "text": "tlLoad con AbortController; _vaLightbox con estado de carga/error y un reintento; middleware NoCacheHTML."
+      }
+    ]
+  },
+  {
+    "version": "2.43.0",
+    "date": "2026-10-21",
+    "name": "Viajes por timbre, videoportero unido a la entrada, Clef en los recorridos, calle ligera, identidades consolidadas y resumen de cada viaje",
+    "summary": "El viaje del videoportero lo abre el timbre (evento nativo del Dahua), no cualquiera que pase: con los 22 timbrazos de la semana habrían sido 6 alertas de viaje en vez de 248. Quien sale del videoportero y aparece en Garage frontal en menos de 4 minutos queda en el mismo recorrido, así el viaje lleva la cara del videoportero. En el enlazador de recorridos el cuerpo lo juzga Clef (AUC 0.84 contra 0.67 del embedding ReID; en 42 pares con rostro confirmado, precisión 0.64 y recall 0.50, antes 0.40 y 0.14), también para unir pedazos de la misma persona en una cámara. En Exterior 1 y 2 solo quien se acerca a la puerta (o a la zona nueva \"seguimiento en calle\") abre una visita completa; el resto se cuenta por hora como transeúnte. De noche se consolidan identidades: pares de \"Persona #N\" parecidos van a Clef y se fusionan solo si Clef e InsightFace coinciden (≥ 0.85 y ≥ 0.40), una fusión por persona por noche; lo demás queda como sugerencia. Al cerrar un viaje con alerta, una sola llamada con video resume quién llegó, por dónde y qué hizo.",
+    "highlights": [
+      {
+        "area": "Viajes",
+        "title": "Disparo por timbre",
+        "text": "Disparador vto-timbre en topology.yml (entry_gap_s 300); DoorAlerts.on_ring abre el viaje."
+      },
+      {
+        "area": "Recorridos",
+        "title": "Videoportero → Garage frontal y Clef",
+        "text": "door_links, door_link_s=240, door_min_s=15; JOURNEY_CLEF, JOURNEY_CLEF_MIN_P=0.7 (3 candidatos por visita)."
+      },
+      {
+        "area": "Personas",
+        "title": "Calle ligera",
+        "text": "VISIT_STREET_LIGHT_CAMS; zona seguimiento_calle; /api/street/passersby."
+      },
+      {
+        "area": "Personas",
+        "title": "Consolidación de identidades",
+        "text": "app/vision/consolidate.py, 03:00 cada noche; POST /api/people/consolidate?dry=1. En prueba: 19 de 250 pares se fusionarían; con la regla doble, 15."
+      },
+      {
+        "area": "Viajes",
+        "title": "Resumen de la película",
+        "text": "TRIP_SUMMARY_ENABLED; la escena de cada visita del recorrido como un video de hasta 8 cuadros; queda en el evento (activity/summary) y en trips.summary."
+      }
+    ]
+  },
+  {
+    "version": "2.42.0",
+    "date": "2026-10-21",
+    "name": "Matrículas confiables, sin autos fantasma y viajes sin ruido",
+    "summary": "Matrículas: solo se dan por buenas con 2 lecturas iguales de confianza ≥ 0.7, 3 de ≥ 0.6 o una de ≥ 0.85; lo demás queda \"por confirmar\" con un botón para confirmarlo (las 7 lecturas viejas poco seguras pasaron a por confirmar). Se sigue leyendo cada 10 min mientras el auto siga ahí (antes se dejaba de intentar a los 20 min). El mismo auto se enlaza por placa, tolerando las confusiones típicas del OCR: partido en la misma cámara se fusiona, visto a la vez por Exterior 1 y 2 queda como gemelo, y si vuelve otro día se cuentan sus visitas. Estacionados: un auto solo se registra si aparece en al menos la mitad de los cuadros, y uno registrado que en 10 min aparece en menos del 15% se da por ido: eran carriles con tráfico que quedaban 'estacionados' durante horas. Viajes: un recorrido solo cuenta si pasa por la puerta o la calle, o si empieza en la cámara de entrada a lo mucho 2 min después del disparo. Reprocesando la semana, las alertas de viaje del videoportero bajan de 248 a 80: el 92% eran personas que ya estaban adentro.",
+    "highlights": [
+      {
+        "area": "Vehículos",
+        "title": "Placas por confirmar y enlazadas",
+        "text": "plates.vote/guess/similar; columnas plate_guess, plate_guess_conf, merged_into, twin_id; /api/vehicles trae plate_guess, twin_id y other_visits."
+      },
+      {
+        "area": "Vehículos",
+        "title": "Sin fantasmas de tráfico",
+        "text": "PARKED_PRESENCE_MIN=0.5, PARKED_PRESENCE_GONE=0.15 (ventana de 10 min), PLATES_SLOW_S=600."
+      },
+      {
+        "area": "Viajes",
+        "title": "Solo quien llega por la puerta",
+        "text": "TRIP_ENTRY_GAP_S=120 y la cámara de entrada de topology.yml (entry_cams): quien aparece ahí tras el timbre cuenta como entrada."
+      }
+    ]
+  },
+  {
+    "version": "2.41.0",
+    "date": "2026-10-21",
+    "name": "Prompt compacto medido",
+    "summary": "El texto fijo de cada cámara baja de ~970 a ~750 tokens (-22%, unos 13% menos por llamada): esquema JSON más corto, descripciones breves de cada código de alerta y sin frases repetidas. Se midió antes de activarlo con scripts/prompt_ab.py: las mismas imágenes y clips de las 10 cámaras con el prompt actual (dos veces, para medir cuánto varía el modelo por sí solo) y con el compacto. Sobre 40 entradas con cuadros limpios, el modelo coincide consigo mismo en 97% de personas y 100% de alertas, y el compacto en 97% y 95%; las 3 diferencias fueron casos ambiguos y en el único claro (una persona de pie en Cowork) acertó el compacto. VLM_PROMPT_COMPACT=false vuelve al texto anterior.",
+    "highlights": [
+      {
+        "area": "Modelo",
+        "title": "Prompt compacto",
+        "text": "scenes.yml: alert_catalog_short; scenes.py: SCHEMA_COMPACT y render_parts(compact=). Promedio 970 -> 752 tokens de texto; el esquema y todos los códigos de alerta se conservan (prueba)."
+      },
+      {
+        "area": "Herramientas",
+        "title": "Prueba A/B de prompts",
+        "text": "scripts/prompt_ab.py (dentro del contenedor). Usa cuadros limpios de go2rtc: /api/snapshot dibuja encima los chips de detección y el texto del último análisis, y el modelo los lee, lo que falsea la comparación."
+      }
+    ]
+  },
+  {
+    "version": "2.40.0",
+    "date": "2026-10-21",
+    "name": "Escena completa con menos llamadas",
+    "summary": "El modelo veía clips de apenas 1 a 2 segundos (30 cuadros seguidos del búfer) y el servidor solo tomaba ~4 cuadros de ellos. Ahora cada clip es la escena de los últimos 16 s en 8 cuadros a 480x270 (un cuadro cada 2 s, ~530 tokens, casi lo mismo que antes), esperando 4 s tras el inicio del movimiento para que la acción entre. Si la escena no cambió desde el último análisis (mismas personas en el mismo lugar, mismos objetos, imagen casi igual) no se llama al modelo; se vuelve a mirar a los 5 minutos. thor-vision manda como mucho 2 peticiones a la vez y, cuando el gateway contesta 503 por capacidad, abre una pausa común: la rutina espera y solo pasan las prioritarias (noche en zonas de alerta, armado, videoportero, personas en la calle). El texto fijo de cada cámara va antes del video para que el servidor lo reutilice de su caché, y la foto del heartbeat va a 640x360.",
+    "highlights": [
+      {
+        "area": "Modelo",
+        "title": "Clip de escena de 16 s",
+        "text": "VLM_SCENE_FRAMES=8, VLM_SCENE_WINDOW_S=16, VLM_SCENE_WIDTH/HEIGHT=480x270, VLM_RISE_DELAY_S=4. Medido: 8 cuadros a 480x270 = 527 tokens; 10 cuadros de 1 s = 471 (el servidor muestrea a 2 fps)."
+      },
+      {
+        "area": "Modelo",
+        "title": "Escena igual sin llamada",
+        "text": "VLM_SAME_GATE, VLM_SAME_STALE_S=300, VLM_SAME_PIX=0.06, VLM_SAME_MOVE=0.08. /api/pipeline: vlm_same_scene_1h."
+      },
+      {
+        "area": "Modelo",
+        "title": "Saturación del gateway",
+        "text": "VLM_MAX_CONCURRENCY=2; pausa 4-60 s tras un 503 de capacidad; rutina omitida (vlm_busy_skips_1h) y prioritarias con un solo reintento. /api/pipeline: gateway."
+      }
+    ]
+  },
+  {
+    "version": "2.39.0",
+    "date": "2026-10-21",
+    "name": "Caras nítidas y alertas de día sin \"persona nocturna\"",
+    "summary": "Las miniaturas de rostro ya no se agrandan: se guardan a su tamaño real (máximo 160 px) y se prefiere la captura JPEG de la cámara sobre el cuadro del video. Una cara de menos de 40 px en el cuadro original no se guarda como miniatura, y al cerrar cada visita Clef revisa si la cara se ve bien: si está barrida, borrosa o no es una cara, la visita se queda solo con el cuerpo. Cowork y Sala de Juntas vuelven a su horario: el modo de alerta total del 9 de octubre estaba fijo en la configuración y daba unas 1,200 alertas de \"persona nocturna\" de día; para alertar por toda persona está el botón de armado, y de día esa alerta ahora se llama actividad del armado. En la vista de cámara la línea de tiempo incrustada ya no pide video ni capturas de las 11 cámaras, que dejaban sin conexión a la imagen de la alerta.",
+    "highlights": [
+      {
+        "area": "Personas",
+        "title": "Miniaturas sin zoom",
+        "text": "Recorte a tamaño real (máx. 160 px); mínimo de 40 px de cara (FACE_THUMB_MIN_PX); Clef quita las miniaturas con probabilidad < 0.18 de verse bien (FACE_CLEF_MIN, 0 lo apaga). Log FACE_Q."
+      },
+      {
+        "area": "Alertas",
+        "title": "Horario normal en Cowork y Sala de Juntas",
+        "text": "Sala de Juntas: alerta de 00:00 a 06:00 entre semana y sin alerta nocturna el fin de semana; Cowork: 22:00 a 06:00. Con armado absoluto, una persona de día es actividad_armado, no persona_nocturna."
+      },
+      {
+        "area": "Cámara",
+        "title": "La captura de la alerta carga",
+        "text": "El panel incrustado (?tl=) solo corre la línea de tiempo; el visor pausa la vista en vivo mientras está abierto y avisa si la captura no carga."
+      }
+    ]
+  },
+  {
+    "version": "2.38.0",
+    "date": "2026-10-21",
+    "name": "Prompts por toma de cámara y video real otra vez",
+    "summary": "Cada cámara le dice al modelo desde dónde mira (TOMA), qué hay en cada parte del encuadre (ZONAS) y cómo se mueve normalmente la gente (FLUJO), y se le pide decir dónde ocurre algo y hacia dónde se mueve, empezando por lo más importante. El videoportero recibe su primer perfil. Con preserveVideoUrl activo en OmniRoute, los clips vuelven a mandarse como video (547 tokens contra 1009 de los cuadros en la misma prueba).",
+    "highlights": [
+      {
+        "area": "Prompts",
+        "title": "Toma, zonas y flujo",
+        "text": "config/scenes.yml: toma, zonas y flujo para las 11 cámaras, escritos a partir de sus capturas de día. Ejemplo Exterior 1: muro con la puerta peatonal a la izquierda, banqueta al centro, calle a la derecha; el mismo tramo que Exterior 2."
+      },
+      {
+        "area": "Modelo",
+        "title": "Video real",
+        "text": "VLM_VIDEO_AS_FRAMES ahora es false por defecto; true vuelve a mandar cuadros si el gateway deja de aceptar video."
+      }
+    ]
+  },
+  {
+    "version": "2.37.0",
+    "date": "2026-10-21",
+    "name": "Identidad en dos etapas: InsightFace + Clef",
+    "summary": "Con el umbral actual (0.45) InsightFace solo reconocía al 12 % de las visitas de la misma persona en otro momento, y por eso se acumulaban cientos de personas 'por revisar'. Ahora, cuando el parecido queda en la zona gris (0.25-0.45), Clef compara la cara de la visita con la mejor cara del candidato al cerrar la visita.",
+    "highlights": [
+      {
+        "area": "Identidad",
+        "title": "Reglas",
+        "text": "Clef >= 0.85: la visita pasa sola a esa persona y se borra la identidad temporal si quedó vacía. Clef 0.6-0.85: sugerencia en /identidades (pestaña Sugerencias, con el % de Clef). Nunca se mueve una visita de alguien con nombre. Todo queda en la tabla identity_checks."
+      },
+      {
+        "area": "Medición",
+        "title": "Prueba con 160 pares",
+        "text": "AUC InsightFace 0.928, Clef 0.915, combinados 0.955. En una semana de visitas: ~37 uniones automáticas (0 entre dos personas con nombre) y el caso Oswaldo/Neto (Clef 0.74) habría quedado solo como sugerencia."
+      }
+    ]
+  },
+  {
+    "version": "2.36.1",
+    "date": "2026-10-21",
+    "name": "El vigilante de cuadros ya no tumba el contenedor",
+    "summary": "El vigilante de v2.34.2 liberaba desde otro hilo la captura colgada; con FFmpeg (respaldo de cam-118) eso tumbó el proceso dos veces el 21-oct (01:16 y 01:19, sin apagado ordenado). Ahora solo libera capturas de GStreamer (seguro, probado con el videoportero) y las de FFmpeg llevan tiempos máximos propios de apertura (10 s) y lectura (8 s).",
+    "highlights": [
+      {
+        "area": "Captura",
+        "title": "Sin caídas del contenedor",
+        "text": "FFmpeg: CAP_PROP_OPEN_TIMEOUT_MSEC y CAP_PROP_READ_TIMEOUT_MSEC; la lectura colgada regresa sola y el lector reconecta."
+      },
+      {
+        "area": "Diagnóstico",
+        "title": "cam-118 y videoportero",
+        "text": "La red a cam-118 no pierde paquetes; sus fallas y el reinicio del videoportero (01:25) coinciden con la saturación de sesiones RTSP de la madrugada (TV con video en vivo, go2rtc y Thor a la vez). Con el modo ligero en TV y go2rtc como único cliente del videoportero no se han repetido."
+      }
+    ]
+  },
+  {
+    "version": "2.36.0",
+    "date": "2026-10-21",
+    "name": "Auditoría: compresión, un bug que llenaba el log, ahorro en pestañas ocultas y autochequeo",
+    "summary": "Pasada adversarial con una batería fija (scripts/audit_battery.py) medida antes y después. Se corrige el borrado del volcado de depuración que fallaba en cada llamada (45 % de los avisos del log), se comprimen páginas y JSON (el panel y la línea de tiempo pesaban 220 y 640 KB), la línea de tiempo se guarda 10 s en caché, el panel deja de consultar con la pestaña oculta y abre los videos escalonados, y hay un nuevo /api/selfcheck.",
+    "highlights": [
+      {
+        "area": "Bug",
+        "title": "Volcado de depuración",
+        "text": "Al rotar archivos intentaba borrar la carpeta 'latest' y fallaba: 4,956 de 12,150 avisos en 24 h."
+      },
+      {
+        "area": "Rendimiento",
+        "title": "Gzip selectivo",
+        "text": "Páginas y JSON comprimidos; imágenes, clips y flujos no se tocan."
+      },
+      {
+        "area": "Panel",
+        "title": "Pestaña oculta y precarga",
+        "text": "Los 13 temporizadores se saltan con la pestaña oculta y refrescan al volver; preconexión a go2rtc, prefetch de la vista de cámara al pasar el cursor, videos escalonados cada 250 ms."
+      },
+      {
+        "area": "Operación",
+        "title": "/api/selfcheck",
+        "text": "Cámaras, modelo, modo sin VLM, Clef, go2rtc, gateway de IA, Tuya, disco y eventos recientes en un solo estado ok/aviso/falla."
+      }
+    ]
+  },
+  {
+    "version": "2.35.0",
+    "date": "2026-10-21",
+    "name": "Íconos por tipo de equipo, puertas de enlace en /iot y ONVIF sin el videoportero duplicado",
+    "summary": "En /iot cada equipo Tuya muestra un ícono según lo que es (foco, interruptor de 1/2/3 botones, sensor de contacto, abre-portón, cortina, enchufe, gateway, panel, alarma) y su rótulo; se agregan las puertas de enlace Zigbee, el panel y la alarma con su estado en línea desde la nube. El videoportero deja de aparecer como 'cam-vto · 127.0.0.1:80' en la página ONVIF.",
+    "highlights": [
+      {
+        "area": "IoT",
+        "title": "Tipos e íconos",
+        "text": "config/iot.yml lleva type (y gangs en interruptores) por dispositivo; la página agrupa en Puertas de enlace, Cámaras, Sensores de puertas/ventanas/garage, Focos, Interruptores y enchufes, Cortinas."
+      },
+      {
+        "area": "IoT",
+        "title": "Gateways",
+        "text": "Gateway Site (en línea según la nube), Gateway 2do Piso (la nube no autoriza el equipo: sin datos), Panel de control P1 y Alarma Site (desconectada). El puente sincroniza su estado en línea cada 10 min."
+      },
+      {
+        "area": "ONVIF",
+        "title": "Sin duplicado del videoportero",
+        "text": "Las cámaras que Thor lee por go2rtc (127.0.0.1) ya no se listan como equipos propios: el aparato real sigue siendo el endpoint 'vto' (192.168.0.3)."
+      }
+    ]
+  },
+  {
+    "version": "2.34.4",
+    "date": "2026-10-21",
+    "name": "El video llega al modelo como cuadros",
+    "summary": "OmniRoute descarta el video_url (el modelo recibía 33 tokens y respondía 'no hay video'), por lo que los análisis de video de las cámaras trabajaban solo con el texto y el recorte. Ahora la secuencia se manda como 6 imágenes en orden cronológico a 640x360, que el gateway sí respeta (misma descripción que directo a Spark01). VLM_VIDEO_AS_FRAMES=false vuelve al video.",
+    "highlights": [
+      {
+        "area": "Modelo",
+        "title": "Secuencia como imágenes",
+        "text": "Prueba con un clip real: directo a Spark01 el video_url dio 547 tokens y descripción correcta; por el gateway 33 tokens y 'no hay video'; las mismas 8 imágenes por el gateway 1009 tokens y la misma descripción correcta."
+      }
+    ]
+  },
+  {
+    "version": "2.34.3",
+    "date": "2026-10-21",
+    "name": "Toda visita guarda al menos el cuadro completo",
+    "summary": "Las alertas de persona nocturna de Garage frontal salían sin imagen: sus visitas no generaban recorte de cuerpo ni de cara. Ahora, si una visita no tiene escena, se guarda el cuadro con el recuadro de la persona en cuanto se detecta.",
+    "highlights": [
+      {
+        "area": "Alertas",
+        "title": "Imagen garantizada",
+        "text": "En 24 h, 19 de 100 alertas persona_nocturna (modo sin VLM) y todas de cam-228 no traían captura; las demás alertas ya la traen (Tuya recuperó la suya con la clave nueva)."
+      }
+    ]
+  },
+  {
+    "version": "2.34.2",
+    "date": "2026-10-21",
+    "name": "Reconexión automática de cámaras con el video colgado",
+    "summary": "El videoportero llevaba unas 7 horas congelado en Thor y marcado como 'streaming': cap.read() se quedó bloqueado sin que nada lo detectara. Ahora un vigilante por cámara libera la captura si no llegan cuadros nuevos en 20 s (STREAM_STALL_S) y el lector reconecta solo.",
+    "highlights": [
+      {
+        "area": "Captura",
+        "title": "Vigilante de cuadros",
+        "text": "Aplica a todas las cámaras. Si la captura se libera, el log dice 'sin cuadros nuevos en N s: se fuerza la reconexion'."
+      }
+    ]
+  },
+  {
+    "version": "2.34.1",
+    "date": "2026-10-17",
+    "name": "El video en vivo se reinicia solo si se congela",
+    "summary": "Cuando una cámara se cae y go2rtc reconecta (el videoportero rechazó conexiones RTSP unos 11 minutos), el video del navegador se quedaba en el último cuadro. Un vigilante revisa cada 2.5 s si el video avanza y, si lleva 7.5 s sin avanzar, lo reinicia y vuelve a las fotos mientras reconecta.",
+    "highlights": [
+      {
+        "area": "Video",
+        "title": "Vigilante de video congelado",
+        "text": "En el panel y en /camara/<id>: currentTime sin cambios 3 revisiones seguidas dispara el reintento."
+      }
+    ]
+  },
+  {
     "version": "2.34.0",
     "date": "2026-10-13",
     "name": "Presencia WiFi por teléfono, sugerencias con Clef, encabezado en una fila y TV ligera",

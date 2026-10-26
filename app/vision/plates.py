@@ -39,8 +39,10 @@ def normalize(text: Optional[str]) -> str:
     return t if _PLATE.match(t) else ""
 
 
-def vote(reads: list, min_conf: float = 0.5, min_single: float = 0.8, min_agree: int = 2) -> Optional[tuple]:
-    """reads: [(texto, confianza)]. Devuelve (texto, confianza_media, lecturas) del ganador si es confiable, si no None."""
+def vote(reads: list, min_conf: float = 0.7, min_single: float = 0.85, min_agree: int = 2) -> Optional[tuple]:
+    """reads: [(texto, confianza)]. Devuelve (texto, confianza_media, lecturas) del ganador si es confiable, si no None.
+    Confiable: 2 lecturas iguales con media >= 0.7, 3 o mas con media >= 0.6, o una sola muy segura (>= 0.85). Lo demas queda "por confirmar"
+    (ver guess): con el umbral anterior (2 lecturas >= 0.5) entraron placas mal leidas (MB5939A por MKB543A, RAC451E por RAG051E)."""
     groups = defaultdict(list)
     for t, c in reads:
         if t:
@@ -49,9 +51,43 @@ def vote(reads: list, min_conf: float = 0.5, min_single: float = 0.8, min_agree:
         return None
     text, confs = max(groups.items(), key=lambda kv: (sum(kv[1]), len(kv[1])))
     avg = sum(confs) / len(confs)
-    if (len(confs) >= min_agree and avg >= min_conf) or (len(confs) == 1 and avg >= min_single):
+    if (len(confs) >= min_agree and avg >= min_conf) or (len(confs) >= 3 and avg >= 0.6) or (len(confs) == 1 and avg >= min_single):
         return text, round(avg, 3), len(confs)
     return None
+
+
+def guess(reads: list, min_conf: float = 0.35) -> Optional[tuple]:
+    """La mejor lectura aunque no alcance para darla por buena: (texto, confianza_media, lecturas), para mostrarla como "por confirmar"."""
+    groups = defaultdict(list)
+    for t, c in reads:
+        if t:
+            groups[t].append(float(c))
+    if not groups:
+        return None
+    text, confs = max(groups.items(), key=lambda kv: (sum(kv[1]), len(kv[1])))
+    avg = sum(confs) / len(confs)
+    return (text, round(avg, 3), len(confs)) if avg >= min_conf else None
+
+
+# Caracteres que el OCR confunde entre si en placas mexicanas (misma forma a baja resolucion)
+_CONFUSE = [set("0ODQ"), set("1IL7"), set("5S"), set("8B"), set("2Z"), set("6G"), set("CG"), set("4A"), set("MNWH"), set("UV"), set("EF"), set("PR")]
+
+
+def _close(a: str, b: str) -> bool:
+    return a == b or any(a in g and b in g for g in _CONFUSE)
+
+
+def similar(a: Optional[str], b: Optional[str]) -> bool:
+    """Misma placa con tolerancia de OCR: iguales, mismo largo con 1 caracter distinto, o (6+ caracteres) 2 distintos donde al menos uno
+    es una confusion tipica del OCR. Solo se usa para enlazar registros que ya coinciden en lugar y tiempo, asi que el riesgo es bajo."""
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    if len(a) != len(b) or len(a) < 5:
+        return False
+    diff = [(x, y) for x, y in zip(a, b) if x != y]
+    return len(diff) == 1 or (len(diff) == 2 and len(a) >= 6 and any(_close(x, y) for x, y in diff))
 
 
 def enabled() -> bool:

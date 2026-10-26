@@ -12,8 +12,27 @@ _MAX_EVENTS = 4000
 _MAX_SPAN_S = 8 * 86400
 
 
+_CACHE: dict = {}
+_CACHE_TTL_S = 10.0
+
+
 @router.get("/api/timeline")
 def timeline(request: Request, since: Optional[float] = None, until: Optional[float] = None, cam_id: Optional[str] = None):
+    """Consulta con cache de 10 s: abrir el panel en varias pantallas a la vez ya no repite la consulta de ~300 ms."""
+    now = time.time()
+    key = (round((since or 0) / 10), round((until or 0) / 10), cam_id)
+    hit = _CACHE.get(key)
+    if hit and now - hit[0] < _CACHE_TTL_S:
+        return hit[1]
+    res = _timeline(request, since, until, cam_id)
+    _CACHE[key] = (now, res)
+    if len(_CACHE) > 64:
+        for k in sorted(_CACHE, key=lambda k: _CACHE[k][0])[:32]:
+            _CACHE.pop(k, None)
+    return res
+
+
+def _timeline(request: Request, since: Optional[float], until: Optional[float], cam_id: Optional[str]):
     until = until or time.time()
     since = since or until - 86400
     since = max(since, until - _MAX_SPAN_S)

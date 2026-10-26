@@ -10,6 +10,7 @@ import numpy as np
 
 from app.capture.frame_buffer     import FrameBuffer
 from app.vision.detection_store   import DetectionStore
+from app.vision import vlm_analyzer
 from app.vision.vlm_analyzer import VLMAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,26 @@ logger = logging.getLogger(__name__)
 # — no son alertas reales, no deben disparar snapshots
 _FAKE_ALERTS = {"error", "empty response", "bad json", "encode failed",
                 "unreachable", ""}
+
+
+import os
+
+SCENE_FRAMES = int(os.environ.get("VLM_SCENE_FRAMES", "8"))          # cuadros del clip de escena (el servidor junta pares: 8 cuadros = 4 grupos)
+SCENE_WINDOW_S = float(os.environ.get("VLM_SCENE_WINDOW_S", "16"))   # segundos de escena que cubre el clip (antes ~1 s: el buffer de 30 cuadros a 10-30 fps)
+SCENE_STEP_S = float(os.environ.get("VLM_SCENE_STEP_S", "2"))        # un cuadro del anillo de escena cada tanto
+SCENE_W, SCENE_H = int(os.environ.get("VLM_SCENE_WIDTH", "480")), int(os.environ.get("VLM_SCENE_HEIGHT", "270"))   # 8 cuadros a 480x270 = ~530 tokens
+RISE_DELAY_S = float(os.environ.get("VLM_RISE_DELAY_S", "4"))        # al empezar el movimiento se espera para que la accion entre en el clip
+SAME_STALE_S = float(os.environ.get("VLM_SAME_STALE_S", "300"))      # una escena que no cambia se vuelve a mirar a lo mucho cada tanto
+SAME_PIX = float(os.environ.get("VLM_SAME_PIX", "0.06"))             # fraccion de pixeles (64x36) que cambiaron: por debajo es la misma escena
+SAME_MOVE = float(os.environ.get("VLM_SAME_MOVE", "0.08"))           # cuanto se puede mover (fraccion del cuadro) una persona y seguir siendo "la misma escena"
+SAME_GATE = os.environ.get("VLM_SAME_GATE", "true").lower() == "true"
+IDLE_W, IDLE_H = int(os.environ.get("VLM_IDLE_WIDTH", "640")), int(os.environ.get("VLM_IDLE_HEIGHT", "360"))   # foto de "sin movimiento": 235 tokens contra 895 a 1280x720
+
+
+def _fit(frame: np.ndarray, w: int, h: int) -> np.ndarray:
+    fh, fw = frame.shape[:2]
+    k = min(w / fw, h / fh, 1.0)
+    return cv2.resize(frame, (max(2, int(fw * k) // 2 * 2), max(2, int(fh * k) // 2 * 2)), interpolation=cv2.INTER_AREA) if k < 1.0 else frame
 
 
 def _summarize_objects(objects) -> dict:
@@ -119,6 +140,11 @@ class VLMWorker(threading.Thread):
         self._handled_rise     = 0.0
         self.last_info: dict   = {}
         self._call_log: deque  = deque(maxlen=3000)
+        self._ring: deque      = deque(maxlen=int(SCENE_WINDOW_S / max(0.5, SCENE_STEP_S)) + 2)   # (ts, cuadro chico) para el clip de escena
+        self._ring_t           = 0.0
+        self._last_sig         = None     # estado de la escena del ultimo analisis (personas, objetos, miniatura)
+        self.same_skips: deque = deque(maxlen=3000)
+        self.busy_skips: deque = deque(maxlen=3000)
 
     def skips_last_hour(self) -> int:
         cutoff = time.time() - 3600
@@ -133,6 +159,48 @@ class VLMWorker(threading.Thread):
         if det and det.yolo_persons > 0 and time.time() - det.yolo_ts < 8.0:
             return True
         return st["active"] and time.time() - st["since"] >= self.sustain_s
+
+    # ── Escena igual / prioridad ───────────────────────────────────────────
+
+    def _signature(self, frame: np.ndarray, det) -> dict:
+        fresh = det is not None and time.time() - det.yolo_ts < 10.0
+        fh, fw = frame.shape[:2]
+        bbs = (det.person_bboxes or []) if fresh else []
+        sx, sy = fw, fh
+        if fresh and getattr(det, "frame_wh", None):
+            sx, sy = det.frame_wh
+        return {"t": time.time(), "people": det.yolo_persons if fresh else 0,
+                "centers": sorted(((b[0] + b[2]) / 2 / max(1, sx), (b[1] + b[3]) / 2 / max(1, sy)) for b in bbs[:8]),
+                "objs": _summarize_objects(det.objects) if fresh else {},
+                "thumb": cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (64, 36), interpolation=cv2.INTER_AREA)}
+
+    def _same_scene(self, sig: dict) -> bool:
+        """Misma escena que el ultimo analisis: mismas personas en casi el mismo lugar, mismos objetos y la imagen casi igual."""
+        last = self._last_sig
+        if not SAME_GATE or last is None or sig["t"] - last["t"] > SAME_STALE_S:
+            return False
+        if sig["people"] != last["people"] or sig["objs"] != last["objs"] or len(sig["centers"]) != len(last["centers"]):
+            return False
+        for (x0, y0), (x1, y1) in zip(sig["centers"], last["centers"]):
+            if abs(x0 - x1) > SAME_MOVE or abs(y0 - y1) > SAME_MOVE:
+                return False
+        return float((cv2.absdiff(sig["thumb"], last["thumb"]) > 25).mean()) < SAME_PIX
+
+    def _high_priority(self, det) -> bool:
+        """Prioritaria si una persona aqui puede ser alerta ahora: horario nocturno de alerta (o armado), videoportero, o persona en una camara de calle."""
+        if self.cam_id == "cam-vto":
+            return True
+        sc = self.scene
+        if sc is not None and sc.night_alert():
+            return True
+        people = det.yolo_persons if det is not None and time.time() - det.yolo_ts < 10.0 else 0
+        return bool(sc is not None and sc.vehicles and people > 0)
+
+    def _feed_ring(self, frame: np.ndarray) -> None:
+        t = time.time()
+        if t - self._ring_t >= SCENE_STEP_S:
+            self._ring.append((t, _fit(frame, SCENE_W, SCENE_H)))
+            self._ring_t = t
 
     def calls_last_hour(self) -> dict:
         cutoff = time.time() - 3600
@@ -175,6 +243,7 @@ class VLMWorker(threading.Thread):
                 self._stop.wait(self.check_interval_s)
                 continue
 
+            self._feed_ring(frame)
             now     = time.monotonic()
             elapsed = now - self._last_analysis_t
 
@@ -192,7 +261,10 @@ class VLMWorker(threading.Thread):
                     reason         = "idle"
                 elif elapsed >= self.native_min_interval_s:
                     st = self.motion_source.snapshot()
-                    if st["active"] or st["last_rise_ts"] > self._handled_rise:
+                    rising = st["last_rise_ts"] > self._handled_rise
+                    if rising and time.time() - st["last_rise_ts"] < RISE_DELAY_S:
+                        pass                                    # recien empezo: se espera a que la accion entre en el clip
+                    elif st["active"] or rising:
                         if self._person_gate(st):
                             should_analyze = True
                             reason         = "cam-motion"
@@ -217,6 +289,20 @@ class VLMWorker(threading.Thread):
 
             if should_analyze:
                 detection = self.store.get(self.context_cam_id)
+                sig = self._signature(frame, detection)
+                high = self._high_priority(detection)
+                if reason != "idle" and self._same_scene(sig):
+                    # nada cambio desde el ultimo analisis: no se gasta otra llamada (se vuelve a mirar a los SAME_STALE_S)
+                    self._handled_rise = time.time()
+                    self._last_analysis_t = now
+                    self.same_skips.append(time.time())
+                    self.last_info = dict(self.last_info, skipped="igual", skipped_ts=time.time())
+                    self._stop.wait(self.check_interval_s)
+                    continue
+                if not high and vlm_analyzer.gateway_busy():
+                    self.busy_skips.append(time.time())        # gateway saturado: la rutina espera (no cuenta como analisis)
+                    self._stop.wait(self.check_interval_s)
+                    continue
                 context = None
                 if detection and time.time() - detection.yolo_ts < 10.0:
                     context = {
@@ -234,11 +320,18 @@ class VLMWorker(threading.Thread):
                 is_motion_trigger = reason.startswith("motion=") or reason == "cam-motion"
                 self._handled_rise = time.time()
                 media_kind = "frame"
-                if is_motion_trigger:
-                    result, media_kind = self._analyze_as_video(frame, context)
-                else:
-                    result = self.analyzer.analyze(frame, context, tag=self.cam_id,
-                                                   scene=self.scene)
+                with vlm_analyzer.priority(high):
+                    if is_motion_trigger:
+                        result, media_kind = self._analyze_as_video(frame, context)
+                    else:
+                        result = self.analyzer.analyze(_fit(frame, IDLE_W, IDLE_H) if reason == "idle" else frame, context,
+                                                       tag=self.cam_id, scene=self.scene)
+                if result.get("_busy_skip"):
+                    self.busy_skips.append(time.time())
+                    self._stop.wait(self.check_interval_s)
+                    continue
+                if result.get("activity") != "error":
+                    self._last_sig = sig
 
                 self.store.update_nemotron(self.cam_id, result)
                 self._last_analysis_t = now
@@ -312,6 +405,22 @@ class VLMWorker(threading.Thread):
         (fallback), para que el log de arriba sea preciso sobre qué se
         mandó de verdad, no solo qué se intentó.
         """
+        ring = [(t, f) for t, f in self._ring if time.time() - t <= SCENE_WINDOW_S]
+        if len(ring) >= 3:
+            # clip de escena completa: un cuadro cada ~SCENE_STEP_S de los ultimos SCENE_WINDOW_S, mas el actual
+            if time.time() - ring[-1][0] > 0.5:
+                ring.append((time.time(), _fit(current_frame, SCENE_W, SCENE_H)))
+            n = len(ring)
+            k = min(SCENE_FRAMES, n)
+            sel = [ring[round(i * (n - 1) / max(k - 1, 1))] for i in range(k)]
+            span = max(0.5, sel[-1][0] - sel[0][0])
+            ctx = dict(context or {})
+            ctx["_clip_s"], ctx["_clip_n"] = span, len(sel)
+            res = self.analyzer.analyze_video([f for _, f in sel], (len(sel) - 1) / span, ctx, tag=self.cam_id,
+                                              scene=self.scene, crop_frame=current_frame)
+            if context is not None and ctx.get("_has_crop"):
+                context["_has_crop"] = True
+            return res, "video"
         entries = self.buffer.get_recent_frames(self.video_window_s)
         if len(entries) < 2:
             return self.analyzer.analyze(current_frame, context, tag=self.cam_id,
