@@ -520,6 +520,12 @@ app.add_middleware(SelectiveGZip)
 from app.utils.nocache_mw import NoCacheHTML
 app.add_middleware(NoCacheHTML)
 
+# Acceso: sin sesión válida no se entra a ninguna ruta (ver docs/ACCESO.md). Se agrega al final = capa externa.
+from app.auth.guard import AuthGuard  # noqa: E402
+from app.auth.routes import router as auth_router  # noqa: E402
+app.include_router(auth_router)
+app.add_middleware(AuthGuard)
+
 app.include_router(stream_router)
 app.include_router(status_router)
 app.include_router(ws_router)
