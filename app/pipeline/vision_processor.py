@@ -275,7 +275,7 @@ class VisionModels:
                     logger.debug("Cara descartada: sin persona YOLO cerca (bbox=%s)", bbox)
                     continue
                 name, conf = face_db.recognize(face.embedding)
-                thumb = self._crop_thumb(frame, bbox, size=128, margin=0.35)
+                thumb = self._crop_thumb(frame, bbox, size=160, margin=0.35)
                 thumb_b64 = base64.b64encode(thumb).decode() if thumb else None
                 fx1, fy1 = max(0, bbox[0]), max(0, bbox[1])
                 fcrop = frame[fy1:max(fy1 + 1, bbox[3]), fx1:max(fx1 + 1, bbox[2])]
@@ -293,7 +293,7 @@ class VisionModels:
     @staticmethod
     def _crop_thumb(frame: np.ndarray, bbox: tuple, size: int = 72,
                     margin: float = 0.0) -> Optional[bytes]:
-        """Recorta el bbox de la cara y lo codifica como JPEG chico (avatar).
+        """Recorta el bbox de la cara (cuadrado, lado maximo `size`, nunca agrandado) y lo codifica como JPEG.
         No falla nunca hacia arriba — un thumb roto no debe tumbar la detección."""
         try:
             h, w = frame.shape[:2]
@@ -308,7 +308,8 @@ class VisionModels:
             crop = frame[max(0, y1):min(h, y2), max(0, x1):min(w, x2)]
             if pl or pt or pr or pb:
                 crop = cv2.copyMakeBorder(crop, pt, pb, pl, pr, cv2.BORDER_REPLICATE)
-            crop = cv2.resize(crop, (size, size), interpolation=cv2.INTER_AREA if size <= 72 else cv2.INTER_CUBIC)
+            if crop.shape[0] > size:          # solo se reduce: agrandar una cara chica solo la vuelve borrosa
+                crop = cv2.resize(crop, (size, size), interpolation=cv2.INTER_AREA)
             ok, buf = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 80 if margin else 70])
             return buf.tobytes() if ok else None
         except Exception as exc:

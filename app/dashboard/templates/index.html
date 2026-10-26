@@ -4,6 +4,24 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>THOR Vision — OXM Tech</title>
+<script>
+// Precarga y ahorro: el temporizador de consulta se salta cuando la pestaña esta oculta (TV apagada, otra pestaña) y se actualiza al volver;
+// y se abre la conexion con go2rtc antes de pedir el primer video.
+(() => {
+  const si = window.setInterval.bind(window);
+  // incrustado como linea de tiempo (?tl=, vista de camara): solo corre la linea de tiempo; sin esto las consultas del panel oculto llenaban
+  // las 6 conexiones del navegador y la captura de la alerta no cargaba
+  const TLO = window.__TLO = /[?&]tl=/.test(location.search);
+  window.setInterval = (fn, ms, ...a) => si(function(){ if (ms < 60000 && (TLO || (document.hidden && ms !== 1000))) return; return fn.apply(this, arguments); }, ms, ...a);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) return;
+    ['refreshVLM', 'refreshPipeline', '_pollDetections', 'loadTimelineEvents'].forEach(n => { try { if (typeof window[n] === 'function') window[n](); } catch (e) {} }); });
+  try { const l = document.createElement('link'); l.rel = 'preconnect'; l.href = `${location.protocol}//${location.hostname}:1984`; document.head.appendChild(l); } catch (e) {}
+  document.addEventListener('pointerover', e => {                   // precarga la vista de camara al pasar el cursor por el enlace
+    const a = e.target.closest && e.target.closest('a.cam-open'); if (!a || a.dataset.pf) return;
+    a.dataset.pf = '1'; const l = document.createElement('link'); l.rel = 'prefetch'; l.href = a.href; document.head.appendChild(l);
+  }, { passive: true });
+})();
+</script>
 <style>
 :root {
   --oxm-blue:       #76B900;       /* acento NVIDIA, antes azul OXM */
@@ -1418,6 +1436,7 @@ const GO2RTC = `${location.protocol}//${location.hostname}:1984`;
 let LIVE_ON = !LITE && (localStorage.getItem('thor_live_video') ?? '1') === '1';
 if (/[?&]video=0/.test(location.search)) LIVE_ON = false;
 if (/[?&]video=1/.test(location.search)) LIVE_ON = true;
+if (window.__TLO) LIVE_ON = false;
 const _live = {};      // camId -> { pc, on, timer }
 const HEAVY_CAMS = new Set(['cam-189', 'cam-191']);        // 2592x1944 H.264 a 30 fps
 let _heavyOk = null;
@@ -1483,6 +1502,16 @@ _onDomReady(() => {      // el menu 'Más' se coloca bajo su boton sin que lo re
   });
   document.addEventListener('click', e => { if (d.open && !d.contains(e.target)) d.open = false; });
 });
+const _vt = {};      // vigilante: camId -> { t, n }
+setInterval(() => {
+  Object.keys(_live).forEach(id => {
+    const st = _live[id], v = document.getElementById(`vid-${id}`);
+    if (!st || !st.on || !v) return;
+    const w = _vt[id] || (_vt[id] = { t: -1, n: 0 });
+    if (v.currentTime === w.t && !v.paused) { if (++w.n >= 3) { w.n = 0; liveFail(id); } } else w.n = 0;
+    w.t = v.currentTime;
+  });
+}, 2500);
 function _initLiveVideo(cameras){
   if (!document.getElementById('live-toggle')){
     const b = document.createElement('button');
@@ -1498,10 +1527,11 @@ function _initLiveVideo(cameras){
     document.getElementById('cam-grid').before(b);
     document.addEventListener('visibilitychange', () => cameras.forEach(c => (document.hidden || !LIVE_ON) ? stopLive(c.id, !document.hidden ? true : false) : startLive(c.id)));
   }
-  if (LIVE_ON) cameras.forEach(c => startLive(c.id));
+  if (LIVE_ON) cameras.forEach((c, i) => setTimeout(() => { if (LIVE_ON && !document.hidden) startLive(c.id); }, i * 250));      // escalonado: 11 negociaciones WebRTC a la vez saturan equipos modestos
 }
 
 function startSnapshotPolling(camId) {
+  if (window.__TLO) return;            // la linea de tiempo incrustada no muestra camaras
   if (_pollers[camId]) _pollers[camId].running = false;
   const state = { running: true, errors: 0 };
   _pollers[camId] = state;
@@ -2906,13 +2936,26 @@ function _tlRender(animate){
   _tlLegend();
 }
 
+let _tlAbort = null;
 async function tlLoad(){
   const [since, until] = _tlWin();
+  if (_tlAbort) { try { _tlAbort.abort(); } catch (_) {} }          // un clic nuevo cancela la carga anterior: no se acumulan
+  const ctl = _tlAbort = (typeof AbortController === 'function') ? new AbortController() : null;
+  const sum = document.getElementById('tl-sum'), plot = document.getElementById('tl-plot');
+  if (sum) sum.textContent = 'Cargando…';                           // senal inmediata: con ventanas anchas la carga y el dibujo tardan segundos
+  if (plot) plot.style.opacity = '.45';
   try {
-    const d = await (await fetch(`/api/timeline?since=${since.toFixed(0)}&until=${until.toFixed(0)}${TL_ONLY ? '&cam_id=' + encodeURIComponent(TL_ONLY) : ''}`)).json();
+    const d = await (await fetch(`/api/timeline?since=${since.toFixed(0)}&until=${until.toFixed(0)}${TL_ONLY ? '&cam_id=' + encodeURIComponent(TL_ONLY) : ''}`, ctl ? { signal: ctl.signal } : {})).json();
+    if (ctl && _tlAbort !== ctl) return;
     TL.data = d;
+    await new Promise(r => requestAnimationFrame(() => r()));         // deja pintar "Cargando…" antes del dibujo pesado
     _tlRender(true);
-  } catch (_) { document.getElementById('tl-sum').textContent = 'sin datos'; }
+    if (plot) plot.style.opacity = '';
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+    if (sum) sum.textContent = 'sin datos';
+    if (plot) plot.style.opacity = '';
+  }
 }
 
 function _tlSetSpan(dir){
@@ -3180,14 +3223,14 @@ function initVehicles(){
         document.querySelectorAll('#veh-tabs .hist-range').forEach(x => x.classList.toggle('on', x.dataset.st === ''));
         return load();
       }
-      document.getElementById('veh-note').textContent = `Cámaras: ${d.tracked_cams.join(', ')} · se registra un vehículo quieto más de ${Math.round(d.min_parked_s / 60)} min · la placa se lee sola en los autos de la zona de estacionamiento y se puede corregir a mano`;
+      document.getElementById('veh-note').textContent = `Cámaras: ${d.tracked_cams.join(', ')} · se registra un vehículo quieto más de ${Math.round(d.min_parked_s / 60)} min · la placa se lee sola en los autos de la zona de estacionamiento; las lecturas poco seguras quedan por confirmar y todas se pueden corregir a mano`;
       document.getElementById('veh-body').innerHTML = d.vehicles.length ? d.vehicles.map(v => `<tr>
         <td>${v.has_thumb ? `<img class="veh-img" data-vid="${v.id}" style="cursor:zoom-in" title="Ver llegada y salida" src="/api/vehicles/${v.id}/image" loading="lazy" alt="">` : ''}</td>
         <td>${_escapeHtml(v.cam)}</td><td>${_escapeHtml(v.cls)}${v.in_zone ? ' <small class="conn-ok" title="Dentro del polígono de estacionamiento: con alertas y lectura de placa">en polígono</small>' : ' <small class="muted" title="Fuera del polígono: solo informativo">informativo</small>'}</td>
         <td>${_escapeHtml(new Date(v.first_ts * 1000).toLocaleString('es-MX', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', hour12:false }))}</td>
         <td>${dur(v.duration_s)}</td>
         <td>${v.state === 'parked' ? '<span class="conn-ok">estacionado</span>' : '<span class="conn-warn">se fue</span>'}</td>
-        <td><input class="veh-plate" data-id="${v.id}" value="${_escapeHtml(v.plate || '')}" placeholder="sin placa" maxlength="12" aria-label="Placa">${v.plate_src === 'auto' ? ` <small class="conn-ok" title="Lectura automática">auto ${Math.round((v.plate_conf || 0) * 100)}%</small>` : ''}${v.has_plate_img ? ` <img class="veh-img" style="height:26px;width:auto" src="/api/vehicles/${v.id}/plate" alt="Recorte de la placa">` : ''}</td></tr>`).join('')
+        <td><input class="veh-plate" data-id="${v.id}" value="${_escapeHtml(v.plate || '')}" placeholder="${v.plate_guess ? '¿' + _escapeHtml(v.plate_guess) + '?' : 'sin placa'}" maxlength="12" aria-label="Placa">${(v.plate_src || '').startsWith('auto') ? ` <small class="conn-ok" title="Lectura automática">auto ${Math.round((v.plate_conf || 0) * 100)}%</small>` : ''}${!v.plate && v.plate_guess ? ` <button type="button" class="set-btn veh-ok" data-id="${v.id}" data-p="${_escapeHtml(v.plate_guess)}" title="Lectura poco segura (${Math.round((v.plate_guess_conf || 0) * 100)}%): revisa el recorte y confírmala o escribe la correcta">Confirmar ${_escapeHtml(v.plate_guess)}</button>` : ''}${v.has_plate_img ? ` <img class="veh-img" style="height:26px;width:auto" src="/api/vehicles/${v.id}/plate" alt="Recorte de la placa">` : ''}${v.twin_id ? ` <small class="muted" title="El mismo auto, visto a la vez por la otra cámara de calle">también en la otra cámara</small>` : ''}${v.other_visits ? ` <small class="conn-warn" title="Otras veces que se registró esta placa en los últimos 30 días">vino ${v.other_visits + 1} veces · última ${_escapeHtml(new Date(v.last_other_visit * 1000).toLocaleDateString('es-MX', { day:'2-digit', month:'short' }))}</small>` : ''}</td></tr>`).join('')
         : '<tr><td colspan="7" style="padding:14px;color:var(--text-secondary)">Sin vehículos registrados todavía.</td></tr>';
     } catch (e) { document.getElementById('veh-note').textContent = 'Error al leer /api/vehicles'; }
   }
@@ -3208,6 +3251,11 @@ function initVehicles(){
   document.getElementById('veh-tabs')?.addEventListener('click', e => {
     const b = e.target.closest('[data-st]'); if (!b) return;
     state = b.dataset.st; document.querySelectorAll('#veh-tabs .hist-range').forEach(x => x.classList.toggle('on', x === b)); load();
+  });
+  document.getElementById('veh-body')?.addEventListener('click', async e => {
+    const b = e.target.closest('.veh-ok'); if (!b) return;
+    const r = await fetch(`/api/vehicles/${b.dataset.id}`, { method:'PATCH', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ plate: b.dataset.p }) });
+    if (r.ok) load();
   });
   document.getElementById('veh-body')?.addEventListener('change', async e => {
     const inp = e.target.closest('.veh-plate'); if (!inp) return;
@@ -3698,9 +3746,22 @@ function _vaLightbox(img, nav){
   nv.hidden = !(nav && nav.list.length > 1);
   if (nav) nv.querySelector('span').textContent = `${nav.i + 1} / ${nav.list.length}`;
   const im = lb.querySelector('img');
+  const cap = lb.querySelector('.va-lb-cap');
+  const base = `${img.hora || ''} · ${img.cam || ''}${(img.personas || []).length ? ' · ' + img.personas.join(', ') : ''} — ${img.url ? '' : '(sin captura) '}${img.texto || ''}`;
+  cap.textContent = base;
   im.style.display = img.url ? '' : 'none';
-  if (img.url) im.src = img.url;
-  lb.querySelector('.va-lb-cap').textContent = `${img.hora || ''} · ${img.cam || ''}${(img.personas || []).length ? ' · ' + img.personas.join(', ') : ''} — ${img.url ? '' : '(sin captura) '}${img.texto || ''}`;
+  if (img.url){
+    im.style.opacity = '.25';                                        // la imagen anterior no se queda: se ve que esta cargando
+    const mine = img.url;
+    im.onload = () => { if (im.dataset.u === mine) im.style.opacity = '1'; };
+    im.onerror = () => {
+      if (im.dataset.u !== mine) return;
+      cap.textContent = base + '  ·  no se pudo cargar la captura';
+      if (!im.dataset.retry){ im.dataset.retry = '1'; setTimeout(() => { if (im.dataset.u === mine) im.src = mine + (mine.includes('?') ? '&' : '?') + 'r=' + Date.now(); }, 1200); }
+    };
+    im.dataset.u = mine; im.dataset.retry = '';
+    im.removeAttribute('src'); im.src = img.url;
+  }
   lb.hidden = false;
 }
 

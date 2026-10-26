@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import tempfile
+import threading
 import time
 import urllib.request
 import urllib.error
@@ -13,11 +14,51 @@ from typing import List, Optional
 import cv2
 import numpy as np
 
+from app.vision import scenes as _scenes
 from app.vision.scenes import normalize_result
 
 logger = logging.getLogger(__name__)
 VIDEO_MAX_W = int(os.environ.get("VLM_VIDEO_MAX_WIDTH", "640"))
 VIDEO_MAX_H = int(os.environ.get("VLM_VIDEO_MAX_HEIGHT", "360"))
+VIDEO_AS_FRAMES = os.environ.get("VLM_VIDEO_AS_FRAMES", "false").lower() == "true"    # OmniRoute ya conserva video_url (preserveVideoUrl, 21-oct): 547 tokens contra 1009 de los cuadros; true vuelve a cuadros
+VIDEO_FRAMES = int(os.environ.get("VLM_VIDEO_FRAMES", "6"))
+
+# Control de saturacion del gateway (compartido por todas las camaras): como mucho MAX_CONC peticiones a la vez; cuando el gateway contesta
+# 503 por capacidad (admision llena, peticiones pesadas, filtros) se abre una pausa comun que crece 4 s -> 60 s y se cierra con la primera
+# respuesta buena. Durante la pausa las llamadas de rutina se saltan y solo las prioritarias (alertas posibles) esperan su turno y reintentan.
+MAX_CONC = int(os.environ.get("VLM_MAX_CONCURRENCY", "2"))
+_SEM = threading.BoundedSemaphore(max(1, MAX_CONC))
+_BUSY = {"until": 0.0, "n": 0, "skipped": 0, "busy_503": 0}
+_LOCAL = threading.local()
+_BUSY_MARKERS = ("admission", "Structurally heavy", "pre-dispatch", "capacity")
+
+
+def gateway_busy() -> bool:
+    return time.time() < _BUSY["until"]
+
+
+def busy_stats() -> dict:
+    return {"busy": gateway_busy(), "busy_for_s": max(0, round(_BUSY["until"] - time.time())), "skipped": _BUSY["skipped"], "busy_503": _BUSY["busy_503"], "max_concurrency": MAX_CONC}
+
+
+class priority:
+    """with priority(False): la llamada es de rutina (se salta si el gateway esta saturado). Por defecto todas son prioritarias."""
+    def __init__(self, high: bool):
+        self.high = high
+
+    def __enter__(self):
+        self.prev = getattr(_LOCAL, "high", True)
+        _LOCAL.high = self.high
+
+    def __exit__(self, *a):
+        _LOCAL.high = self.prev
+
+
+def _mark_busy(body: str) -> None:
+    if any(m in body for m in _BUSY_MARKERS):
+        _BUSY["n"] += 1
+        _BUSY["busy_503"] += 1
+        _BUSY["until"] = time.time() + min(60.0, 4.0 * 2 ** (_BUSY["n"] - 1))
 
 SYSTEM_PROMPT = (
     "Eres un analista de cámaras de seguridad. Describes solo lo que es "
@@ -73,11 +114,11 @@ def _dump_debug(tag: str, media_bytes: bytes, media_ext: str, response_body: str
         base.with_suffix(media_ext).write_bytes(media_bytes)
         base.with_suffix(".response.json").write_text(response_body, encoding="utf-8")
 
-        files = sorted(DEBUG_DIR.iterdir(), key=lambda p: p.stat().st_mtime)
+        files = sorted((p for p in DEBUG_DIR.iterdir() if p.is_file()), key=lambda p: p.stat().st_mtime)      # 'latest/' es una carpeta: borrarla fallaba en cada llamada
         excess = len(files) - DEBUG_MAX_FILES
         for f in files[:max(excess, 0)]:
             f.unlink(missing_ok=True)
-    except Exception as e:
+    except OSError as e:
         logger.warning("No se pudo guardar debug dump: %s", e)
 
 
@@ -160,8 +201,8 @@ class VLMAnalyzer:
 
         b64 = base64.b64encode(jpeg).decode()
         crop_part = self._person_crop_part(frame, context, tag)
-        user_text = self._build_context_prefix(context) + (
-            scene.render() if scene else self.user_prompt)
+        user_text = (scene.render_parts()[0], self._build_context_prefix(context) + scene.render_parts()[1]) if scene else \
+            self._build_context_prefix(context) + self.user_prompt
 
         content_part = {"type": "image_url", "image_url": {
             "url": f"data:image/jpeg;base64,{b64}"
@@ -228,15 +269,27 @@ class VLMAnalyzer:
         if len(frames) < 2:
             return self.analyze(frames[-1], context, scene=scene)
 
+        crop_part = self._person_crop_part(
+            crop_frame if crop_frame is not None else frames[-1], context, tag)
+        note = ""
+        if context and context.get("_clip_s"):
+            note = (f"El video es la escena de los ultimos ~{context['_clip_s']:.0f} s en {context['_clip_n']} cuadros (uno cada "
+                    f"~{context['_clip_s'] / max(1, context['_clip_n'] - 1):.0f} s; el ultimo es el momento actual): cuenta lo que pasa a lo "
+                    "largo de toda la secuencia, quien llega, que hace y hacia donde va.\n")
+        if scene:
+            static, dyn = scene.render_parts(video=True)
+            user_text = (static, note + self._build_context_prefix(context) + dyn)
+        else:
+            user_text = note + self._build_context_prefix(context) + self.video_user_prompt
+
+        if VIDEO_AS_FRAMES:
+            return self._analyze_frames(frames, fps, crop_part, user_text, tag, scene, context)
+
         mp4 = self._encode_mp4(frames, fps)
         if not mp4:
             return self._error("video encode failed")
 
         b64 = base64.b64encode(mp4).decode()
-        crop_part = self._person_crop_part(
-            crop_frame if crop_frame is not None else frames[-1], context, tag)
-        user_text = self._build_context_prefix(context) + (
-            scene.render(video=True) if scene else self.video_user_prompt)
 
         content_part = {"type": "video_url", "video_url": {
             "url": f"data:video/mp4;base64,{b64}"
@@ -246,6 +299,32 @@ class VLMAnalyzer:
         return self._finish(self._request(content_part, user_text, self.video_timeout,
                               debug_tag=tag, debug_media=mp4, debug_ext=".mp4"),
                             scene, context)
+
+    def _analyze_frames(self, frames: List[np.ndarray], fps: float, crop_part, user_text: str, tag: str, scene, context) -> dict:
+        """La misma secuencia como imagenes en orden cronologico (6 cuadros a 640x360 por defecto): funciona por el gateway aunque este descarte el video."""
+        n = len(frames)
+        k = min(VIDEO_FRAMES, n)
+        sel = [frames[round(i * (n - 1) / max(k - 1, 1))] for i in range(k)]
+        parts, last = [], None
+        for fr in sel:
+            h, w = fr.shape[:2]
+            tw, th = self._target_dims(w, h)
+            vs = min(VIDEO_MAX_W / tw, VIDEO_MAX_H / th, 1.0)
+            small = cv2.resize(fr, (max(2, int(tw * vs)), max(2, int(th * vs))), interpolation=cv2.INTER_AREA)
+            ok, buf = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 72])
+            if not ok:
+                continue
+            last = buf.tobytes()
+            parts.append({"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(last).decode()}})
+        if len(parts) < 2:
+            return self._error("frames encode failed")
+        secs = n / fps if fps and fps > 0 else 0
+        note = (f"Las {len(parts)} primeras imagenes son cuadros de UNA secuencia de video de ~{secs:.0f} s, en orden cronologico "
+                "(la primera es la mas antigua): describe el movimiento entre ellas.\n")
+        if crop_part:
+            parts.append(crop_part)
+        user_text = (user_text[0], note + user_text[1]) if isinstance(user_text, tuple) else note + user_text
+        return self._finish(self._request(parts, user_text, self.video_timeout, debug_tag=tag, debug_media=last, debug_ext=".jpg"), scene, context)
 
     @staticmethod
     def _union_box(context: dict):
@@ -352,13 +431,38 @@ class VLMAnalyzer:
     def _request(self, media_content_part: dict, user_text: str, timeout: int,
                  debug_tag: str = "req", debug_media: Optional[bytes] = None,
                  debug_ext: str = ".bin") -> dict:
-        """Reintenta solo los fallos transitorios, con backoff exponencial."""
+        """Reintenta solo los fallos transitorios, con backoff exponencial. Las llamadas de rutina no esperan ni reintentan si el gateway esta saturado."""
+        high = getattr(_LOCAL, "high", True)
+        if not high and gateway_busy():
+            _BUSY["skipped"] += 1
+            return self._busy_error()
+        if not _SEM.acquire(timeout=30 if high else 3):
+            _BUSY["skipped"] += 1
+            return self._busy_error()
+        try:
+            return self._request_retry(media_content_part, user_text, timeout, debug_tag, debug_media, debug_ext, high)
+        finally:
+            _SEM.release()
+
+    @classmethod
+    def _busy_error(cls) -> dict:
+        err = cls._error("gateway ocupado: llamada de rutina omitida")
+        err["_busy_skip"] = True
+        return err
+
+    def _request_retry(self, media_content_part, user_text, timeout, debug_tag, debug_media, debug_ext, high: bool) -> dict:
         delay = self._RETRY_BASE_DELAY
         for intento in range(1, self._MAX_ATTEMPTS + 1):
             result = self._request_once(media_content_part, user_text, timeout,
                                         debug_tag, debug_media, debug_ext)
+            if result.get("activity") != "error":
+                _BUSY["n"] = 0
+                _BUSY["until"] = 0.0
+            busy = result.pop("_busy503", False)
             if not result.pop("_retryable", False):
                 return result
+            if busy and (not high or gateway_busy() and intento >= 2):
+                return result                   # saturado: la rutina no reintenta y la prioritaria solo una vez
             if intento == self._MAX_ATTEMPTS:
                 logger.warning("VLM cam=%s: agotados %d intentos",
                                debug_tag, self._MAX_ATTEMPTS)
@@ -382,13 +486,15 @@ class VLMAnalyzer:
             # Deshabilitar thinking mode — fuerza respuesta directa en content
             "chat_template_kwargs": {"enable_thinking": False},
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": _scenes.SYSTEM_COMPACT if _scenes.COMPACT else SYSTEM_PROMPT},
                 {
                     "role": "user",
+                    # (fijo, variable): el texto fijo va antes del medio para que el servidor lo reutilice de su cache de prefijos
                     "content": [
+                        *([{"type": "text", "text": user_text[0]}] if isinstance(user_text, tuple) else []),
                         *(media_content_part if isinstance(media_content_part, list)
                           else [media_content_part]),
-                        {"type": "text", "text": user_text},
+                        {"type": "text", "text": user_text[1] if isinstance(user_text, tuple) else user_text},
                     ]
                 }
             ]
@@ -473,6 +579,9 @@ class VLMAnalyzer:
                 _dump_latest(debug_tag, debug_media, debug_ext, body)
             err = self._error(f"http {e.code}: {body[:200]}")
             err["_retryable"] = e.code in self._RETRY_HTTP_CODES
+            if e.code in (429, 503) and any(m in body for m in _BUSY_MARKERS):
+                _mark_busy(body)
+                err["_busy503"] = True
             return err
         except urllib.error.URLError as e:
             logger.warning("VLM unreachable: %s", e)
@@ -555,7 +664,7 @@ class VLMAnalyzer:
 
             # fps mínimo de 1 — VideoWriter no acepta 0 o negativos, y un
             # buffer recién arrancado puede reportar fps=0 antes de estabilizar.
-            safe_fps = max(fps, 1.0)
+            safe_fps = max(fps, 0.25)          # el clip de escena va a ~0.5 fps: su duracion real le dice al modelo cuanto tiempo cubre
 
             with tempfile.NamedTemporaryFile(suffix=".mp4", delete=True) as tmp:
                 writer = cv2.VideoWriter(

@@ -1,3 +1,4 @@
+import os
 import urllib.parse
 import logging
 import threading
@@ -125,7 +126,12 @@ class RTSPReader(threading.Thread):
             self._native_wh = None
             logger.info("[%s] Streaming started", self.cam.id)
 
-            self._read_loop(cap)
+            done = threading.Event()
+            threading.Thread(target=self._watchdog, args=(cap, done), daemon=True, name=f"stall-{self.cam.id}").start()
+            try:
+                self._read_loop(cap)
+            finally:
+                done.set()
             cap.release()
 
             if not self._stop_event.is_set():
@@ -137,6 +143,27 @@ class RTSPReader(threading.Thread):
         logger.info("[%s] Reader stopped", self.cam.id)
 
     # ── Internals ────────────────────────────────────────────────────────────
+
+    def _watchdog(self, cap: cv2.VideoCapture, done: threading.Event) -> None:
+        """cap.read() puede quedarse bloqueado para siempre si la fuente deja de enviar (el videoportero estuvo ~7 h congelado y marcado 'streaming').
+        Si no llega un cuadro nuevo en STALL_S s, se libera la captura desde aqui: read() devuelve False y el lector reconecta."""
+        stall_s = float(os.environ.get("STREAM_STALL_S", "20"))
+        while not done.wait(5.0):
+            if time.time() - self._connected_since < stall_s:
+                continue
+            lat = self.buffer.latency_ms()
+            if lat < 0 or lat > stall_s * 1000:
+                if not self._method.startswith("GStreamer"):
+                    # FFmpeg: liberar la captura mientras read() esta bloqueado tumbo el contenedor (21-oct, cam-118, 2 veces).
+                    # Ahi manda CAP_PROP_READ_TIMEOUT_MSEC: la lectura regresa sola con error y el lector reconecta.
+                    logger.warning("[%s] sin cuadros nuevos en %.0f s (FFmpeg): se espera el tiempo maximo de lectura", self.cam.id, max(lat, 0) / 1000)
+                    return
+                logger.warning("[%s] sin cuadros nuevos en %.0f s: se fuerza la reconexion", self.cam.id, max(lat, 0) / 1000)
+                try:
+                    cap.release()                       # en GStreamer es seguro: read() regresa False (verificado con el videoportero)
+                except cv2.error as exc:
+                    logger.warning("[%s] liberar captura colgada: %s", self.cam.id, exc)
+                return
 
     def _open_capture(self) -> Optional[cv2.VideoCapture]:
         self._connect_attempts += 1
@@ -222,7 +249,8 @@ class RTSPReader(threading.Thread):
         """OpenCV/FFMPEG directo — buffersize=1 para mínima latencia."""
         url = self._url()
         try:
-            cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+            # tiempos maximos propios de FFmpeg: una lectura colgada vuelve sola con error (liberar la captura desde otro hilo tumbaba el proceso)
+            cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG, [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 10000, cv2.CAP_PROP_READ_TIMEOUT_MSEC, 8000])
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             if cap.isOpened():
                 ret, frame = cap.read()
