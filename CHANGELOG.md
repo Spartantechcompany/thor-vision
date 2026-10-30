@@ -2,6 +2,14 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.46.0 — Menos llamadas al modelo de visión (2026-10-30)
+
+El modelo de visión ya no describe cada movimiento: solo entra cuando YOLO ve una persona real o un animal, y describe una vez por episodio (las mismas personas no se vuelven a describir en 10 minutos). En las cámaras de calle solo se describe a quien se acerca a la puerta; el resto queda como conteo. Los objetos que YOLO confunde con personas en el mismo lugar (la bicicleta con casco del Garage posterior) se recuerdan y dejan de abrir visitas. El análisis de rutina sin movimiento pasa de cada 15 minutos a cada hora. Alertas: sin tipo o sin severidad no cuentan, en la calle solo media y alta, y el mismo tipo en la misma cámara se agrupa durante 15 minutos salvo que suba de severidad. En el Garage posterior entrar por el portón ya no es alerta (de noche sigue siendo persona nocturna).
+
+- **VLM · Compuerta por episodio**: VLMWorker._struct_gate: sin_objeto, calle_registro, mismo_episodio (VLM_STRUCT_GATE, VLM_EPISODE_REFRESH_S=600). Motivos en /api/pipeline → vlm_gate_1h.
+- **Tracker · Memoria de falsos fijos**: VisitManager._fp_like: caja sin cara descartada ≥2 veces en el mismo lugar (IoU≥0.5, 24 h) no abre visita ni pide capturas (FP_MEMORY_*). VisitManager.active_tracks().
+- **Alertas · Agrupación y validación**: ALERT_SILENCE_S=900 por cámara y tipo; repeat_of / alert_dropped en el evento. VLM_IDLE_HEARTBEAT_S por defecto 3600.
+
 ## v2.45.0 — Focos por red local, horarios y casas separadas (2026-10-24)
 
 La página IoT es solo de la casa Patricio 10: los equipos de Coworking540 (Ahuehuete, Barra, Ceiba, Encino, Sabila, Co Working, Pasillo Entrada, Security Camera...) se sacaron y nunca entran en los controles de grupo ni en los horarios. Los equipos con más de 90 días desconectados van a una sección 'Retirados' al final y no cuentan como fallas. Nuevo panel de focos: brillo, color y blanco (cálido/neutro/frío) de todos los focos a la vez o de cada uno, y horarios (hora, días, focos, color o brillo) que se guardan en el servicio de control y se pueden probar al momento. Todo va por la red local porque el proyecto de la nube de Tuya agotó su cupo de equipos controlables. Las direcciones de los focos salen de la lista de clientes del UDM.

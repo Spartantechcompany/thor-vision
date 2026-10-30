@@ -171,9 +171,10 @@ cameras:
       - objetos que aparecen o desaparecen de los lados
     ignore:
       - el auto blanco y los objetos guardados estaticos, ruido infrarrojo, reflejos en la pared
-    alert_types: [manipulacion_vehiculo, acceso_no_autorizado, persona_nocturna, objeto_abandonado, persona_en_suelo, fuego_humo, animal]
+    # sin acceso_no_autorizado: entrar por el porton del fondo es el flujo normal de la casa (40 de 76 alertas en una semana eran eso); de noche lo cubre persona_nocturna
+    alert_types: [manipulacion_vehiculo, persona_nocturna, objeto_abandonado, persona_en_suelo, fuego_humo, animal]
     night_person: alert
-    known_exempt: [acceso_no_autorizado, persona_nocturna, manipulacion_vehiculo]   # solo desconocidos
+    known_exempt: [persona_nocturna, manipulacion_vehiculo]   # solo desconocidos
     vehicles: true
 
   cam-228:

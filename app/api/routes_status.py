@@ -180,7 +180,8 @@ def pipeline(request: Request):
             "vlm": {**(w.last_info or {}), "calls_1h": calls,
                      "skips_1h": w.skips_last_hour(),
                      "same_1h": _last_hour(getattr(w, "same_skips", ())),
-                     "busy_1h": _last_hour(getattr(w, "busy_skips", ()))},
+                     "busy_1h": _last_hour(getattr(w, "busy_skips", ())),
+                     "gate_1h": w.gate_last_hour() if hasattr(w, "gate_last_hour") else {}},
         }
     skips = sum(c["vlm"]["skips_1h"] for c in cams.values())
     from app.vision import vlm_analyzer
@@ -188,7 +189,16 @@ def pipeline(request: Request):
             "vlm_skips_1h": skips,
             "vlm_same_scene_1h": sum(c["vlm"]["same_1h"] for c in cams.values()),
             "vlm_busy_skips_1h": sum(c["vlm"]["busy_1h"] for c in cams.values()),
+            "vlm_gate_1h": _sum_dicts(c["vlm"]["gate_1h"] for c in cams.values()),
             "gateway": vlm_analyzer.busy_stats()}
+
+
+def _sum_dicts(ds) -> dict:
+    out: dict = {}
+    for d in ds:
+        for k, v in d.items():
+            out[k] = out.get(k, 0) + v
+    return out
 
 
 def _last_hour(ts_list) -> int:

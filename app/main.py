@@ -398,7 +398,7 @@ async def lifespan(app: FastAPI):
     app.state.chat_probe_stop = start_chat_probe(app)
 
     native_min_s  = float(_env("VLM_NATIVE_MIN_INTERVAL_S", "NEMOTRON_NATIVE_MIN_INTERVAL_S", "30"))
-    idle_beat_s   = float(_env("VLM_IDLE_HEARTBEAT_S", "NEMOTRON_IDLE_HEARTBEAT_S",     "900"))
+    idle_beat_s   = float(_env("VLM_IDLE_HEARTBEAT_S", "NEMOTRON_IDLE_HEARTBEAT_S",     "3600"))
 
     from app.vision import scenes as scenes_mod
     from app.vision.scenes import Scenes
@@ -421,6 +421,7 @@ async def lifespan(app: FastAPI):
                 scene                 = scenes.get(cam.id),
                 require_person        = require_person,
                 sustain_s             = sustain_s,
+                tracks_source         = getattr(app.state, "visits", None),
                 cam_id              = cam.id,
                 buffer              = buf,
                 store               = detection_store,

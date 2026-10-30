@@ -41,6 +41,14 @@ def _fit(frame: np.ndarray, w: int, h: int) -> np.ndarray:
     return cv2.resize(frame, (max(2, int(fw * k) // 2 * 2), max(2, int(fh * k) // 2 * 2)), interpolation=cv2.INTER_AREA) if k < 1.0 else frame
 
 
+ANIMALS = {"perro", "gato"}
+ALERT_SILENCE_S = float(os.environ.get("ALERT_SILENCE_S", "900"))   # misma camara y mismo tipo de alerta: se agrupa en la anterior durante 15 min
+_SEV = {"none": 0, "low": 1, "medium": 2, "high": 3}
+STRUCT_GATE = os.environ.get("VLM_STRUCT_GATE", "true").lower() == "true"     # el VLM solo describe si YOLO ve una persona real o un animal
+EPISODE_REFRESH_S = float(os.environ.get("VLM_EPISODE_REFRESH_S", "600"))      # mismas personas/animal: se vuelve a describir a lo mas cada 10 min
+STREET_CAMS = {c.strip() for c in os.environ.get("VISIT_STREET_LIGHT_CAMS", "cam-189,cam-191").split(",") if c.strip()}
+
+
 def _summarize_objects(objects) -> dict:
     out: dict = {}
     for o in objects or []:
@@ -108,6 +116,7 @@ class VLMWorker(threading.Thread):
         scene=None,
         require_person: bool = False,
         sustain_s: float = 10.0,
+        tracks_source=None,       # VisitManager: personas reales en cuadro (sin falsos fijos), para describir una vez por episodio
     ):
         super().__init__(daemon=True, name=f"vlm-{cam_id}")
         self.cam_id              = cam_id
@@ -131,6 +140,10 @@ class VLMWorker(threading.Thread):
         self.require_person      = require_person
         self.sustain_s           = sustain_s
         self._skip_log: deque    = deque(maxlen=3000)
+        self.tracks_source       = tracks_source
+        self._last_ep            = None           # (ids de tracks, hubo animal, ts) del ultimo episodio descrito
+        self.gate_skips: deque   = deque(maxlen=5000)   # (ts, motivo)
+        self._alert_last: dict   = {}             # tipos de alerta -> (ts, severidad, event_id)
 
         self._stop             = threading.Event()
         self._prev_gray        = None
@@ -159,6 +172,35 @@ class VLMWorker(threading.Thread):
         if det and det.yolo_persons > 0 and time.time() - det.yolo_ts < 8.0:
             return True
         return st["active"] and time.time() - st["since"] >= self.sustain_s
+
+    def _episode(self):
+        """(ids de personas reales en cuadro, hay animal). En calle solo cuentan las que se acercan a la puerta."""
+        det = self.store.get(self.context_cam_id)
+        fresh = det is not None and time.time() - det.yolo_ts < 8.0
+        objs = _summarize_objects(det.objects) if fresh else {}
+        tracks = self.tracks_source.active_tracks(self.context_cam_id, 8.0)
+        if self.cam_id in STREET_CAMS:
+            tracks = [t for t in tracks if t["near"]]
+        return frozenset(t["id"] for t in tracks), any(objs.get(k) for k in ANIMALS)
+
+    def _struct_gate(self):
+        """None si vale la pena describir; si no, el motivo del descarte. Movimiento sin persona ni animal no se describe,
+        y las mismas personas (o el mismo animal) ya descritas no se vuelven a describir hasta EPISODE_REFRESH_S."""
+        ids, animal = self._episode()
+        if not ids and not animal:
+            return ("calle_registro" if self.cam_id in STREET_CAMS and self.tracks_source.active_tracks(self.context_cam_id, 8.0) else "sin_objeto"), None
+        last = self._last_ep
+        if last is not None and ids <= last[0] and (animal <= last[1]) and time.time() - last[2] < EPISODE_REFRESH_S:
+            return "mismo_episodio", None
+        return None, (ids, animal)
+
+    def gate_last_hour(self) -> dict:
+        cutoff = time.time() - 3600
+        out: dict = {}
+        for ts, why in list(self.gate_skips):
+            if ts >= cutoff:
+                out[why] = out.get(why, 0) + 1
+        return out
 
     # ── Escena igual / prioridad ───────────────────────────────────────────
 
@@ -249,6 +291,7 @@ class VLMWorker(threading.Thread):
 
             should_analyze = False
             reason         = ""
+            pending_ep     = None
 
             native = (self.motion_source is not None
                       and self.motion_source.usable())
@@ -264,6 +307,16 @@ class VLMWorker(threading.Thread):
                     rising = st["last_rise_ts"] > self._handled_rise
                     if rising and time.time() - st["last_rise_ts"] < RISE_DELAY_S:
                         pass                                    # recien empezo: se espera a que la accion entre en el clip
+                    elif (st["active"] or rising) and STRUCT_GATE and self.tracks_source is not None:
+                        why, ep = self._struct_gate()
+                        if why is None:
+                            should_analyze = True
+                            reason         = "cam-motion"
+                            pending_ep     = ep
+                        else:
+                            self._handled_rise = time.time()
+                            self.gate_skips.append((time.time(), why))
+                            self._skip_log.append(time.time())
                     elif st["active"] or rising:
                         if self._person_gate(st):
                             should_analyze = True
@@ -332,12 +385,17 @@ class VLMWorker(threading.Thread):
                     continue
                 if result.get("activity") != "error":
                     self._last_sig = sig
+                    if pending_ep is not None:
+                        self._last_ep = (pending_ep[0], pending_ep[1], time.time())
 
                 self.store.update_nemotron(self.cam_id, result)
                 self._last_analysis_t = now
 
                 people    = result.get("people") if isinstance(result.get("people"), int) else 0
                 has_alert = self._has_real_alert(result)
+                group = None
+                if has_alert:
+                    has_alert, group = self._alert_filter(result)
 
                 # ── Persistir evento ─────────────────────────────────────
                 event_id: Optional[int] = None
@@ -350,6 +408,10 @@ class VLMWorker(threading.Thread):
                         payload = dict(result)
                         payload["_trigger"]    = reason
                         payload["_media_kind"] = media_kind
+                        if group and group.get("repeat_of"):
+                            payload["repeat_of"] = group["repeat_of"]
+                        elif group and group.get("dropped"):
+                            payload["alert_dropped"] = group["dropped"]
                         event_id = self.db.insert_event(
                             type      = self.event_type,
                             cam_id    = self.cam_id,
@@ -357,6 +419,8 @@ class VLMWorker(threading.Thread):
                             people    = max(people, 0),
                             has_alert = has_alert,
                         )
+                        if has_alert and group and group.get("key") is not None:
+                            self._alert_last[group["key"]] = (time.time(), group["sev"], event_id)
                     except Exception as e:
                         logger.warning("DB insert error cam=%s: %s", self.cam_id, e)
 
@@ -433,6 +497,21 @@ class VLMWorker(threading.Thread):
                                            crop_frame=current_frame), "video"
 
     # ── Snapshot trigger logic ────────────────────────────────────────────
+
+    def _alert_filter(self, result: dict):
+        """(sigue siendo alerta, info). Sin tipo o con severidad none no es alerta; en camaras de calle solo media/alta;
+        el mismo tipo en la misma camara dentro de ALERT_SILENCE_S se agrupa en la anterior salvo que suba de severidad."""
+        types = tuple(sorted(str(t) for t in (result.get("alert_types") or []) if t))
+        sev = str(result.get("severity") or "none").lower()
+        if not types or _SEV.get(sev, 0) == 0:
+            return False, {"dropped": "sin_tipo_o_severidad"}
+        if self.cam_id in STREET_CAMS and _SEV.get(sev, 0) < 2:
+            return False, {"dropped": "calle_baja"}
+        last = self._alert_last.get(types)
+        if last is not None and time.time() - last[0] < ALERT_SILENCE_S and _SEV.get(sev, 0) <= _SEV.get(last[1], 0):
+            self.gate_skips.append((time.time(), "alerta_repetida"))
+            return False, {"repeat_of": last[2]}
+        return True, {"key": types, "sev": sev}
 
     @staticmethod
     def _has_real_alert(result: dict) -> bool:

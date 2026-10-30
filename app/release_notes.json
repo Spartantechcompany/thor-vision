@@ -1,5 +1,28 @@
 [
   {
+    "version": "2.46.0",
+    "date": "2026-10-30",
+    "name": "Menos llamadas al modelo de visión",
+    "summary": "El modelo de visión ya no describe cada movimiento: solo entra cuando YOLO ve una persona real o un animal, y describe una vez por episodio (las mismas personas no se vuelven a describir en 10 minutos). En las cámaras de calle solo se describe a quien se acerca a la puerta; el resto queda como conteo. Los objetos que YOLO confunde con personas en el mismo lugar (la bicicleta con casco del Garage posterior) se recuerdan y dejan de abrir visitas. El análisis de rutina sin movimiento pasa de cada 15 minutos a cada hora. Alertas: sin tipo o sin severidad no cuentan, en la calle solo media y alta, y el mismo tipo en la misma cámara se agrupa durante 15 minutos salvo que suba de severidad. En el Garage posterior entrar por el portón ya no es alerta (de noche sigue siendo persona nocturna).",
+    "highlights": [
+      {
+        "area": "VLM",
+        "title": "Compuerta por episodio",
+        "text": "VLMWorker._struct_gate: sin_objeto, calle_registro, mismo_episodio (VLM_STRUCT_GATE, VLM_EPISODE_REFRESH_S=600). Motivos en /api/pipeline → vlm_gate_1h."
+      },
+      {
+        "area": "Tracker",
+        "title": "Memoria de falsos fijos",
+        "text": "VisitManager._fp_like: caja sin cara descartada ≥2 veces en el mismo lugar (IoU≥0.5, 24 h) no abre visita ni pide capturas (FP_MEMORY_*). VisitManager.active_tracks()."
+      },
+      {
+        "area": "Alertas",
+        "title": "Agrupación y validación",
+        "text": "ALERT_SILENCE_S=900 por cámara y tipo; repeat_of / alert_dropped en el evento. VLM_IDLE_HEARTBEAT_S por defecto 3600."
+      }
+    ]
+  },
+  {
     "version": "2.45.0",
     "date": "2026-10-24",
     "name": "Focos por red local, horarios y casas separadas",

@@ -57,6 +57,9 @@ SNAP_MIN_INTERVAL_S = _f("FACE_SNAPSHOT_INTERVAL_S", 1.5)
 SNAP_MAX_PER_VISIT = int(_f("FACE_SNAPSHOT_MAX", 6))
 SNAP_MIN_BODY_H = _f("FACE_SNAPSHOT_MIN_BODY_H", 120.0)
 HUNT_MAX_S = _f("FACE_HUNT_MAX_S", 30.0)
+FP_MEM_S = _f("FP_MEMORY_S", 86400.0)       # memoria de falsos fijos (bicicleta con casco, bolsa, reflejo): caja que ya se descarto antes en el mismo lugar
+FP_MEM_IOU = _f("FP_MEMORY_IOU", 0.5)
+FP_MEM_MIN = int(_f("FP_MEMORY_MIN", 2))    # tantas veces descartada ahi = sospechosa (no abre visita, ni capturas, ni VLM) hasta que se mueva o muestre cara
 
 
 def _dedupe(persons: list) -> list:
@@ -199,6 +202,7 @@ class Track:
         self.gray: Optional[tuple] = None             # (sujeto candidato, parecido) cuando InsightFace quedo en la zona gris
         self.door_first = self.door_last = None      # primera y ultima vez que su punto base cayo en una zona 'puerta_peatonal'
         self.door_alerted = False
+        self.suspect = False                          # caja en un punto donde ya se descartaron falsos y no se ha movido
 
     def still_spot(self):
         """(cx, cy, tam) si el track casi no se movio en toda su vida (arbol, poste, sombra); si no, None."""
@@ -255,6 +259,7 @@ class VisitManager:
         self._vlm_q: queue.Queue = queue.Queue(maxsize=30)
         self._vlm_last: dict = {}
         self._ghosts: dict = {}
+        self._fp_boxes: dict = {}          # cam -> [(ts, caja)] de falsos sin cara ya descartados
         self.stats = {"visits_opened": 0, "visits_closed": 0, "subjects_created": 0,
                       "subject_matches": 0, "vlm_described": 0, "vlm_false_positive": 0,
                       "snap_requests": 0, "snap_faces": 0, "snap_wins": 0,
@@ -441,7 +446,7 @@ class VisitManager:
         if self.trips_attend is not None and self.trips_attend(cam_id):
             return True
         for tr in list(self._tracks.get(cam_id, ())):
-            if (not tr.good_face and not tr.static and now - tr.last_ts < 6.0
+            if (not tr.good_face and not tr.static and not tr.suspect and now - tr.last_ts < 6.0
                     and now - tr.first_ts < HUNT_MAX_S and self._full(cam_id, tr)):
                 return True
         return False
@@ -459,6 +464,10 @@ class VisitManager:
             new_track = self._next_tid.get(cam_id, 0) != tid0
             for tr, pb in zip(det_tracks, persons):
                 tr.observe(pb, ots)
+                tr.suspect = tr.n_face == 0 and tr.still_spot() is not None and self._fp_like(cam_id, pb, ots)
+                if tr.suspect:
+                    tr.live_bbox = pb if src != "pre" else tr.live_bbox
+                    continue                                   # falso fijo conocido: no se recorta, verifica ni captura
                 if cam_id in LIGHT_CAMS and not getattr(tr, "near", False) and frame is not None:
                     nd = zones_mod.near_door(cam_id, pb, frame.shape[1], frame.shape[0])
                     tr.near = True if nd is None else nd
@@ -664,7 +673,11 @@ class VisitManager:
         for tr in tracks:
             closed = now - tr.last_ts > MAX_GAP_S
             try:
-                if tr.visit_id is None and (tr.hits >= MIN_HITS or tr.n_face >= 1) and self._full(cam_id, tr):
+                if tr.visit_id is None and tr.suspect and tr.n_face == 0:
+                    if closed:
+                        self._fp_note(cam_id, tr.bbox, tr.last_ts)     # el falso sigue ahi: la memoria se renueva
+                        self.stats["fp_suppressed"] = self.stats.get("fp_suppressed", 0) + 1
+                elif tr.visit_id is None and (tr.hits >= MIN_HITS or tr.n_face >= 1) and self._full(cam_id, tr):
                     self._open_visit(cam_id, tr)
                 elif closed and tr.visit_id is None and cam_id in LIGHT_CAMS and tr.hits >= MIN_HITS:
                     self._passerby(cam_id, tr.first_ts)          # paso por la calle sin acercarse: solo se cuenta
@@ -727,6 +740,8 @@ class VisitManager:
             self.stats["clef_rejected"] = self.stats.get("clef_rejected", 0) + 1
         if tr.ghost:
             self.stats["ghost_visits"] = self.stats.get("ghost_visits", 0) + 1
+            if tr.n_face == 0:
+                self._fp_note(cam_id, tr.bbox, tr.last_ts)
         if tr.face_src:
             self.stats["best_" + tr.face_src] = self.stats.get("best_" + tr.face_src, 0) + 1
         if tr.snap_n or tr.pre_n:
@@ -891,6 +906,25 @@ class VisitManager:
                     if tr.subject_id == sid:
                         tr.subject_id = None
             return self.db.delete_subject(sid)
+
+    def _fp_note(self, cam_id, box, ts) -> None:
+        lst = self.__dict__.setdefault("_fp_boxes", {}).setdefault(cam_id, [])
+        lst[:] = [x for x in lst if ts - x[0] < FP_MEM_S][-300:]
+        lst.append((ts, tuple(box)))
+
+    def _fp_like(self, cam_id, box, ts) -> bool:
+        if FP_MEM_MIN <= 0 or cam_id == "cam-vto":
+            return False
+        n = sum(1 for t, b in getattr(self, "_fp_boxes", {}).get(cam_id, ()) if ts - t < FP_MEM_S and _iou(b, box) >= FP_MEM_IOU)
+        return n >= FP_MEM_MIN
+
+    def active_tracks(self, cam_id: str, max_age_s: float = 8.0) -> list:
+        """Tracks vivos que pueden ser personas reales: sin falsos fijos conocidos ni objetos quietos. Para que el VLM describa una vez por episodio."""
+        now = time.time()
+        with self._lock:
+            return [{"id": tr.id, "visit_id": tr.visit_id, "near": bool(getattr(tr, "near", False)), "face": tr.n_face > 0}
+                    for tr in self._tracks.get(cam_id, ())
+                    if now - tr.last_ts <= max_age_s and not tr.suspect and not tr.static and tr.hits >= 2]
 
     def known_present(self, cam_id: str, max_age_s: float = 20.0) -> list:
         now = time.time()
