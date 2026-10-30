@@ -20,6 +20,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 MODEL_DIR = os.environ.get("CLEF_MODEL_DIR", "/app/data/models/clef-flash")
 PORT = int(os.environ.get("CLEF_PORT", "20140"))
 HOST = os.environ.get("CLEF_HOST", "127.0.0.1")
+MODEL_NAME = os.environ.get("CLEF_NAME", "clef-flash")
+VIDEO_MAX_FRAMES = int(os.environ.get("CLEF_VIDEO_FRAMES", "8"))
 MAX_SIDE = int(os.environ.get("CLEF_IMG_MAX_SIDE", "448"))        # lado mayor de cada imagen: acota los tokens de imagen
 MAX_BODY = 8 * 1024 * 1024
 
@@ -45,10 +47,20 @@ def _image(b64: str):
     return im.resize((max(28, int(im.width * k)), max(28, int(im.height * k)))) if k < 1 else im
 
 
+def _video(frames: list):
+    """Lista de JPEG base64 (cuadros en orden) -> lista de imagenes PIL; maximo VIDEO_MAX_FRAMES cuadros repartidos parejo."""
+    n = len(frames)
+    pick = frames if n <= VIDEO_MAX_FRAMES else [frames[round(i * (n - 1) / (VIDEO_MAX_FRAMES - 1))] for i in range(VIDEO_MAX_FRAMES)]
+    return [_image(x) for x in pick]
+
+
 def decide(req: dict) -> dict:
-    rec = {"model": "clef-flash", "state": req.get("state", ""), "questions": req["questions"]}
+    rec = {"model": MODEL_NAME, "state": req.get("state", ""), "questions": req["questions"]}
     if req.get("images"):
         rec["images"] = [_image(x) for x in req["images"][:4]]
+    if req.get("videos"):
+        rec["videos"] = [_video(v) for v in req["videos"][:2]]
+        rec["media_kwargs"] = {"do_sample_frames": False, **(req.get("media_kwargs") or {})}
     t0 = time.time()
     with _lock:                                                     # un pase a la vez en la GPU
         import torch
