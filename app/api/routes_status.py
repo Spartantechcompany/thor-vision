@@ -181,7 +181,8 @@ def pipeline(request: Request):
                      "skips_1h": w.skips_last_hour(),
                      "same_1h": _last_hour(getattr(w, "same_skips", ())),
                      "busy_1h": _last_hour(getattr(w, "busy_skips", ())),
-                     "gate_1h": w.gate_last_hour() if hasattr(w, "gate_last_hour") else {}},
+                     "gate_1h": w.gate_last_hour() if hasattr(w, "gate_last_hour") else {},
+                     "clef_1h": w.clef_last_hour() if hasattr(w, "clef_last_hour") else {}},
         }
     skips = sum(c["vlm"]["skips_1h"] for c in cams.values())
     from app.vision import vlm_analyzer

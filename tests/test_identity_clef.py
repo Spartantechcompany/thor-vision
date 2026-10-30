@@ -12,9 +12,9 @@ class DB:
         self._lock = threading.RLock()
         self._conn = sqlite3.connect(":memory:", check_same_thread=False)
         self._conn.executescript("""CREATE TABLE subjects (id INTEGER PRIMARY KEY, name TEXT, named INTEGER);
-            CREATE TABLE person_visits (id INTEGER PRIMARY KEY, subject_id INTEGER, face BLOB, face_score REAL);
+            CREATE TABLE person_visits (id INTEGER PRIMARY KEY, subject_id INTEGER, face BLOB, face_score REAL, body BLOB, body_score REAL);
             INSERT INTO subjects VALUES (1, 'Ana', 1), (2, NULL, 0), (3, 'Neto', 1);
-            INSERT INTO person_visits VALUES (10, 1, x'01', 0.9), (20, 2, x'02', 0.5), (30, 3, x'03', 0.8);""")
+            INSERT INTO person_visits VALUES (10, 1, x'01', 0.9, x'b1', 5), (20, 2, x'02', 0.5, x'b2', 4), (30, 3, x'03', 0.8, NULL, NULL);""")
 
     def update_person_visit(self, vid, **f):
         with self._lock:
@@ -22,13 +22,14 @@ class DB:
 
 
 class Clef:
-    def __init__(self, p): self.p = p
+    def __init__(self, p, body=None): self.p, self.body = p, body
     def same_person(self, a, b): return self.p
+    def same_body(self, a, b): return self.body
 
 
-def mgr(p):
+def mgr(p, body=None):
     m = vm.VisitManager.__new__(vm.VisitManager)
-    m.db, m._lock, m.stats, m.verifier = DB(), threading.RLock(), {}, Clef(p)
+    m.db, m._lock, m.stats, m.verifier = DB(), threading.RLock(), {}, Clef(p, body)
     m._subjects = {1: {"name": "Ana", "named": True}, 2: {"name": None, "named": False}, 3: {"name": "Neto", "named": True}}
     return m
 
@@ -51,3 +52,29 @@ def test_nunca_mueve_la_visita_de_alguien_con_nombre():
     m = mgr(0.99)
     assert m._id_check(30, 3, 1, 0.40, b"face") == "bloqueado"           # Neto -> Ana: bloqueado aunque Clef diga 0.99
     assert m.db._conn.execute("SELECT subject_id FROM person_visits WHERE id=30").fetchone()[0] == 3
+
+
+def test_cara_dudosa_mas_cuerpo_parecido_se_une_sola():
+    m = mgr(0.7, body=0.82)
+    assert m._id_check(20, 2, 1, 0.33, b"face") == "auto_doble"
+    assert m.db._conn.execute("SELECT subject_id FROM person_visits WHERE id=20").fetchone()[0] == 1
+
+
+def test_cara_dudosa_con_cuerpo_distinto_solo_sugiere():
+    m = mgr(0.7, body=0.3)
+    assert m._id_check(20, 2, 1, 0.33, b"face") == "sugerencia"
+    assert m.db._conn.execute("SELECT subject_id FROM person_visits WHERE id=20").fetchone()[0] == 2
+
+
+def test_el_cuerpo_nunca_une_a_alguien_con_nombre():
+    m = mgr(0.7, body=0.99)
+    assert m._id_check(30, 3, 1, 0.40, b"face") == "bloqueado"
+
+
+def test_cara_borrosa_borra_el_sujeto_de_visita_unica_pero_no_el_nombrado():
+    m = mgr(0.9)
+    m._drop_orphan_subject(20)                                  # sujeto 2: sin nombre, una sola visita
+    assert m.db._conn.execute("SELECT subject_id FROM person_visits WHERE id=20").fetchone()[0] is None
+    assert m.db._conn.execute("SELECT COUNT(*) FROM subjects WHERE id=2").fetchone()[0] == 0 and 2 not in m._subjects
+    m._drop_orphan_subject(10)                                  # sujeto 1: con nombre, se conserva
+    assert m.db._conn.execute("SELECT subject_id FROM person_visits WHERE id=10").fetchone()[0] == 1

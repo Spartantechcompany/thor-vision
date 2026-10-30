@@ -41,6 +41,8 @@ def _fit(frame: np.ndarray, w: int, h: int) -> np.ndarray:
     return cv2.resize(frame, (max(2, int(fw * k) // 2 * 2), max(2, int(fh * k) // 2 * 2)), interpolation=cv2.INTER_AREA) if k < 1.0 else frame
 
 
+CLEF_GATE = os.environ.get("CLEF_GATE", "shadow").lower()          # off | shadow (mide y guarda clef_p, no descarta) | on (descarta clef_p < CLEF_GATE_MIN)
+CLEF_GATE_MIN = float(os.environ.get("CLEF_GATE_MIN", "0.15"))
 ANIMALS = {"perro", "gato"}
 ALERT_SILENCE_S = float(os.environ.get("ALERT_SILENCE_S", "900"))   # misma camara y mismo tipo de alerta: se agrupa en la anterior durante 15 min
 _SEV = {"none": 0, "low": 1, "medium": 2, "high": 3}
@@ -116,6 +118,7 @@ class VLMWorker(threading.Thread):
         scene=None,
         require_person: bool = False,
         sustain_s: float = 10.0,
+        clef=None,                # ClefClient: segunda compuerta (algo real se mueve) antes de llamar al VLM
         tracks_source=None,       # VisitManager: personas reales en cuadro (sin falsos fijos), para describir una vez por episodio
     ):
         super().__init__(daemon=True, name=f"vlm-{cam_id}")
@@ -141,6 +144,8 @@ class VLMWorker(threading.Thread):
         self.sustain_s           = sustain_s
         self._skip_log: deque    = deque(maxlen=3000)
         self.tracks_source       = tracks_source
+        self.clef                = clef
+        self.clef_log: deque     = deque(maxlen=5000)   # (ts, p, lo-habria-descartado)
         self._last_ep            = None           # (ids de tracks, hubo animal, ts) del ultimo episodio descrito
         self.gate_skips: deque   = deque(maxlen=5000)   # (ts, motivo)
         self._alert_last: dict   = {}             # tipos de alerta -> (ts, severidad, event_id)
@@ -193,6 +198,25 @@ class VLMWorker(threading.Thread):
         if last is not None and ids <= last[0] and (animal <= last[1]) and time.time() - last[2] < EPISODE_REFRESH_S:
             return "mismo_episodio", None
         return None, (ids, animal)
+
+    def _clef_gate(self, frame: np.ndarray):
+        """(p, descartar). p = probabilidad Clef de que algo real se mueva (None si Clef no respondio); descartar solo en modo 'on'."""
+        if CLEF_GATE == "off" or self.clef is None:
+            return None, False
+        fr = [f for _, f in list(self._ring)] or [frame]
+        picks = [fr[0], fr[len(fr) // 2], fr[-1]] if len(fr) >= 3 else fr[-1:]
+        jpgs = [cv2.imencode(".jpg", x, [cv2.IMWRITE_JPEG_QUALITY, 85])[1].tobytes() for x in picks]
+        p = self.clef.relevant_motion(jpgs, self.cam_id)
+        if p is None:
+            return None, False
+        would = p < CLEF_GATE_MIN
+        self.clef_log.append((time.time(), p, would))
+        return p, would and CLEF_GATE == "on"
+
+    def clef_last_hour(self) -> dict:
+        cutoff = time.time() - 3600
+        rows = [r for r in list(self.clef_log) if r[0] >= cutoff]
+        return {"consultas": len(rows), "habria_descartado": sum(1 for r in rows if r[2]), "modo": CLEF_GATE}
 
     def gate_last_hour(self) -> dict:
         cutoff = time.time() - 3600
@@ -352,6 +376,14 @@ class VLMWorker(threading.Thread):
                     self.last_info = dict(self.last_info, skipped="igual", skipped_ts=time.time())
                     self._stop.wait(self.check_interval_s)
                     continue
+                clef_p = None
+                if reason == "cam-motion" and not high:
+                    clef_p, clef_skip = self._clef_gate(frame)
+                    if clef_skip:
+                        self._handled_rise = time.time()
+                        self.gate_skips.append((time.time(), "clef_irrelevante"))
+                        self._stop.wait(self.check_interval_s)
+                        continue
                 if not high and vlm_analyzer.gateway_busy():
                     self.busy_skips.append(time.time())        # gateway saturado: la rutina espera (no cuenta como analisis)
                     self._stop.wait(self.check_interval_s)
@@ -408,6 +440,8 @@ class VLMWorker(threading.Thread):
                         payload = dict(result)
                         payload["_trigger"]    = reason
                         payload["_media_kind"] = media_kind
+                        if clef_p is not None:
+                            payload["clef_p"] = round(clef_p, 3)
                         if group and group.get("repeat_of"):
                             payload["repeat_of"] = group["repeat_of"]
                         elif group and group.get("dropped"):

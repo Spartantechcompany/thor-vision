@@ -40,6 +40,7 @@ SAME_BODY_Q = {"same": {"type": "noul", "instructions": "Are these two security-
                                                     "body build, hair and accessories; ignore pose, camera angle, lighting and image quality."}}
 
 
+RELEVANT_Q = {"relevant": {"type": "noul", "instructions": "Does a real person, vehicle or animal enter, leave or move through the scene in this camera footage? Answer false if the only changes are lighting, sun, shadows, infrared noise, compression, reflections or fixed objects, or if the only moving things are far away cars on a distant street."}}
 FACE_CLEAR_Q = {"clear": {"type": "noul", "instructions": "Is this face photo clear enough to recognize the person? Answer false if it is blurry, smeared, "
                                                       "streaked by video compression, pixelated, too small, too dark, the face is mostly hidden or turned away, "
                                                       "or it is not a face at all."}}
@@ -76,6 +77,15 @@ class ClefClient:
                     self._paused_until, self._fails = time.time() + PAUSE_S, 0
                     logger.warning("Clef: %d fallos seguidos, pausa de %.0f s (%s)", FAILS, PAUSE_S, exc)
             self.stats["errors"] += 1
+            return None
+
+    def relevant_motion(self, frames: list, where: str = "") -> Optional[float]:
+        """frames: 2-3 JPEG del momento (inicio, medio, fin). Probabilidad de que algo real (persona, vehiculo, animal) se mueva en la escena;
+        AUC 0.998 con 3 fotos sobre 45 clips etiquetados a mano (el umbral util es bajo, ~0.15: los puntajes salen bajos). None si no hay respuesta."""
+        out = self.decide({"task": "Security camera footage; decide whether anything worth describing happened.", "camera": where}, frames, RELEVANT_Q)
+        try:
+            return float(out["answers"]["relevant"]["noul"]) if out else None
+        except (KeyError, TypeError, ValueError):
             return None
 
     def same_person(self, face_a: bytes, face_b: bytes) -> Optional[float]:

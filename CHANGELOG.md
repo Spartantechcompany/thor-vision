@@ -2,6 +2,15 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.47.0 — Clef en las compuertas y en la creación de identidades (2026-10-30)
+
+Clef-flash (ya instalado) ahora acepta video y fotos para decidir si algo real se mueve en la escena: en 45 clips etiquetados a mano separó lo relevante del ruido con AUC 0.998 con 3 fotos (el modelo 27B no mejoró y tarda tres veces más). Entra como segunda compuerta antes del modelo de visión, en modo sombra: mide y guarda su probabilidad en cada análisis (clef_p) sin descartar nada, para compararla un día completo contra lo que el modelo de visión ve de verdad. En identidades: una cara que Clef juzga borrosa ya no deja un sujeto huérfano (80 % de los sujetos sin nombre tenía una sola visita y 583 ni conservaron la cara), y cuando la cara queda en zona dudosa (0.6 a 0.85) el cuerpo desempata: si Clef también ve el mismo cuerpo (≥0.7) las dos visitas se unen solas; nunca se mueve a alguien con nombre.
+
+- **VLM · Compuerta Clef (sombra)**: CLEF_GATE=off|shadow|on, CLEF_GATE_MIN=0.15. ClefClient.relevant_motion con 3 fotos del anillo. clef_p en el evento; /api/pipeline → vlm.clef_1h (habria_descartado).
+- **Identidades · Confirmación doble cara + cuerpo**: VisitManager._id_check: Clef cara 0.6-0.85 y same_body ≥ ID_BODY_CONFIRM_P=0.7 → decisión auto_doble. Nunca con sujetos con nombre.
+- **Identidades · Sujeto huérfano por cara borrosa**: VisitManager._drop_orphan_subject: si Clef quita la cara y era la única visita de un sujeto sin nombre, se borra el sujeto (la visita se conserva).
+- **Clef · Servidor con video**: clef_server.py acepta videos (CLEF_VIDEO_FRAMES=8) y CLEF_NAME; scripts/bench_clef_video.py.
+
 ## v2.46.0 — Menos llamadas al modelo de visión (2026-10-30)
 
 El modelo de visión ya no describe cada movimiento: solo entra cuando YOLO ve una persona real o un animal, y describe una vez por episodio (las mismas personas no se vuelven a describir en 10 minutos). En las cámaras de calle solo se describe a quien se acerca a la puerta; el resto queda como conteo. Los objetos que YOLO confunde con personas en el mismo lugar (la bicicleta con casco del Garage posterior) se recuerdan y dejan de abrir visitas. El análisis de rutina sin movimiento pasa de cada 15 minutos a cada hora. Alertas: sin tipo o sin severidad no cuentan, en la calle solo media y alta, y el mismo tipo en la misma cámara se agrupa durante 15 minutos salvo que suba de severidad. En el Garage posterior entrar por el portón ya no es alerta (de noche sigue siendo persona nocturna).

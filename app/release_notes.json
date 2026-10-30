@@ -1,5 +1,33 @@
 [
   {
+    "version": "2.47.0",
+    "date": "2026-10-30",
+    "name": "Clef en las compuertas y en la creación de identidades",
+    "summary": "Clef-flash (ya instalado) ahora acepta video y fotos para decidir si algo real se mueve en la escena: en 45 clips etiquetados a mano separó lo relevante del ruido con AUC 0.998 con 3 fotos (el modelo 27B no mejoró y tarda tres veces más). Entra como segunda compuerta antes del modelo de visión, en modo sombra: mide y guarda su probabilidad en cada análisis (clef_p) sin descartar nada, para compararla un día completo contra lo que el modelo de visión ve de verdad. En identidades: una cara que Clef juzga borrosa ya no deja un sujeto huérfano (80 % de los sujetos sin nombre tenía una sola visita y 583 ni conservaron la cara), y cuando la cara queda en zona dudosa (0.6 a 0.85) el cuerpo desempata: si Clef también ve el mismo cuerpo (≥0.7) las dos visitas se unen solas; nunca se mueve a alguien con nombre.",
+    "highlights": [
+      {
+        "area": "VLM",
+        "title": "Compuerta Clef (sombra)",
+        "text": "CLEF_GATE=off|shadow|on, CLEF_GATE_MIN=0.15. ClefClient.relevant_motion con 3 fotos del anillo. clef_p en el evento; /api/pipeline → vlm.clef_1h (habria_descartado)."
+      },
+      {
+        "area": "Identidades",
+        "title": "Confirmación doble cara + cuerpo",
+        "text": "VisitManager._id_check: Clef cara 0.6-0.85 y same_body ≥ ID_BODY_CONFIRM_P=0.7 → decisión auto_doble. Nunca con sujetos con nombre."
+      },
+      {
+        "area": "Identidades",
+        "title": "Sujeto huérfano por cara borrosa",
+        "text": "VisitManager._drop_orphan_subject: si Clef quita la cara y era la única visita de un sujeto sin nombre, se borra el sujeto (la visita se conserva)."
+      },
+      {
+        "area": "Clef",
+        "title": "Servidor con video",
+        "text": "clef_server.py acepta videos (CLEF_VIDEO_FRAMES=8) y CLEF_NAME; scripts/bench_clef_video.py."
+      }
+    ]
+  },
+  {
     "version": "2.46.0",
     "date": "2026-10-30",
     "name": "Menos llamadas al modelo de visión",

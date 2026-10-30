@@ -41,6 +41,7 @@ FACE_MIN_DET = _f("FACE_MIN_DET", 0.7)
 FACE_BLUR_MIN = _f("FACE_BLUR_MIN", 20.0)
 FACE_THUMB_MIN_PX = _f("FACE_THUMB_MIN_PX", 40.0)     # ancho nativo minimo de la cara para guardarla como miniatura (mas chica se ve borrosa)
 FACE_THUMB_SHARP = _f("FACE_THUMB_SHARP", 120.0)     # nitidez minima (varianza del Laplaciano a 64 px): solo corta lo muy desenfocado; lo fino lo juzga Clef
+ID_BODY_P = _f("ID_BODY_CONFIRM_P", 0.7)        # cara en zona de sugerencia (>=ID_SUGGEST_P) + cuerpo parecido (Clef >= esto): dos señales independientes, se une sola
 FACE_CLEF_MIN = _f("FACE_CLEF_MIN", 0.18)            # Clef: por debajo, la cara de la visita no se muestra (barrida, borrosa o no es cara); 0 lo apaga
 SNAP_FACE_BONUS = _f("FACE_SNAP_BONUS", 1.3)          # la captura JPEG de la camara no trae el barrido del video H.264: a igual calidad, gana
 MATCH_THR = _f("SUBJECT_MATCH_THRESHOLD", 0.45)
@@ -375,10 +376,43 @@ class VisitManager:
                 self.db._conn.execute("UPDATE person_visits SET face=NULL WHERE id=?", (vid,))
                 self.db._conn.commit()
             self.stats["face_clef_drop"] = self.stats.get("face_clef_drop", 0) + 1
+            self._drop_orphan_subject(vid)
         else:
             self.stats["face_clef_ok"] = self.stats.get("face_clef_ok", 0) + 1
         logger.info("FACE_Q visita=%s Clef=%.2f %s", vid, p, "quitada" if p < FACE_CLEF_MIN else "ok")
         return p
+
+    def _drop_orphan_subject(self, vid) -> None:
+        """La cara se juzgo borrosa: si esta visita era la UNICA de un sujeto sin nombre, ese sujeto nacio de un embedding malo. Se desliga y se borra
+        (la visita conserva cuerpo, escena y hora). Nunca toca sujetos con nombre ni con otras visitas."""
+        with self._lock:
+            with self.db._lock:
+                row = self.db._conn.execute("SELECT subject_id FROM person_visits WHERE id=?", (vid,)).fetchone()
+                sid = row[0] if row else None
+                if sid is None:
+                    return
+                n = self.db._conn.execute("SELECT COUNT(*) FROM person_visits WHERE subject_id=?", (sid,)).fetchone()[0]
+                if n != 1 or (self._subjects.get(sid) or {}).get("named"):
+                    return
+                self.db._conn.execute("UPDATE person_visits SET subject_id=NULL WHERE id=?", (vid,))
+                self.db._conn.execute("DELETE FROM subjects WHERE id=? AND named=0", (sid,))
+                self.db._conn.commit()
+            self._subjects.pop(sid, None)
+        self.stats["subjects_dropped_blur"] = self.stats.get("subjects_dropped_blur", 0) + 1
+        logger.info("ID_ORPHAN visita=%s sujeto=%s borrado (cara borrosa, visita unica)", vid, sid)
+
+    def _body_same(self, vid, cand) -> Optional[float]:
+        """Clef compara el cuerpo de la visita con el mejor cuerpo del candidato (ropa, complexion)."""
+        try:
+            with self.db._lock:
+                a = self.db._conn.execute("SELECT body FROM person_visits WHERE id=?", (vid,)).fetchone()
+                b = self.db._conn.execute("SELECT body FROM person_visits WHERE subject_id=? AND body IS NOT NULL AND id<>? ORDER BY body_score DESC LIMIT 1", (cand, vid)).fetchone()
+        except sqlite3.Error as exc:
+            logger.debug("body_same: %s", exc)
+            return None
+        if not a or not a[0] or not b or not self.verifier:
+            return None
+        return self.verifier.same_body(a[0], b[0])
 
     def _id_check(self, vid, sid0, cand, sim, face) -> Optional[str]:
         with self.db._lock:
@@ -391,8 +425,11 @@ class VisitManager:
         s0, sc = self._subjects.get(sid0) or {}, self._subjects.get(cand) or {}
         blocked = bool(s0.get("named"))                          # visitas de alguien con nombre no se mueven solas (evito un Oswaldo -> Neto)
         decision = "bloqueado" if blocked and p >= ID_SUGGEST_P else "no"
-        if p >= ID_AUTO_P and not blocked:
-            decision = "auto"
+        body_p = None
+        if ID_SUGGEST_P <= p < ID_AUTO_P and not blocked:
+            body_p = self._body_same(vid, cand)                     # cara dudosa: el cuerpo desempata
+        if (p >= ID_AUTO_P or (body_p is not None and body_p >= ID_BODY_P)) and not blocked:
+            decision = "auto" if p >= ID_AUTO_P else "auto_doble"
             with self._lock:
                 self.db.update_person_visit(vid, subject_id=cand)
                 with self.db._lock:
@@ -402,6 +439,8 @@ class VisitManager:
                         self._subjects.pop(sid0, None)
                     self.db._conn.commit()
             self.stats["id_clef_auto"] = self.stats.get("id_clef_auto", 0) + 1
+            if decision == "auto_doble":
+                self.stats["id_clef_doble"] = self.stats.get("id_clef_doble", 0) + 1
         elif p >= ID_SUGGEST_P and not blocked:
             decision = "sugerencia"
             self.stats["id_clef_suggest"] = self.stats.get("id_clef_suggest", 0) + 1
@@ -411,7 +450,7 @@ class VisitManager:
             self.db._conn.execute("INSERT INTO identity_checks (ts, visit_id, from_sid, into_sid, sim, p_clef, decision) VALUES (?,?,?,?,?,?,?)",
                                   (time.time(), vid, sid0, cand, round(sim, 3), round(p, 3), decision))
             self.db._conn.commit()
-        logger.info("ID_CLEF visita=%s %s -> %s IF=%.2f Clef=%.2f %s", vid, sid0, cand, sim, p, decision)
+        logger.info("ID_CLEF visita=%s %s -> %s IF=%.2f Clef=%.2f cuerpo=%s %s", vid, sid0, cand, sim, p, "-" if body_p is None else f"{body_p:.2f}", decision)
         return decision
 
     def _ver_loop(self) -> None:

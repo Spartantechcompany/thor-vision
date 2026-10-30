@@ -33,7 +33,7 @@ class DB:
     def __init__(self):
         self._lock = threading.RLock()
         self._conn = sqlite3.connect(":memory:", check_same_thread=False)
-        self._conn.executescript("CREATE TABLE person_visits (id INTEGER PRIMARY KEY, face BLOB); INSERT INTO person_visits VALUES (1, x'01'), (2, x'02');")
+        self._conn.executescript("CREATE TABLE person_visits (id INTEGER PRIMARY KEY, face BLOB, subject_id INTEGER); INSERT INTO person_visits VALUES (1, x'01', NULL), (2, x'02', NULL);")
 
 
 class Clef:
@@ -43,7 +43,7 @@ class Clef:
 
 def _mgr(p):
     m = vm.VisitManager.__new__(vm.VisitManager)
-    m.db, m.stats, m.verifier = DB(), {}, Clef(p)
+    m.db, m.stats, m.verifier, m._lock, m._subjects = DB(), {}, Clef(p), __import__('threading').RLock(), {}
     return m
 
 

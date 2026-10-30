@@ -422,6 +422,7 @@ async def lifespan(app: FastAPI):
                 require_person        = require_person,
                 sustain_s             = sustain_s,
                 tracks_source         = getattr(app.state, "visits", None),
+                clef                  = getattr(app.state, "clef", None),
                 cam_id              = cam.id,
                 buffer              = buf,
                 store               = detection_store,

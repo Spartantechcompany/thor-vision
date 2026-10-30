@@ -84,3 +84,37 @@ def test_alertas_validas_agrupadas_y_calle_baja():
     calle = _worker("cam-189", [])
     assert calle._alert_filter({"alert_types": ["merodeo"], "severity": "low"})[1]["dropped"] == "calle_baja"
     assert calle._alert_filter({"alert_types": ["merodeo"], "severity": "medium"})[0]
+
+
+class _FakeClef:
+    def __init__(self, p): self.p, self.n = p, 0
+
+    def relevant_motion(self, frames, where=""):
+        self.n += 1
+        return self.p
+
+
+def _frame():
+    import numpy as np
+    return np.zeros((270, 480, 3), np.uint8)
+
+
+def test_compuerta_clef_sombra_mide_pero_no_descarta(monkeypatch):
+    w = _worker("cam-118", [])
+    w.clef, w._ring, w.clef_log = _FakeClef(0.02), [], __import__("collections").deque(maxlen=50)
+    monkeypatch.setattr(vw, "CLEF_GATE", "shadow")
+    assert w._clef_gate(_frame()) == (0.02, False)
+    assert w.clef_last_hour()["habria_descartado"] == 1
+
+
+def test_compuerta_clef_activa_descarta_lo_irrelevante(monkeypatch):
+    w = _worker("cam-118", [])
+    w.clef, w._ring, w.clef_log = _FakeClef(0.02), [], __import__("collections").deque(maxlen=50)
+    monkeypatch.setattr(vw, "CLEF_GATE", "on")
+    assert w._clef_gate(_frame()) == (0.02, True)
+    w.clef = _FakeClef(0.6)
+    assert w._clef_gate(_frame()) == (0.6, False)
+    w.clef = _FakeClef(None)                                    # Clef caido: nunca bloquea
+    assert w._clef_gate(_frame()) == (None, False)
+    monkeypatch.setattr(vw, "CLEF_GATE", "off")
+    assert w._clef_gate(_frame()) == (None, False)
