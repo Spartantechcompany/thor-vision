@@ -2,6 +2,13 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
+## v2.48.0 — Login de producción y menos llamadas al modelo, juntos (2026-11-11)
+
+Integra el acceso con usuario y contraseña de Diego Reyes (PR #3) en su versión de producción, la que corría en la Thor desde el 27 de octubre: roles admin y operador, panel /admin, bloqueo de IP tras intentos fallidos y código de 6 dígitos. Se suma a las mejoras de la 2.46 y 2.47 (el modelo de visión describe una vez por episodio y solo con persona real o animal, memoria de falsos fijos, alertas agrupadas, Clef en modo sombra). Las dos líneas de trabajo se habían separado: desplegar una quitaba la otra.
+
+- **Acceso · Login de producción**: app/auth tal como corría en la Thor (panel.py, roles, ip_blocks, sin_2fa); main.py registra auth y panel después de NoCacheHTML, igual que en producción. Cuentas en data/auth.db.
+- **Repo · Rama unida con main**: Fusiona upstream/main (snapshot de producción del 26-oct + PR #3). config/iot.yml y topology.yml dejan de versionarse, como en main. El lint excluye app/_vendor (segno).
+
 ## v2.47.0 — Clef en las compuertas y en la creación de identidades (2026-10-30)
 
 Clef-flash (ya instalado) ahora acepta video y fotos para decidir si algo real se mueve en la escena: en 45 clips etiquetados a mano separó lo relevante del ruido con AUC 0.998 con 3 fotos (el modelo 27B no mejoró y tarda tres veces más). Entra como segunda compuerta antes del modelo de visión, en modo sombra: mide y guarda su probabilidad en cada análisis (clef_p) sin descartar nada, para compararla un día completo contra lo que el modelo de visión ve de verdad. En identidades: una cara que Clef juzga borrosa ya no deja un sujeto huérfano (80 % de los sujetos sin nombre tenía una sola visita y 583 ni conservaron la cara), y cuando la cara queda en zona dudosa (0.6 a 0.85) el cuerpo desempata: si Clef también ve el mismo cuerpo (≥0.7) las dos visitas se unen solas; nunca se mueve a alguien con nombre.

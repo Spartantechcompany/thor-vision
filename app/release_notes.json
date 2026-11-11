@@ -1,5 +1,23 @@
 [
   {
+    "version": "2.48.0",
+    "date": "2026-11-11",
+    "name": "Login de producción y menos llamadas al modelo, juntos",
+    "summary": "Integra el acceso con usuario y contraseña de Diego Reyes (PR #3) en su versión de producción, la que corría en la Thor desde el 27 de octubre: roles admin y operador, panel /admin, bloqueo de IP tras intentos fallidos y código de 6 dígitos. Se suma a las mejoras de la 2.46 y 2.47 (el modelo de visión describe una vez por episodio y solo con persona real o animal, memoria de falsos fijos, alertas agrupadas, Clef en modo sombra). Las dos líneas de trabajo se habían separado: desplegar una quitaba la otra.",
+    "highlights": [
+      {
+        "area": "Acceso",
+        "title": "Login de producción",
+        "text": "app/auth tal como corría en la Thor (panel.py, roles, ip_blocks, sin_2fa); main.py registra auth y panel después de NoCacheHTML, igual que en producción. Cuentas en data/auth.db."
+      },
+      {
+        "area": "Repo",
+        "title": "Rama unida con main",
+        "text": "Fusiona upstream/main (snapshot de producción del 26-oct + PR #3). config/iot.yml y topology.yml dejan de versionarse, como en main. El lint excluye app/_vendor (segno)."
+      }
+    ]
+  },
+  {
     "version": "2.47.0",
     "date": "2026-10-30",
     "name": "Clef en las compuertas y en la creación de identidades",

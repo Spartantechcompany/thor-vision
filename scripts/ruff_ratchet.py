@@ -15,7 +15,7 @@ BASE = pathlib.Path(__file__).resolve().parent.parent / ".ci" / "ruff-baseline.j
 
 
 def current() -> dict:
-    out = subprocess.run(["ruff", "check", "app", "--select", SELECT, "--output-format", "json", "--exit-zero"],
+    out = subprocess.run(["ruff", "check", "app", "--select", SELECT, "--extend-exclude", "app/_vendor", "--output-format", "json", "--exit-zero"],
                          capture_output=True, text=True, check=True).stdout
     return dict(collections.Counter(d["code"] for d in json.loads(out or "[]")))
 
