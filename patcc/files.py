@@ -1,11 +1,11 @@
-"""Archivos de datos de OXM Hogar: JSON con escritura atómica y, para secretos, permisos 600."""
+"""Archivos de datos de PAT Control Center: JSON con escritura atómica y, para secretos, permisos 600."""
 import json
 import os
 import tempfile
 import threading
 import time
 
-DATA = os.environ.get("HOGAR_DATA", "/srv/data")
+DATA = os.environ.get("PATCC_DATA", "/srv/data")
 _lock = threading.Lock()
 
 

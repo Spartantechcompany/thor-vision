@@ -2,13 +2,13 @@
 
 Generado desde `app/release_notes.json` (la misma fuente que muestra el dashboard). Versionado semántico: mayor = cambia el modelo de datos o el flujo; menor = funciones nuevas; parche = correcciones.
 
-## v2.49.0 — OXM Hogar: panel aparte de luces y dispositivos (2026-11-18)
+## v2.49.0 — PAT Control Center: centro de control de luces y dispositivos (2026-11-18)
 
-Nuevo panel OXM Hogar (puerto 8095, contenedor propio) para controlar y automatizar las luces y dispositivos de la casa: interruptores, focos y cortinas de Tuya, y luces, bocinas, Apple TV y Fire TV de Home Assistant. Escenas que mezclan los dos sistemas y horarios por hora fija o al atardecer/amanecer. El token de Home Assistant se pega en Ajustes y nunca sale del servidor. Usa el mismo acceso de thor-vision (usuario, contraseña y código) con cuentas y cookies propias. thor-vision muestra solo un reflejo: un indicador con las luces encendidas que abre el panel.
+Nuevo PAT Control Center (PAT·CC; puerto 8095, contenedor propio) para controlar y automatizar las luces y dispositivos de la casa Patricio 10: interruptores, focos y cortinas de Tuya, y luces, bocinas, Apple TV y Fire TV de Home Assistant. Escenas que mezclan los dos sistemas y horarios por hora fija o al atardecer/amanecer. Sin login por defecto (red local de confianza; la bitácora anota desde qué dirección se ordenó); el login de thor-vision queda como opción con PATCC_AUTH=on. El token de Home Assistant se pega en Ajustes y nunca sale del servidor. thor-vision muestra solo un reflejo: un indicador con las luces encendidas.
 
-- **Hogar · Servicio aparte**: hogar/ (FastAPI): ha.py (acciones permitidas, token 600), tuya.py (estado de thor-vision, control por el servicio de oapc-devops), automation.py (escenas y horarios). docs/HOGAR.md.
-- **Acceso · Login reutilizable**: app/auth: THOR_COOKIE_PREFIX, THOR_APP_NAME y THOR_MACHINE_EXTRA por variable de entorno; sin cambios con los valores por defecto.
-- **Vision · Reflejo del hogar**: GET /api/hogar/resumen (con HOGAR_TOKEN) y un indicador de luces en el encabezado.
+- **PAT·CC · Servicio aparte**: patcc/ (FastAPI): ha.py (acciones permitidas, token 600), tuya.py (estado de thor-vision, control por el servicio de oapc-devops), automation.py (escenas y horarios). docs/PAT-CONTROL-CENTER.md.
+- **Acceso · Login opcional y reutilizable**: app/auth: THOR_COOKIE_PREFIX, THOR_APP_NAME y THOR_MACHINE_EXTRA por variable de entorno; sin cambios con los valores por defecto. PAT·CC sin login salvo PATCC_AUTH=on.
+- **Vision · Reflejo de PAT·CC**: GET /api/patcc/resumen y un indicador de luces en el encabezado que abre PAT Control Center.
 
 ## v2.48.0 — Login de producción y menos llamadas al modelo, juntos (2026-11-11)
 

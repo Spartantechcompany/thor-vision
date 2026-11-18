@@ -27,7 +27,7 @@ class Tuya:
         self._stop = threading.Event()
 
     def start(self) -> None:
-        threading.Thread(target=self._bulbs_loop, daemon=True, name="hogar-focos").start()
+        threading.Thread(target=self._bulbs_loop, daemon=True, name="patcc-focos").start()
 
     # ── estado ─────────────────────────────────────────────────────
     def devices(self, max_age: float = 4.0) -> list:

@@ -14,7 +14,7 @@ import time
 import uuid
 from datetime import datetime, timedelta
 
-from hogar import files
+from patcc import files
 
 SCENES = "escenas.json"
 SCHEDULES = "horarios.json"
@@ -181,7 +181,7 @@ class Automations:
         return results
 
     def start(self) -> None:
-        threading.Thread(target=self._loop, daemon=True, name="hogar-horarios").start()
+        threading.Thread(target=self._loop, daemon=True, name="patcc-horarios").start()
 
     def _sun(self):
         try:

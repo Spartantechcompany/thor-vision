@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from hogar import files
+from patcc import files
 
 CFG = "ha.json"
 TIMEOUT = 8.0

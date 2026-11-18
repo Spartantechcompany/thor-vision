@@ -2,23 +2,23 @@
   {
     "version": "2.49.0",
     "date": "2026-11-18",
-    "name": "OXM Hogar: panel aparte de luces y dispositivos",
-    "summary": "Nuevo panel OXM Hogar (puerto 8095, contenedor propio) para controlar y automatizar las luces y dispositivos de la casa: interruptores, focos y cortinas de Tuya, y luces, bocinas, Apple TV y Fire TV de Home Assistant. Escenas que mezclan los dos sistemas y horarios por hora fija o al atardecer/amanecer. El token de Home Assistant se pega en Ajustes y nunca sale del servidor. Usa el mismo acceso de thor-vision (usuario, contraseña y código) con cuentas y cookies propias. thor-vision muestra solo un reflejo: un indicador con las luces encendidas que abre el panel.",
+    "name": "PAT Control Center: centro de control de luces y dispositivos",
+    "summary": "Nuevo PAT Control Center (PAT·CC; puerto 8095, contenedor propio) para controlar y automatizar las luces y dispositivos de la casa Patricio 10: interruptores, focos y cortinas de Tuya, y luces, bocinas, Apple TV y Fire TV de Home Assistant. Escenas que mezclan los dos sistemas y horarios por hora fija o al atardecer/amanecer. Sin login por defecto (red local de confianza; la bitácora anota desde qué dirección se ordenó); el login de thor-vision queda como opción con PATCC_AUTH=on. El token de Home Assistant se pega en Ajustes y nunca sale del servidor. thor-vision muestra solo un reflejo: un indicador con las luces encendidas.",
     "highlights": [
       {
-        "area": "Hogar",
+        "area": "PAT·CC",
         "title": "Servicio aparte",
-        "text": "hogar/ (FastAPI): ha.py (acciones permitidas, token 600), tuya.py (estado de thor-vision, control por el servicio de oapc-devops), automation.py (escenas y horarios). docs/HOGAR.md."
+        "text": "patcc/ (FastAPI): ha.py (acciones permitidas, token 600), tuya.py (estado de thor-vision, control por el servicio de oapc-devops), automation.py (escenas y horarios). docs/PAT-CONTROL-CENTER.md."
       },
       {
         "area": "Acceso",
-        "title": "Login reutilizable",
-        "text": "app/auth: THOR_COOKIE_PREFIX, THOR_APP_NAME y THOR_MACHINE_EXTRA por variable de entorno; sin cambios con los valores por defecto."
+        "title": "Login opcional y reutilizable",
+        "text": "app/auth: THOR_COOKIE_PREFIX, THOR_APP_NAME y THOR_MACHINE_EXTRA por variable de entorno; sin cambios con los valores por defecto. PAT·CC sin login salvo PATCC_AUTH=on."
       },
       {
         "area": "Vision",
-        "title": "Reflejo del hogar",
-        "text": "GET /api/hogar/resumen (con HOGAR_TOKEN) y un indicador de luces en el encabezado."
+        "title": "Reflejo de PAT·CC",
+        "text": "GET /api/patcc/resumen y un indicador de luces en el encabezado que abre PAT Control Center."
       }
     ]
   },

@@ -1,4 +1,4 @@
-"""OXM Hogar: acceso con cuentas y cookies propias, token de Home Assistant que nunca sale del servidor, acciones permitidas,
+"""PAT Control Center: acceso con cuentas y cookies propias, token de Home Assistant que nunca sale del servidor, acciones permitidas,
 escenas y horarios (hora fija y atardecer)."""
 import importlib
 from datetime import datetime
@@ -18,21 +18,21 @@ def _reload_auth():
 
 
 @pytest.fixture
-def hogar(tmp_path, monkeypatch):
+def patcc(tmp_path, monkeypatch):
     monkeypatch.setenv("THOR_AUTH_DB", str(tmp_path / "auth.db"))
     monkeypatch.setenv("THOR_SESSION_SECRET", SECRET)
     monkeypatch.setenv("THOR_MACHINE_TOKEN", MACHINE)
     monkeypatch.setenv("THOR_MACHINE_EXTRA", "/api/resumen")
-    monkeypatch.setenv("THOR_COOKIE_PREFIX", "hogar")
-    monkeypatch.setenv("HOGAR_AUTH", "on")
-    monkeypatch.setenv("THOR_APP_NAME", "OXM Hogar")
-    monkeypatch.setenv("HOGAR_DATA", str(tmp_path / "data"))
-    monkeypatch.setenv("HOGAR_NO_THREADS", "1")
+    monkeypatch.setenv("THOR_COOKIE_PREFIX", "patcc")
+    monkeypatch.setenv("PATCC_AUTH", "on")
+    monkeypatch.setenv("THOR_APP_NAME", "PAT Control Center")
+    monkeypatch.setenv("PATCC_DATA", str(tmp_path / "data"))
+    monkeypatch.setenv("PATCC_NO_THREADS", "1")
     _reload_auth()
-    for mod in ("hogar.files", "hogar.ha", "hogar.tuya", "hogar.automation", "hogar.main"):
+    for mod in ("patcc.files", "patcc.ha", "patcc.tuya", "patcc.automation", "patcc.main"):
         importlib.reload(importlib.import_module(mod))
     from app.auth import guard, passwords, sessions, store
-    from hogar import main
+    from patcc import main
 
     store.create_user("Ana.Admin", passwords.hash_password("clave-larga-123"), "admin")
     store.create_user("Beto.Op", passwords.hash_password("clave-larga-456"), "operador")
@@ -53,25 +53,25 @@ def hogar(tmp_path, monkeypatch):
     _reload_auth()
 
 
-def test_sin_sesion_no_entra_y_la_cookie_es_propia(hogar):
-    main, client, guard = hogar
-    assert guard.COOKIE_FULL == "hogar_sesion"                 # no pisa la sesión de thor-vision en el mismo host
+def test_sin_sesion_no_entra_y_la_cookie_es_propia(patcc):
+    main, client, guard = patcc
+    assert guard.COOKIE_FULL == "patcc_sesion"                 # no pisa la sesión de thor-vision en el mismo host
     c = client()
     assert c.get("/api/estado").status_code == 401
     r = c.get("/", headers={"accept": "text/html"}, follow_redirects=False)
     assert r.status_code in (302, 303) and "/login" in r.headers["location"]
-    assert "OXM Hogar" in c.get("/login").text
+    assert "PAT Control Center" in c.get("/login").text
 
 
-def test_estado_con_sesion(hogar):
-    main, client, _ = hogar
+def test_estado_con_sesion(patcc):
+    main, client, _ = patcc
     j = client("Beto.Op").get("/api/estado").json()
     assert j["user"] == {"name": "Beto.Op", "role": "operador"}
     assert j["ha"]["entities"][0]["id"] == "light.p1" and j["tuya"]["devices"][0]["name"] == "Cocina"
 
 
-def test_resumen_con_token_de_maquina(hogar):
-    main, client, _ = hogar
+def test_resumen_con_token_de_maquina(patcc):
+    main, client, _ = patcc
     c = client()
     assert c.get("/api/resumen").status_code == 401
     j = c.get("/api/resumen", headers={"Authorization": f"Bearer {MACHINE}"}).json()
@@ -79,9 +79,9 @@ def test_resumen_con_token_de_maquina(hogar):
     assert c.get("/api/estado", headers={"Authorization": f"Bearer {MACHINE}"}).status_code == 401   # la máquina solo ve el resumen
 
 
-def test_token_de_ha_solo_admin_y_nunca_vuelve(hogar, monkeypatch):
-    main, client, _ = hogar
-    from hogar import files
+def test_token_de_ha_solo_admin_y_nunca_vuelve(patcc, monkeypatch):
+    main, client, _ = patcc
+    from patcc import files
     monkeypatch.setattr(main.ha, "_get", staticmethod(lambda url, tok, p: {"version": "2026.11.0", "location_name": "Casa"}))
     op = client("Beto.Op")
     assert op.post("/api/ajustes/ha", json={"url": "http://192.168.0.110:8123", "token": "x" * 40}, headers=SAME).status_code == 403
@@ -100,8 +100,8 @@ def test_token_de_ha_solo_admin_y_nunca_vuelve(hogar, monkeypatch):
     assert ad.post("/api/ajustes/ha", json={"url": "ftp://x", "token": "y" * 40}, headers=SAME).status_code == 400
 
 
-def test_ha_solo_acciones_de_control(hogar, monkeypatch):
-    from hogar.ha import HA
+def test_ha_solo_acciones_de_control(patcc, monkeypatch):
+    from patcc.ha import HA
     h = HA()
     monkeypatch.setattr(h, "states", lambda max_age=2.0: [{"entity_id": "light.p1"}, {"entity_id": "button.oxmtech_drive_reboot"},
                                                           {"entity_id": "media_player.sala"}, {"entity_id": "tts.google"}])
@@ -111,8 +111,8 @@ def test_ha_solo_acciones_de_control(hogar, monkeypatch):
             h.call(dom, svc, {"entity_id": ent})
 
 
-def test_escena_y_horario(hogar):
-    from hogar import automation as A
+def test_escena_y_horario(patcc):
+    from patcc import automation as A
     with pytest.raises(ValueError):
         A.validate_scene({"name": "x", "actions": [{"t": "rm -rf"}]})
     s = A.validate_scene({"name": "Noche", "actions": [{"t": "focos", "ids": "all", "action": {"on": True, "brightness": 30}},
@@ -131,8 +131,8 @@ def test_escena_y_horario(hogar):
     assert A.target_today("amanecer", now, {}) is None            # sin datos del sol no se adivina
 
 
-def test_horario_corre_una_sola_vez(hogar, monkeypatch):
-    from hogar import automation as A
+def test_horario_corre_una_sola_vez(patcc, monkeypatch):
+    from patcc import automation as A
 
     class FakeTuya:
         calls = []
@@ -156,12 +156,12 @@ def test_horario_corre_una_sola_vez(hogar, monkeypatch):
 
 
 def test_sin_login_por_defecto_entra_cualquiera_de_la_red(tmp_path, monkeypatch):
-    monkeypatch.setenv("HOGAR_DATA", str(tmp_path / "data"))
-    monkeypatch.setenv("HOGAR_NO_THREADS", "1")
-    monkeypatch.delenv("HOGAR_AUTH", raising=False)
-    for mod in ("hogar.files", "hogar.ha", "hogar.tuya", "hogar.automation", "hogar.main"):
+    monkeypatch.setenv("PATCC_DATA", str(tmp_path / "data"))
+    monkeypatch.setenv("PATCC_NO_THREADS", "1")
+    monkeypatch.delenv("PATCC_AUTH", raising=False)
+    for mod in ("patcc.files", "patcc.ha", "patcc.tuya", "patcc.automation", "patcc.main"):
         importlib.reload(importlib.import_module(mod))
-    from hogar import files, main
+    from patcc import files, main
     monkeypatch.setattr(main.ha, "view", lambda: [])
     monkeypatch.setattr(main.tuya, "view", lambda: [])
     c = TestClient(main.app)

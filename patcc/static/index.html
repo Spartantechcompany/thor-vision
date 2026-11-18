@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0E1117">
-<title>OXM Hogar</title>
+<title>PAT Control Center</title>
 <style>
 :root{--bg:#0E1117;--card:#161B24;--panel:#1C2130;--borde:#252C3A;--texto:#E8EDF3;--sec:#8B949E;--apagado:#484F58;
 --acento:#76B900;--acento-glow:rgba(118,185,0,.35);--error:#F85149;--aviso:#D29922;--logo:#1E78C2;--radio:12px}
@@ -77,13 +77,14 @@ z-index:20;max-width:min(92vw,520px);box-shadow:0 10px 30px rgba(0,0,0,.5);displ
 .nota{background:var(--panel);border:1px solid var(--borde);border-left:3px solid var(--acento);border-radius:10px;padding:12px 14px;font-size:.9rem}
 .nota code{background:var(--bg);padding:1px 6px;border-radius:4px}
 .media-t{font-size:.85rem;color:var(--sec);min-height:1.2em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media (max-width:520px){.grid{grid-template-columns:1fr}.top{padding:10px 12px}main{padding:12px 12px 80px}}
+.marca .corto{display:none}
+@media (max-width:520px){.marca .largo{display:none}.marca .corto{display:inline}.grid{grid-template-columns:1fr}.top{padding:10px 12px}main{padding:12px 12px 80px}}
 </style>
 </head>
 <body>
 <header>
   <div class="top">
-    <div class="marca"><span class="oxm">oxm</span><span class="tech">tech</span> · <span class="app">Hogar</span></div>
+    <div class="marca"><span class="oxm">oxm</span><span class="tech">tech</span> · <span class="app"><span class="largo">PAT Control Center</span><span class="corto">PAT·CC</span></span></div>
     <span class="esp"></span>
     <span id="c-ha" class="chip">HA</span>
     <span id="c-tuya" class="chip">Tuya</span>
@@ -107,7 +108,7 @@ z-index:20;max-width:min(92vw,520px);box-shadow:0 10px 30px rgba(0,0,0,.5);displ
 'use strict';
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let TAB = (() => { try { return localStorage.getItem('hogar_tab') || 'inicio'; } catch (e) { return 'inicio'; } })();
+let TAB = (() => { try { return localStorage.getItem('patcc_tab') || 'inicio'; } catch (e) { return 'inicio'; } })();
 let S = null, SC = {scenes: [], schedules: [], next: null}, AJ = null, BUSY = 0, DRAFT = null;
 
 function toast(msg, bad){ const t = $('#toast'); t.textContent = msg; t.className = 'toast' + (bad ? ' mal' : ''); t.style.display = 'block';
@@ -341,7 +342,7 @@ function vAjustes(){
     ${admin ? `<label class="f">Dirección<input class="in" id="a-url" value="${esc(h.url || 'http://192.168.0.110:8123')}" autocomplete="off"></label>
     <label class="f">Token de acceso de larga duración<input class="in" id="a-tok" type="password" autocomplete="new-password" placeholder="${h.configured ? 'Pega uno nuevo para reemplazarlo' : 'Pega el token'}"></label>
     <div class="btns"><button class="btn pri" id="a-save">Probar y guardar</button>${h.configured ? '<button class="btn pel" id="a-del">Desconectar</button>' : ''}</div>
-    <small class="muted">El token se guarda solo en el servidor (archivo con permisos 600) y nunca vuelve al navegador. Este panel no pide cuenta: entra quien esté en la red local. Créalo en Home Assistant → tu perfil → Seguridad → Tokens de acceso de larga duración, con un nombre como «oxm-hogar».</small>`
+    <small class="muted">El token se guarda solo en el servidor (archivo con permisos 600) y nunca vuelve al navegador. Este panel no pide cuenta: entra quien esté en la red local. Créalo en Home Assistant → tu perfil → Seguridad → Tokens de acceso de larga duración, con un nombre como «pat-cc».</small>`
     : '<small class="muted">Solo un administrador puede cambiar la conexión.</small>'}
   </div>
   <h2>Tuya</h2><div class="card"><p>Servicio de control: <code>${esc(AJ.tuya_service)}</code><br>Estado de los equipos: <code>${esc(AJ.vision)}</code> (thor-vision)</p>
@@ -394,7 +395,7 @@ document.addEventListener('click', async ev => {
   const t = ev.target.closest('button, input[type=checkbox]');
   if (!t) return;
   const ds = t.dataset;
-  if (t.closest('#tabs')){ TAB = ds.t; try { localStorage.setItem('hogar_tab', TAB); } catch (e) {}
+  if (t.closest('#tabs')){ TAB = ds.t; try { localStorage.setItem('patcc_tab', TAB); } catch (e) {}
     document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b === t));
     if (TAB === 'escenas') await loadScenes(); if (TAB === 'ajustes') await loadAjustes(); render(true); return; }
   if (ds.ha){ doHa(ds.ha, t.checked ? 'turn_on' : 'turn_off', ds.e); return; }

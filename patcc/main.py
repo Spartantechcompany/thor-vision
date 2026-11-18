@@ -1,9 +1,9 @@
-"""OXM Hogar: una sola página con luces, medios, sensores, escenas y horarios de toda la casa (Home Assistant + Tuya).
+"""PAT Control Center: una sola página con luces, medios, sensores, escenas y horarios de toda la casa (Home Assistant + Tuya).
 
-Arranque:  uvicorn hogar.main:app --host 0.0.0.0 --port 8095
-Variables: HOGAR_DATA, THOR_AUTH_DB, THOR_SESSION_SECRET, THOR_COOKIE_PREFIX=hogar, THOR_APP_NAME="OXM Hogar",
+Arranque:  uvicorn patcc.main:app --host 0.0.0.0 --port 8095
+Variables: PATCC_DATA, THOR_AUTH_DB, THOR_SESSION_SECRET, THOR_COOKIE_PREFIX=patcc, THOR_APP_NAME="PAT Control Center",
            THOR_MACHINE_TOKEN + THOR_MACHINE_EXTRA=/api/resumen (para el reflejo en thor-vision), TUYA_SERVICE_URL, VISION_URL.
-Acceso: por defecto SIN login (red local de confianza, HOGAR_AUTH=off); con HOGAR_AUTH=on vuelve el login de app/auth y los roles
+Acceso: por defecto SIN login (red local de confianza, PATCC_AUTH=off); con PATCC_AUTH=on vuelve el login de app/auth y los roles
 (operador y admin controlan y crean escenas; solo admin cambia la conexión con Home Assistant).
 """
 import os
@@ -19,12 +19,12 @@ from app.auth.guard import COOKIE_FULL, AuthGuard
 from app.auth.panel import router as admin_auth_router
 from app.auth.routes import _same_origin
 from app.auth.routes import router as auth_router
-from hogar import automation, files
-from hogar.ha import HA, HAError
-from hogar.tuya import Tuya
+from patcc import automation, files
+from patcc.ha import HA, HAError
+from patcc.tuya import Tuya
 
 PAGE = pathlib.Path(__file__).parent / "static" / "index.html"
-AUTH = os.environ.get("HOGAR_AUTH", "off").lower() in ("on", "1", "true", "si")
+AUTH = os.environ.get("PATCC_AUTH", "off").lower() in ("on", "1", "true", "si")
 
 ha = HA()
 tuya = Tuya()
@@ -33,13 +33,13 @@ auto = automation.Automations(ha, tuya)
 
 @asynccontextmanager
 async def _lifespan(_app):
-    if os.environ.get("HOGAR_NO_THREADS") != "1":
+    if os.environ.get("PATCC_NO_THREADS") != "1":
         tuya.start()
         auto.start()
     yield
 
 
-app = FastAPI(title="OXM Hogar", docs_url=None, redoc_url=None, openapi_url=None, lifespan=_lifespan)
+app = FastAPI(title="PAT Control Center", docs_url=None, redoc_url=None, openapi_url=None, lifespan=_lifespan)
 
 
 # ── sesión y permisos ──────────────────────────────────────────────
@@ -240,7 +240,7 @@ def ajustes(request: Request):
     info = ha.info()
     if u.get("role") != "admin":
         info = {"configured": info["configured"], "url": info["url"]}
-    from hogar import tuya as tmod
+    from patcc import tuya as tmod
     return {"ha": info, "tuya_service": tmod.SVC, "vision": tmod.VISION, "role": u.get("role"), "auth": AUTH}
 
 
@@ -276,7 +276,7 @@ def bitacora(request: Request):
     return e or {"items": files.recent_log(150)}
 
 
-# Acceso (solo con HOGAR_AUTH=on): mismas pantallas y reglas que thor-vision, con cuentas y cookies propias. Al final = capa externa.
+# Acceso (solo con PATCC_AUTH=on): mismas pantallas y reglas que thor-vision, con cuentas y cookies propias. Al final = capa externa.
 if AUTH:
     app.include_router(auth_router)
     app.include_router(admin_auth_router)
