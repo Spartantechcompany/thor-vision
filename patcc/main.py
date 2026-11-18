@@ -109,7 +109,7 @@ def depurar_ha(entities: list, tuya_all: list):
         if e["domain"] not in ("light", "switch"):
             out.append(e)
             continue
-        tid = e.get("tuya_id")
+        tid = (e.get("tuya_id") or "").split("_")[0] or None          # los botones de un interruptor llegan como «<id>_channel_N»
         if tid:
             if tid in shown:
                 oculto["duplicados"] += 1

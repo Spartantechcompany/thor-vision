@@ -454,6 +454,8 @@ def test_depurar_ha_quita_duplicados_otra_casa_y_switches_que_no_son_luces(tmp_p
         {"id": "switch.cam_flip", "domain": "switch", "name": "Flip", "state": "off", "tuya_id": "cam999", "dev": "Cámara garaje"},              # ajuste de cámara, ya sale de Tuya
         {"id": "switch.barra", "domain": "switch", "name": "Barra Switch", "state": "off", "tuya_id": "otra123", "dev": "Barra"},                 # Coworking540
         {"id": "light.security", "domain": "light", "name": "Security Camera Floodlight", "state": "off", "tuya_id": "otra456", "dev": "Security Camera"},
+        {"id": "switch.cocina_ch2", "domain": "switch", "name": "Channel 2 Switch", "state": "off", "tuya_id": "aaa111_channel_2", "dev": "Channel 2"},   # botón de un interruptor de la casa
+        {"id": "switch.barra_ch1", "domain": "switch", "name": "Channel 1 Switch", "state": "off", "tuya_id": "otra123_channel_1", "dev": "Channel 1"},    # botón de otra casa
         {"id": "switch.pasillo_nuevo", "domain": "switch", "name": "Channel 1 Switch", "state": "off", "tuya_id": "nuevo77", "dev": "Pasillo 2"},  # de la casa y sin tarjeta: se queda con nombre
         {"id": "switch.oxmtech_drive_home_mode", "domain": "switch", "name": "OXMTECH_DRIVE Surveillance Station Home mode", "state": "off"},      # NAS
         {"id": "light.tp_link", "domain": "light", "name": "P1", "state": "off"},                                                                  # luz de otra marca: se queda
@@ -462,6 +464,6 @@ def test_depurar_ha_quita_duplicados_otra_casa_y_switches_que_no_son_luces(tmp_p
     out, oculto = main.depurar_ha(ents, tuya_casa)
     assert [e["id"] for e in out] == ["switch.pasillo_nuevo", "light.tp_link", "media_player.sala"]
     assert out[0]["name"] == "Pasillo 2 · Channel 1 Switch"
-    assert oculto == {"duplicados": 2, "otra_casa": 2, "no_luces": 1}
+    assert oculto == {"duplicados": 3, "otra_casa": 3, "no_luces": 1}
     monkeypatch.undo()
     _reload_auth()
