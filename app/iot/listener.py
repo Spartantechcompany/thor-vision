@@ -448,7 +448,7 @@ class IotListener:
                         "cam_name": self.cam_names.get(dev.get("cam") or "", None), "confirmed": bool(dev.get("confirmed")),
                         "open": st.get("open"), "since": st.get("since"), "battery": st.get("battery"), "last_ts": st.get("last_ts"), "online": st.get("online"),
                         "alias": dev.get("alias"), "role": dev.get("role"), "switches": st.get("sw"), "percent": st.get("percent"),
-                        "type": dev.get("type"), "gangs": dev.get("gangs"), "gang_names": dev.get("gang_names"), "cloud": dev.get("cloud", True),
+                        "type": dev.get("type"), "gangs": dev.get("gangs"), "gang_names": dev.get("gang_names"), "cloud": dev.get("cloud", True), "retired": bool(dev.get("retired")),
                         "info": st.get("info"), "children": st.get("children"),
                         "related": [{"id": c, "name": self.cam_names.get(c) or (self.devices_by_alias.get(c) or c)} for c in (dev.get("related") or [])]})
         return out

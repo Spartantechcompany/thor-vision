@@ -14,7 +14,7 @@ import time
 import uuid
 from datetime import datetime, timedelta
 
-from patcc import files
+from patcc import consola, files
 
 SCENES = "escenas.json"
 SCHEDULES = "horarios.json"
@@ -178,6 +178,7 @@ class Automations:
                 results.append({"ok": False, "what": a.get("t"), "detail": str(exc)[:160]})
         ok = sum(1 for r in results if r["ok"])
         files.log(who, f"escena «{sc['name']}»", f"{ok} de {len(results)} órdenes")
+        consola.log("info" if ok == len(results) else "warn", "escenas", f"«{sc['name']}» por {who}: {ok} de {len(results)} órdenes")
         return results
 
     def start(self) -> None:

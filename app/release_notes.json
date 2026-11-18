@@ -19,6 +19,21 @@
         "area": "Vision",
         "title": "Reflejo de PAT·CC",
         "text": "GET /api/patcc/resumen y un indicador de luces en el encabezado que abre PAT Control Center."
+      },
+      {
+        "area": "PAT·CC",
+        "title": "Registro de la nube y filtro por casa",
+        "text": "patcc/registro.py (SQLite): equipos, cambios y sincronizaciones; GET /registry y POST /registry/sync en el servicio Tuya; estado de nube por equipo (cupo, sin cupo, retirado); solo la casa PATCC_TUYA_HOME."
+      },
+      {
+        "area": "PAT·CC",
+        "title": "Conexiones, token y consola",
+        "text": "/api/conexiones (HA, Tuya, focos, MQTT, nube) con tiempos; vigencia del token leída del JWT; consola de devops en /consola con log y comandos de diagnóstico."
+      },
+      {
+        "area": "Vision",
+        "title": "iot_listener expone retired",
+        "text": "El estado de /api/iot/devices incluye retired (iot.yml)."
       }
     ]
   },

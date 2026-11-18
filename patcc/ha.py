@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from patcc import files
+from patcc import consola, files
 
 CFG = "ha.json"
 TIMEOUT = 8.0
@@ -69,6 +69,25 @@ class HA:
         return {"configured": self.configured, "url": c.get("url", ""), "token_hint": ("…" + tok[-4:]) if tok else "",
                 "saved_by": c.get("saved_by"), "saved_ts": c.get("saved_ts"), "last_error": self.last_error}
 
+    def token_info(self) -> dict:
+        """Fechas de creación y vencimiento leídas del propio token (JWT) solo para mostrarlas; el token nunca sale del servidor."""
+        import base64
+        import json
+        from datetime import datetime
+        tok = self._cfg().get("token") or ""
+        try:
+            part = tok.split(".")[1]
+            claims = json.loads(base64.urlsafe_b64decode(part + "=" * (-len(part) % 4)))
+        except (IndexError, ValueError):
+            return {}
+        out = {}
+        for k, name in (("iat", "created"), ("exp", "expires")):
+            if isinstance(claims.get(k), (int, float)):
+                out[name] = datetime.fromtimestamp(claims[k]).strftime("%Y-%m-%d")
+        if isinstance(claims.get("exp"), (int, float)):
+            out["days_left"] = round((claims["exp"] - time.time()) / 86400)
+        return out
+
     def save(self, url: str, token: str, who: str) -> dict:
         """Prueba la conexión antes de guardar; si falla no se guarda nada."""
         url = _check_url(url)
@@ -89,14 +108,20 @@ class HA:
     # ── HTTP ───────────────────────────────────────────────────────
     @staticmethod
     def _get(url: str, token: str, p: str):
+        t0 = time.time()
         try:
             r = httpx.get(url + p, headers={"Authorization": f"Bearer {token}"}, timeout=TIMEOUT)
         except httpx.HTTPError as exc:
+            consola.log("error", "ha", f"GET {p} sin respuesta: {type(exc).__name__}")
             raise HAError(f"Home Assistant no responde: {type(exc).__name__}") from exc
+        ms = round((time.time() - t0) * 1000)
         if r.status_code == 401:
+            consola.log("error", "ha", f"GET {p} → 401 (token rechazado) {ms} ms")
             raise HAError("Home Assistant rechazó el token (401)")
         if r.status_code != 200:
+            consola.log("error", "ha", f"GET {p} → {r.status_code} {ms} ms")
             raise HAError(f"Home Assistant respondió {r.status_code}")
+        consola.log("debug", "ha", f"GET {p} → 200 {ms} ms")
         return r.json()
 
     def _conn(self):
@@ -148,12 +173,17 @@ class HA:
                 raise ValueError("falta el reproductor donde anunciar")
             data["message"] = str(data.get("message") or "")[:300]
         url, tok = self._conn()
+        t0 = time.time()
         try:
             r = httpx.post(f"{url}/api/services/{domain}/{service}", json=data, headers={"Authorization": f"Bearer {tok}"}, timeout=TIMEOUT)
         except httpx.HTTPError as exc:
+            consola.log("error", "ha", f"{domain}.{service} {ents} sin respuesta: {type(exc).__name__}")
             raise HAError(f"Home Assistant no responde: {type(exc).__name__}") from exc
+        ms = round((time.time() - t0) * 1000)
         if r.status_code not in (200, 201):
+            consola.log("error", "ha", f"{domain}.{service} {ents} → {r.status_code} {ms} ms")
             raise HAError(f"Home Assistant respondió {r.status_code}: {r.text[:120]}")
+        consola.log("info", "ha", f"{domain}.{service} {ents} → {r.status_code} {ms} ms")
         with self._lock:
             self._states_ts = 0.0                       # el siguiente sondeo trae el estado nuevo
         return r.json() if r.content else []

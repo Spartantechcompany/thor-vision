@@ -76,6 +76,13 @@ z-index:20;max-width:min(92vw,520px);box-shadow:0 10px 30px rgba(0,0,0,.5);displ
 .toast.mal{border-color:var(--error)}
 .nota{background:var(--panel);border:1px solid var(--borde);border-left:3px solid var(--acento);border-radius:10px;padding:12px 14px;font-size:.9rem}
 .nota code{background:var(--bg);padding:1px 6px;border-radius:4px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none;background:var(--apagado)}
+.dot.ok{background:var(--acento);box-shadow:0 0 8px var(--acento-glow)}.dot.warn{background:var(--aviso)}.dot.bad{background:var(--error)}
+.conx{display:grid;grid-template-columns:auto 1fr auto;gap:8px 12px;align-items:center}
+.conx .d{color:var(--sec);font-size:.84rem}.conx .ms{color:var(--sec);font-size:.8rem;white-space:nowrap}
+.tag.nube{color:var(--aviso);border-color:rgba(210,153,34,.5)}
+.lista-c{display:flex;flex-direction:column;gap:6px;font-size:.86rem}
+.lista-c .c{display:flex;gap:8px;align-items:baseline}.lista-c time{color:var(--sec);white-space:nowrap;font-size:.78rem}
 .media-t{font-size:.85rem;color:var(--sec);min-height:1.2em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .marca .corto{display:none}
 @media (max-width:520px){.marca .largo{display:none}.marca .corto{display:inline}.grid{grid-template-columns:1fr}.top{padding:10px 12px}main{padding:12px 12px 80px}}
@@ -109,7 +116,7 @@ z-index:20;max-width:min(92vw,520px);box-shadow:0 10px 30px rgba(0,0,0,.5);displ
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let TAB = (() => { try { return localStorage.getItem('patcc_tab') || 'inicio'; } catch (e) { return 'inicio'; } })();
-let S = null, SC = {scenes: [], schedules: [], next: null}, AJ = null, BUSY = 0, DRAFT = null;
+let S = null, SC = {scenes: [], schedules: [], next: null}, AJ = null, CX = null, RG = null, BUSY = 0, DRAFT = null;
 
 function toast(msg, bad){ const t = $('#toast'); t.textContent = msg; t.className = 'toast' + (bad ? ' mal' : ''); t.style.display = 'block';
   clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', 3500); }
@@ -173,6 +180,9 @@ function cardHaSwitch(e){
     <div class="nom"><b>${esc(e.name)}</b><small><span class="tag ha">HA</span> ${na ? 'sin conexión' : on ? 'encendido' : 'apagado'}</small></div>
     <input type="checkbox" class="tog" ${on ? 'checked' : ''} ${na ? 'disabled' : ''} data-ha="switch" data-e="${esc(e.id)}"></div></div>`;
 }
+const NUBE = {sin_cupo: 'sin cupo en la nube', retirado: 'retirado'};
+const bloqueado = d => d.type !== 'foco' && (d.nube === 'sin_cupo' || d.nube === 'retirado');
+const nubeTag = d => NUBE[d.nube] ? ` <span class="tag nube" title="La nube de Tuya rechaza las órdenes de este equipo (cupo de control agotado). Hace falta control por red local.">${NUBE[d.nube]}</span>` : '';
 function cardTuyaLight(d){
   const off = d.online === false;
   if (d.type === 'foco'){
@@ -180,7 +190,7 @@ function cardTuyaLight(d){
     const on = reach ? b.on : !!(d.switches && d.switches.switch_led);
     const dis = off && !reach;
     return `<div class="card ${on && !dis ? 'on' : ''} ${dis ? 'off-line' : ''}">
-      <div class="fila"><div class="ico">${IC.bulb(on && !dis)}</div><div class="nom"><b>${esc(d.name)}</b><small><span class="tag tuya">Tuya</span> ${dis ? 'sin conexión' : reach ? (on ? (b.brightness || '') + ' %' : 'apagado') + ' · red local' : 'por la nube'}</small></div>
+      <div class="fila"><div class="ico">${IC.bulb(on && !dis)}</div><div class="nom"><b>${esc(d.name)}</b><small><span class="tag tuya">Tuya</span> ${dis ? 'sin conexión' : reach ? (on ? (b.brightness || '') + ' %' : 'apagado') + ' · red local' : 'por la nube'}${reach ? '' : nubeTag(d)}</small></div>
       <input type="checkbox" class="tog" ${on ? 'checked' : ''} ${dis ? 'disabled' : ''} data-tuya="${esc(d.device_id)}" data-code="switch_led"></div>
       ${reach ? `<input type="range" min="1" max="100" value="${b.brightness || 100}" data-tbr="${esc(d.device_id)}" aria-label="Brillo">
       <div class="btns"><input type="color" value="${esc(b.colour || '#ffffff')}" data-tcol="${esc(d.device_id)}" aria-label="Color">
@@ -191,9 +201,10 @@ function cardTuyaLight(d){
   const codes = d.type === 'interruptor' ? Array.from({length: Math.max(1, Math.min(6, +d.gangs || Object.keys(sw).length || 1))}, (_, i) => 'switch_' + (i + 1)) : (Object.keys(sw).length ? Object.keys(sw) : ['switch_1']);
   const anyOn = codes.some(c => sw[c]);
   const names = d.gang_names || [];
+  const blk = bloqueado(d);
   return `<div class="card ${anyOn && !off ? 'on' : ''} ${off ? 'off-line' : ''}">
-    <div class="fila"><div class="ico">${IC.sw(anyOn && !off)}</div><div class="nom"><b>${esc(d.name)}</b><small><span class="tag tuya">Tuya</span> ${off ? 'sin conexión' : esc(d.type || '')}</small></div></div>
-    <div class="gangs">${codes.map((c, i) => `<button class="gang ${sw[c] ? 'on' : ''}" ${off ? 'disabled' : ''} data-tuya="${esc(d.device_id)}" data-code="${c}" data-val="${sw[c] ? 'false' : 'true'}">${esc(names[i] || (codes.length > 1 ? 'Botón ' + (i + 1) : (sw[c] ? 'Encendido' : 'Apagado')))}</button>`).join('')}</div>
+    <div class="fila"><div class="ico">${IC.sw(anyOn && !off)}</div><div class="nom"><b>${esc(d.name)}</b><small><span class="tag tuya">Tuya</span> ${off ? 'sin conexión' : esc(d.type || '')}${nubeTag(d)}</small></div></div>
+    <div class="gangs">${codes.map((c, i) => `<button class="gang ${sw[c] ? 'on' : ''}" ${off || blk ? 'disabled' : ''} ${blk ? 'title="La nube de Tuya no acepta órdenes de este equipo (sin cupo)"' : ''} data-tuya="${esc(d.device_id)}" data-code="${c}" data-val="${sw[c] ? 'false' : 'true'}">${esc(names[i] || (codes.length > 1 ? 'Botón ' + (i + 1) : (sw[c] ? 'Encendido' : 'Apagado')))}</button>`).join('')}</div>
   </div>`;
 }
 function cardMedia(e, tts){
@@ -333,11 +344,21 @@ function vEscenas(){
     <div class="btns"><button class="btn pri" id="h-save" ${SC.scenes.length ? '' : 'disabled'}>Guardar horario</button></div>
   </div>`;
 }
+const DOT = {ok: 'ok', warn: 'warn', bad: 'bad'};
+const fdate = ts => ts ? new Date(ts * 1000).toLocaleString('es-MX', {dateStyle: 'short', timeStyle: 'short'}) : '—';
+const CHG = {nuevo: 'nuevo', nube: 'cambio de nube', renombrado: 'renombrado', en_linea: 'en línea', sin_linea: 'sin conexión', casa: 'cambió de casa', detectado: 'detectado en la nube', otra_casa: 'de otra casa (ignorado)'};
 function vAjustes(){
   if (!AJ) return '<p class="muted">Cargando…</p>';
-  const h = AJ.ha, admin = AJ.role === 'admin';
-  return `<h2>Home Assistant</h2><div class="card form">
-    <p>${h.configured ? `Conectado a <code>${esc(h.url)}</code>${h.token_hint ? ' · token ' + esc(h.token_hint) : ''}${h.saved_by ? ' · guardado por ' + esc(h.saved_by) : ''}` : 'Sin conectar.'}
+  const h = AJ.ha, admin = AJ.role === 'admin', tk = h.token || {};
+  const conx = CX ? CX.items.map(i => `<span class="dot ${DOT[i.state] || ''}"></span><div><b>${esc(i.name)}</b><div class="d">${esc(i.detail)}</div></div><span class="ms">${i.ms != null ? i.ms + ' ms' : ''}</span>`).join('') : '<span class="muted">Comprobando…</span>';
+  const rg = RG, nm = k => (rg?.names?.[k] || []);
+  return `<h2>Conexiones <button class="btn sm" id="cx-refresh" style="margin-left:8px">Comprobar ahora</button></h2>
+  <div class="card conx">${conx}</div>
+  ${CX ? `<small class="muted">PAT·CC lleva ${Math.round(CX.uptime_s / 60)} min encendido.</small>` : ''}
+  <h2>Home Assistant</h2><div class="card form">
+    <p>${h.configured ? `<span class="dot ${S?.ha?.ok ? 'ok' : 'bad'}"></span> ${S?.ha?.ok ? 'Conectado' : 'Sin respuesta'} a <code>${esc(h.url)}</code>` : 'Sin conectar.'}
+    ${h.configured && tk.expires ? `<br><span class="muted">Token ${esc(h.token_hint || '')} · creado ${esc(tk.created || '?')} · vence ${esc(tk.expires)} (${tk.days_left > 365 ? 'en ' + Math.round(tk.days_left / 365) + ' años' : 'en ' + tk.days_left + ' días'})</span>` : (h.token_hint ? `<br><span class="muted">Token ${esc(h.token_hint)}</span>` : '')}
+    ${h.saved_by ? `<br><span class="muted">Guardado por ${esc(h.saved_by)} el ${fdate(h.saved_ts)}</span>` : ''}
     ${h.last_error ? `<br><span class="err">${esc(h.last_error)}</span>` : ''}</p>
     ${admin ? `<label class="f">Dirección<input class="in" id="a-url" value="${esc(h.url || 'http://192.168.0.110:8123')}" autocomplete="off"></label>
     <label class="f">Token de acceso de larga duración<input class="in" id="a-tok" type="password" autocomplete="new-password" placeholder="${h.configured ? 'Pega uno nuevo para reemplazarlo' : 'Pega el token'}"></label>
@@ -345,8 +366,24 @@ function vAjustes(){
     <small class="muted">El token se guarda solo en el servidor (archivo con permisos 600) y nunca vuelve al navegador. Este panel no pide cuenta: entra quien esté en la red local. Créalo en Home Assistant → tu perfil → Seguridad → Tokens de acceso de larga duración, con un nombre como «pat-cc».</small>`
     : '<small class="muted">Solo un administrador puede cambiar la conexión.</small>'}
   </div>
-  <h2>Tuya</h2><div class="card"><p>Servicio de control: <code>${esc(AJ.tuya_service)}</code><br>Estado de los equipos: <code>${esc(AJ.vision)}</code> (thor-vision)</p>
-  <small class="muted">Los focos se manejan por la red local; los interruptores y cortinas, por la nube de Tuya. Solo aparecen los equipos de la casa Patricio 10.</small></div>
+  <h2>Tuya · registro de la nube <button class="btn sm" id="rg-sync" style="margin-left:8px">Sincronizar ahora</button></h2>
+  <div class="card form">
+    ${rg ? `<p><span class="dot ${rg.last.ok === false ? 'bad' : rg.last.ok ? 'ok' : ''}"></span> ${rg.last.ts ? 'Última sincronización ' + fdate(rg.last.ts) + ' · ' + esc(rg.last.detalle || '') : 'Aún no se sincroniza'}.<br>
+    <span class="muted">Solo cuenta la casa <code>${esc(rg.home)}</code> (Patricio 10). Los equipos de otra casa se ignoran y nunca se muestran ni se controlan. Se revisa solo cada 10 min.</span></p>
+    <div class="tiles">
+      <div class="stat"><span class="n">${rg.counts.cupo || 0}</span><span class="l">con cupo de control</span></div>
+      <div class="stat"><span class="n">${rg.counts.sin_cupo || 0}</span><span class="l">sin cupo (la nube los rechaza)</span></div>
+      <div class="stat"><span class="n">${rg.counts.retirado || 0}</span><span class="l">retirados</span></div>
+      <div class="stat"><span class="n">${(rg.counts.fuera_de_lista || 0)}</span><span class="l">en la nube, sin agregar</span></div>
+      <div class="stat"><span class="n">${rg.counts.otra_casa || 0}</span><span class="l">de otra casa (ignorados)</span></div>
+    </div>
+    ${nm('sin_cupo').length ? `<details><summary class="muted">Sin cupo: ${nm('sin_cupo').length} equipos</summary><p class="muted">${nm('sin_cupo').map(esc).join(' · ')}</p></details>` : ''}
+    ${nm('fuera_de_lista').length ? `<details open><summary class="muted">Detectados en la nube y todavía no agregados: ${nm('fuera_de_lista').map(esc).join(', ')}</summary></details>` : ''}
+    <h2 style="margin:6px 0 2px">Cambios detectados</h2>
+    ${rg.cambios.length ? `<div class="lista-c">${rg.cambios.slice(0, 15).map(c => `<div class="c"><time>${fdate(c.ts)}</time><span><b>${esc(c.nombre || c.device_id)}</b> · ${esc(CHG[c.tipo] || c.tipo)}${c.antes || c.despues ? ` <span class="muted">${esc(c.antes || '')} → ${esc(c.despues || '')}</span>` : ''}</span></div>`).join('')}</div>` : '<small class="muted">Sin cambios todavía: el primer registro es la línea base.</small>'}` : '<p class="muted">Cargando…</p>'}
+  </div>
+  <h2>Tuya · servicios</h2><div class="card"><p>Servicio de control: <code>${esc(AJ.tuya_service)}</code><br>Estado de los equipos: <code>${esc(AJ.vision)}</code> (thor-vision)</p>
+  <small class="muted">Los focos se manejan por la red local; los interruptores y cortinas, por la nube de Tuya, que solo acepta los equipos dentro del cupo de control del proyecto.</small></div>
   ${admin && AJ.auth ? '<h2>Cuentas</h2><div class="card"><p>Usuarios, roles y bloqueos: <a href="/admin" style="color:var(--acento)">panel de administración</a>.</p></div>' : ''}`;
 }
 async function vBitacora(){
@@ -373,7 +410,8 @@ async function poll(){
   try { S = await api('/api/estado'); chips(); render(); } catch (e) { if (e.message !== 'sesión') toast('Sin conexión con el servidor: ' + e.message, true); }
 }
 async function loadScenes(){ try { SC = await api('/api/escenas'); } catch (e) {} }
-async function loadAjustes(){ try { AJ = await api('/api/ajustes'); } catch (e) {} }
+async function loadAjustes(){ try { AJ = await api('/api/ajustes'); } catch (e) {} try { RG = await api('/api/registro'); } catch (e) {} loadConx(); }
+async function loadConx(){ try { CX = await api('/api/conexiones'); if (TAB === 'ajustes') render(true); } catch (e) {} }
 
 // ── acciones ─────────────────────────────────────────────────────
 async function doHa(domain, service, entity_id, data){
@@ -397,7 +435,7 @@ document.addEventListener('click', async ev => {
   const ds = t.dataset;
   if (t.closest('#tabs')){ TAB = ds.t; try { localStorage.setItem('patcc_tab', TAB); } catch (e) {}
     document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b === t));
-    if (TAB === 'escenas') await loadScenes(); if (TAB === 'ajustes') await loadAjustes(); render(true); return; }
+    if (TAB === 'escenas') await loadScenes(); if (TAB === 'ajustes') { CX = null; await loadAjustes(); } render(true); return; }
   if (ds.ha){ doHa(ds.ha, t.checked ? 'turn_on' : 'turn_off', ds.e); return; }
   if (ds.tuya){ const v = ds.val === undefined ? t.checked : ds.val === 'true' ? true : ds.val === 'false' ? false : ds.val; doTuya(ds.tuya, ds.code, v); return; }
   if (ds.hak){ doHa('light', 'turn_on', ds.hak, {color_temp_kelvin: +ds.v}); return; }
@@ -438,6 +476,8 @@ document.addEventListener('click', async ev => {
       const when = tipo === 'hora' ? $('#h-hora').value : tipo + (off ? (off > 0 ? '+' : '') + off : '');
       const body = {name: $('#h-name').value, when, days: [...document.querySelectorAll('.h-dia:checked')].map(x => +x.value), scene_id: $('#h-scene').value, enabled: true};
       try { await api('/api/horarios', {method: 'POST', body}); toast('Horario guardado'); await loadScenes(); render(true); } catch (e) { toast(e.message, true); } return; }
+    case 'cx-refresh': CX = null; render(true); loadConx(); return;
+    case 'rg-sync': toast('Sincronizando con la nube de Tuya…'); try { const r = await api('/api/registro/sync', {method: 'POST'}); RG = r; toast('Sincronizado: ' + r.result); await loadConx(); poll(); render(true); } catch (e) { toast(e.message, true); } return;
     case 'a-save': try { const r = await api('/api/ajustes/ha', {method: 'POST', body: {url: $('#a-url').value, token: $('#a-tok').value}});
         toast(`Conectado: ${r.location || ''} ${r.version || ''}`); await loadAjustes(); poll(); render(true); } catch (e) { toast(e.message, true); } return;
     case 'a-del': if (!confirm('¿Desconectar Home Assistant y borrar el token del servidor?')) return;
@@ -460,6 +500,7 @@ document.addEventListener('change', ev => {
   else if (t.id === 'h-tipo'){ $('#h-hora').disabled = t.value !== 'hora'; }
 });
 document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.dataset.say !== undefined){ document.querySelector(`[data-sayb="${CSS.escape(ev.target.dataset.say)}"]`)?.click(); } });
+document.addEventListener('keydown', ev => { if (ev.key === '`' && !['INPUT', 'SELECT', 'TEXTAREA'].includes(ev.target.tagName)) window.open('/consola', '_blank'); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
 
 document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === TAB));

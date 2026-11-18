@@ -19,23 +19,31 @@ from app.auth.guard import COOKIE_FULL, AuthGuard
 from app.auth.panel import router as admin_auth_router
 from app.auth.routes import _same_origin
 from app.auth.routes import router as auth_router
-from patcc import automation, files
+from patcc import automation, consola, files
+from patcc.registro import Registro
 from patcc.ha import HA, HAError
 from patcc.tuya import Tuya
 
-PAGE = pathlib.Path(__file__).parent / "static" / "index.html"
+STATIC = pathlib.Path(__file__).parent / "static"
+PAGE = STATIC / "index.html"
+CONSOLE_PAGE = STATIC / "consola.html"
+STARTED = time.time()
 AUTH = os.environ.get("PATCC_AUTH", "off").lower() in ("on", "1", "true", "si")
 
 ha = HA()
 tuya = Tuya()
+registro = Registro()
+tuya.registro = registro
 auto = automation.Automations(ha, tuya)
 
 
 @asynccontextmanager
 async def _lifespan(_app):
+    consola.log("info", "sistema", f"PAT·CC arrancó (acceso {'con login' if AUTH else 'sin login, red local'})")
     if os.environ.get("PATCC_NO_THREADS") != "1":
         tuya.start()
         auto.start()
+        registro.start(lambda: tuya.view(all_=True))
     yield
 
 
@@ -240,6 +248,8 @@ def ajustes(request: Request):
     info = ha.info()
     if u.get("role") != "admin":
         info = {"configured": info["configured"], "url": info["url"]}
+    else:
+        info["token"] = ha.token_info()
     from patcc import tuya as tmod
     return {"ha": info, "tuya_service": tmod.SVC, "vision": tmod.VISION, "role": u.get("role"), "auth": AUTH}
 
@@ -268,6 +278,143 @@ def ajustes_ha_borrar(request: Request):
     ha.forget()
     files.log(u["username"], "borró el token de Home Assistant", "ok")
     return {"ok": True}
+
+
+# ── registro de equipos Tuya (BD) ──────────────────────────────────
+@app.get("/api/registro")
+def registro_estado(request: Request):
+    u, e = _who(request)
+    return e or registro.summary()
+
+
+@app.post("/api/registro/sync")
+def registro_sync(request: Request):
+    u, e = _who(request, write=True)
+    if e:
+        return e
+    r = registro.sync(tuya.view(all_=True), manual=True)
+    files.log(u["username"], "sincronizó el registro con la nube de Tuya", r.get("detalle", ""))
+    return {"ok": bool(r.get("ok")), "result": r.get("detalle"), **registro.summary()}
+
+
+# ── conexiones ─────────────────────────────────────────────────────
+def _probe_tcp(host: str, port: int, timeout: float = 2.0):
+    import socket
+    t0 = time.time()
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True, round((time.time() - t0) * 1000)
+    except OSError as exc:
+        return False, type(exc).__name__
+
+
+@app.get("/api/conexiones")
+def conexiones(request: Request):
+    u, e = _who(request)
+    if e:
+        return e
+    import httpx
+    from patcc import registro as reg_mod
+    from patcc import tuya as tmod
+    out = []
+    # Home Assistant
+    if not ha.configured:
+        out.append({"id": "ha", "name": "Home Assistant", "state": "warn", "detail": "sin configurar: pega el token en Ajustes"})
+    else:
+        t0 = time.time()
+        try:
+            c = ha.config()
+            tk = ha.token_info()
+            out.append({"id": "ha", "name": "Home Assistant", "state": "ok", "ms": round((time.time() - t0) * 1000),
+                        "detail": f"{c.get('location_name')} · versión {c.get('version')} · {len(ha.states())} entidades" + (f" · token vence {tk['expires']}" if tk.get("expires") else "")})
+        except HAError as exc:
+            out.append({"id": "ha", "name": "Home Assistant", "state": "bad", "detail": str(exc)})
+    # servicio Tuya (control + registro de la nube)
+    t0 = time.time()
+    try:
+        r = httpx.get(tmod.SVC + "/registry", timeout=15)
+        r.raise_for_status()
+        j = r.json()
+        age = time.time() - (j.get("ts") or 0)
+        out.append({"id": "tuya", "name": "Servicio Tuya (oapc-devops)", "state": "ok" if not j.get("error") else "warn", "ms": round((time.time() - t0) * 1000),
+                    "detail": f"{len(j.get('devices') or [])} equipos en el cupo de la nube · leído hace {round(age / 60)} min" + (f" · {j['error']}" if j.get("error") else "")})
+    except (httpx.HTTPError, ValueError) as exc:
+        out.append({"id": "tuya", "name": "Servicio Tuya (oapc-devops)", "state": "bad", "detail": f"no responde: {type(exc).__name__}"})
+    # focos por red local
+    st = tuya.stats()
+    if st["focos"] == 0:
+        out.append({"id": "focos", "name": "Focos por red local", "state": "warn", "detail": "aún sin lectura (tarda unos minutos tras arrancar)"})
+    else:
+        out.append({"id": "focos", "name": "Focos por red local", "state": "ok" if st["alcanzables"] else "warn",
+                    "detail": f"{st['alcanzables']} de {st['focos']} responden · lectura hace {round((time.time() - st['ts']) / 60)} min"})
+    # thor-vision: escucha el MQTT del puente y entrega el estado de los equipos
+    t0 = time.time()
+    try:
+        r = httpx.get(tmod.VISION + "/api/iot/devices", timeout=8, headers={"Authorization": f"Bearer {tmod.VISION_TOKEN}"} if tmod.VISION_TOKEN else {})
+        r.raise_for_status()
+        j = r.json()
+        newest = max([d.get("last_ts") or 0 for d in j.get("devices", [])] or [0])
+        age = time.time() - newest if newest else None
+        stt = j.get("status", {})
+        out.append({"id": "vision", "name": "thor-vision (escucha el MQTT)", "state": "ok" if stt.get("connected") else "bad", "ms": round((time.time() - t0) * 1000),
+                    "detail": f"{'conectado al broker' if stt.get('connected') else 'sin conexión al broker'} · {stt.get('messages')} mensajes"
+                              + (f" · último mensaje hace {round(age / 60)} min" if age is not None else "") + (f" · {stt['error']}" if stt.get("error") else "")})
+    except (httpx.HTTPError, ValueError) as exc:
+        out.append({"id": "vision", "name": "thor-vision (escucha el MQTT)", "state": "bad", "detail": f"no responde: {type(exc).__name__}"})
+    # broker MQTT
+    host, port = os.environ.get("PATCC_MQTT_HOST", "192.168.0.101"), int(os.environ.get("PATCC_MQTT_PORT", "1883"))
+    ok, ms = _probe_tcp(host, port)
+    out.append({"id": "mqtt", "name": f"Broker MQTT ({host}:{port})", "state": "ok" if ok else "bad", "ms": ms if ok else None,
+                "detail": "puerto abierto" if ok else f"no se alcanza: {ms}"})
+    # registro con la nube
+    last = registro.last
+    if last.get("ts"):
+        out.append({"id": "nube", "name": "Registro de la nube de Tuya", "state": "ok" if last.get("ok") else "bad", "ms": last.get("ms"),
+                    "detail": f"{last.get('detalle')} · hace {round((time.time() - last['ts']) / 60)} min · casa {reg_mod.HOME}"})
+    else:
+        out.append({"id": "nube", "name": "Registro de la nube de Tuya", "state": "warn", "detail": "aún no se sincroniza"})
+    return {"ts": time.time(), "uptime_s": round(time.time() - STARTED), "items": out}
+
+
+# ── consola de devops (no está enlazada en la interfaz: se entra por /consola) ──
+@app.get("/consola", response_class=HTMLResponse)
+def consola_pagina(request: Request):
+    u, e = _who(request)
+    if e:
+        return HTMLResponse("Inicie sesión", status_code=401)
+    return HTMLResponse(CONSOLE_PAGE.read_text(encoding="utf-8"), headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/consola")
+def consola_datos(request: Request, since: int = 0, level: str = "debug", src: str = "", q: str = "", limit: int = 500):
+    u, e = _who(request)
+    if e:
+        return e
+    return {"entries": consola.entries(since, level, src[:20], q[:60], min(max(limit, 1), 1000)), "sources": consola.sources()}
+
+
+CMDS = ("sync", "ha", "tuya", "mqtt")
+
+
+@app.post("/api/consola/cmd")
+async def consola_cmd(request: Request):
+    """Comandos de diagnóstico permitidos (nada que cambie dispositivos): sync, ha, tuya, mqtt."""
+    u, e = _who(request, write=True)
+    if e:
+        return e
+    cmd = str((await _json(request)).get("cmd") or "")
+    if cmd not in CMDS:
+        return _err(400, f"comando desconocido; disponibles: {', '.join(CMDS)}")
+    consola.log("info", "consola", f"{u['username']} ejecutó «{cmd}»")
+    if cmd == "sync":
+        r = registro.sync(tuya.view(all_=True), manual=True)
+        return {"ok": bool(r.get("ok")), "result": r.get("detalle")}
+    rows = {c["id"]: c for c in conexiones(request)["items"]}
+    c = rows.get(cmd)
+    if c is None:
+        return _err(404, "sin dato")
+    consola.log("info" if c["state"] == "ok" else "warn", "consola", f"{c['name']}: {c['state']} · {c['detail']}")
+    return {"ok": c["state"] == "ok", "result": f"{c['name']}: {c['detail']}"}
 
 
 @app.get("/api/bitacora")

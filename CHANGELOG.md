@@ -9,6 +9,9 @@ Nuevo PAT Control Center (PAT·CC; puerto 8095, contenedor propio) para controla
 - **PAT·CC · Servicio aparte**: patcc/ (FastAPI): ha.py (acciones permitidas, token 600), tuya.py (estado de thor-vision, control por el servicio de oapc-devops), automation.py (escenas y horarios). docs/PAT-CONTROL-CENTER.md.
 - **Acceso · Login opcional y reutilizable**: app/auth: THOR_COOKIE_PREFIX, THOR_APP_NAME y THOR_MACHINE_EXTRA por variable de entorno; sin cambios con los valores por defecto. PAT·CC sin login salvo PATCC_AUTH=on.
 - **Vision · Reflejo de PAT·CC**: GET /api/patcc/resumen y un indicador de luces en el encabezado que abre PAT Control Center.
+- **PAT·CC · Registro de la nube y filtro por casa**: patcc/registro.py (SQLite): equipos, cambios y sincronizaciones; GET /registry y POST /registry/sync en el servicio Tuya; estado de nube por equipo (cupo, sin cupo, retirado); solo la casa PATCC_TUYA_HOME.
+- **PAT·CC · Conexiones, token y consola**: /api/conexiones (HA, Tuya, focos, MQTT, nube) con tiempos; vigencia del token leída del JWT; consola de devops en /consola con log y comandos de diagnóstico.
+- **Vision · iot_listener expone retired**: El estado de /api/iot/devices incluye retired (iot.yml).
 
 ## v2.48.0 — Login de producción y menos llamadas al modelo, juntos (2026-11-11)
 

@@ -26,7 +26,7 @@ ssh -t thor docker exec -it pat-cc python3 -m app.auth.admin rol Nombre.Apellido
 | Medios | Bocinas AirPlay/Music Assistant, Apple TV y Fire TV de Home Assistant: reproducir, volumen, fuente y **anunciar un mensaje** |
 | Sensores y puertas | Puertas, ventanas y portón de Tuya; sensores, personas y clima de Home Assistant |
 | Escenas y horarios | Escenas que mezclan órdenes de Tuya y Home Assistant; horarios por hora fija o al amanecer/atardecer (con desfase) |
-| Ajustes | Dirección y token de Home Assistant (solo admin) |
+| Ajustes | Conexiones en vivo (Home Assistant, servicio Tuya, focos por red local, thor-vision/MQTT, broker, nube) con su tiempo de respuesta; token de Home Assistant con fecha de creación y vencimiento; registro de la nube de Tuya con botón **Sincronizar ahora** y la lista de cambios detectados |
 | Bitácora | Quién ordenó qué y cuándo |
 
 ## Seguridad
@@ -85,3 +85,33 @@ está desconectado:
 - Las luces de Home Assistant (2 focos TP-Link KL125) están sin conexión.
 - Notificaciones al celular desde las escenas (Home Assistant ya tiene `notify.gecko_15p` y `notify.gecko_xiii_pro`).
 - Ver las cámaras de Home Assistant (hoy sin conexión; go2rtc de Home Assistant apunta a una dirección que no responde).
+
+## Registro de la nube de Tuya (base de datos)
+
+El servicio Tuya de oapc-devops (`video_service.py`, el único con las credenciales de la nube) expone `GET /registry` y
+`POST /registry/sync` (solo lectura, sin claves locales ni uuid). PAT·CC los consulta cada 10 min (`PATCC_SYNC_MIN`) o al apretar
+**Sincronizar ahora**, y guarda en `data/registro.db` (SQLite):
+
+- `dispositivos`: cada equipo con su casa, su estado de nube y si está en línea.
+- `cambios`: lo que cambió entre sincronizaciones (nuevo, renombrado, cambio de nube, en línea/sin conexión, cambió de casa, detectado en la nube, de otra casa).
+- `sync`: historial de sincronizaciones (éxito, tiempo, detalle).
+
+Estado de nube de cada equipo:
+
+| Estado | Significado | En el panel |
+|---|---|---|
+| `cupo` | Está en la lista de la nube: las órdenes por la nube funcionan | normal |
+| `sin_cupo` | Está en `iot.yml` pero la nube no lo lista: rechaza sus órdenes («quota is insufficient» / «permission deny») | etiqueta «sin cupo en la nube», controles desactivados (los focos siguen por red local) |
+| `retirado` | `retired: true` en `iot.yml` (ya no existe en la nube) | oculto |
+
+**Filtro por casa:** solo cuenta la casa `PATCC_TUYA_HOME` (153519480 = Patricio 10). Un equipo de otra casa (Coworking540 =
+195128033) se anota como «de otra casa (ignorado)» y nunca se muestra ni se controla; PAT·CC además rechaza órdenes a cualquier
+equipo que no esté en la lista de la casa. Mientras thor-vision (v2.45.0) no exponga `retired`, `PATCC_RETIRED_IDS` (ids separados por coma) cubre el caso.
+
+## Consola de devops
+
+`http://192.168.0.10:8095/consola` (no está enlazada en la interfaz; en cualquier pestaña, la tecla `` ` `` la abre en otra ventana).
+Muestra en vivo el registro técnico (llamadas a Home Assistant y a Tuya con su tiempo, errores, sincronizaciones, horarios), con filtros
+por nivel y fuente, búsqueda, pausa y seguimiento. Botones de diagnóstico que **no cambian ningún dispositivo**: Sincronizar Tuya,
+Probar HA, Probar Tuya, Probar MQTT. Se guarda también en `data/consola.log` (rotativo, 2 MB × 3). No registra tokens ni claves.
+La **bitácora** (pestaña Bitácora) es otra cosa: quién ordenó qué.

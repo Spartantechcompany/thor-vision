@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>consola · PAT·CC</title>
+<style>
+:root{--bg:#0a0d12;--panel:#11161d;--borde:#212a36;--texto:#cfd8e3;--sec:#6b7889;--acento:#76B900;--aviso:#D29922;--mal:#F85149;--debug:#5b6776}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--texto);font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+body{display:flex;flex-direction:column}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--borde)}
+h1{font-size:13px;margin:0 8px 0 0;font-weight:600;color:var(--acento)}
+select,input,button{background:var(--bg);color:var(--texto);border:1px solid var(--borde);border-radius:6px;padding:5px 8px;font:inherit;min-height:30px}
+input{min-width:140px;flex:1;max-width:260px}
+button{cursor:pointer}button:hover{border-color:var(--acento)}
+button.on{border-color:var(--acento);color:var(--acento)}
+.sp{flex:1}
+#estado{color:var(--sec);font-size:12px}
+#log{flex:1;overflow:auto;padding:8px 12px;white-space:pre-wrap;word-break:break-word}
+.l{display:grid;grid-template-columns:auto auto auto 1fr;gap:0 10px;padding:1px 0;border-bottom:1px solid rgba(255,255,255,.03)}
+.t{color:var(--sec)}.lv{font-weight:600;width:44px}.sr{color:#7aa2d6;min-width:64px}
+.debug .lv,.debug .m{color:var(--debug)}.info .lv{color:var(--acento)}.warn .lv,.warn .m{color:var(--aviso)}.error .lv,.error .m{color:var(--mal)}
+.res{padding:6px 12px;border-top:1px solid var(--borde);background:var(--panel);min-height:30px;color:var(--sec)}
+.res.ok{color:var(--acento)}.res.mal{color:var(--mal)}
+@media (max-width:640px){.l{grid-template-columns:auto auto 1fr}.sr{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>PAT·CC · consola</h1>
+  <select id="lv" title="Nivel mínimo"><option value="debug">todo</option><option value="info" selected>info</option><option value="warn">avisos</option><option value="error">errores</option></select>
+  <select id="src" title="Fuente"><option value="">todas las fuentes</option></select>
+  <input id="q" placeholder="buscar…" autocomplete="off">
+  <button id="pausa">Pausar</button><button id="limpiar">Limpiar</button><button id="bajar" class="on">Seguir</button>
+  <span class="sp"></span>
+  <button data-cmd="sync" title="Lee otra vez la nube de Tuya y compara">Sincronizar Tuya</button>
+  <button data-cmd="ha" title="Prueba la conexión con Home Assistant">Probar HA</button>
+  <button data-cmd="tuya" title="Prueba el servicio Tuya">Probar Tuya</button>
+  <button data-cmd="mqtt" title="Prueba el puerto del broker MQTT">Probar MQTT</button>
+  <span id="estado"></span>
+</header>
+<div id="log"></div>
+<div id="res" class="res">Comandos de diagnóstico: no cambian ningún dispositivo.</div>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let last = 0, paused = false, follow = true, rows = [];
+const MAX = 3000;
+
+function line(e){
+  const d = new Date(e.ts * 1000);
+  const t = d.toLocaleTimeString('es-MX', {hour12: false}) + '.' + String(d.getMilliseconds()).padStart(3, '0');
+  return `<div class="l ${e.level}"><span class="t">${t}</span><span class="lv">${e.level}</span><span class="sr">${esc(e.src)}</span><span class="m">${esc(e.msg)}</span></div>`;
+}
+async function tick(full){
+  if (paused && !full) return;
+  const p = new URLSearchParams({since: full ? 0 : last, level: $('#lv').value, src: $('#src').value, q: $('#q').value, limit: 800});
+  try {
+    const r = await fetch('/api/consola?' + p);
+    if (r.status === 401) { $('#estado').textContent = 'sin sesión'; return; }
+    const j = await r.json();
+    const sel = $('#src'), cur = sel.value;
+    if (j.sources.length + 1 !== sel.options.length) sel.innerHTML = '<option value="">todas las fuentes</option>' + j.sources.map(s => `<option ${s === cur ? 'selected' : ''}>${esc(s)}</option>`).join('');
+    if (full) rows = [];
+    for (const e of j.entries) { rows.push(e); last = Math.max(last, e.id); }
+    if (rows.length > MAX) rows = rows.slice(-MAX);
+    if (full || j.entries.length) {
+      const box = $('#log'); box.innerHTML = rows.map(line).join('');
+      if (follow) box.scrollTop = box.scrollHeight;
+    }
+    $('#estado').textContent = rows.length + ' líneas' + (paused ? ' · en pausa' : '');
+  } catch (e) { $('#estado').textContent = 'sin conexión'; }
+}
+function reset(){ last = 0; rows = []; tick(true); }
+['lv', 'src'].forEach(i => $('#' + i).addEventListener('change', reset));
+$('#q').addEventListener('input', () => { clearTimeout(reset._t); reset._t = setTimeout(reset, 250); });
+$('#pausa').onclick = e => { paused = !paused; e.target.textContent = paused ? 'Reanudar' : 'Pausar'; e.target.classList.toggle('on', paused); if (!paused) tick(true); };
+$('#limpiar').onclick = () => { rows = []; $('#log').innerHTML = ''; };
+$('#bajar').onclick = e => { follow = !follow; e.target.classList.toggle('on', follow); if (follow) $('#log').scrollTop = $('#log').scrollHeight; };
+$('#log').addEventListener('wheel', () => { const b = $('#log'); if (b.scrollTop + b.clientHeight < b.scrollHeight - 40 && follow) { follow = false; $('#bajar').classList.remove('on'); } });
+document.querySelectorAll('[data-cmd]').forEach(b => b.onclick = async () => {
+  const res = $('#res'); res.className = 'res'; res.textContent = 'Ejecutando ' + b.dataset.cmd + '…';
+  try {
+    const r = await fetch('/api/consola/cmd', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({cmd: b.dataset.cmd})});
+    const j = await r.json();
+    res.className = 'res ' + (j.ok ? 'ok' : 'mal'); res.textContent = j.result || j.error || 'sin respuesta';
+  } catch (e) { res.className = 'res mal'; res.textContent = 'error: ' + e.message; }
+  tick();
+});
+tick(true); setInterval(() => tick(), 1500);
+</script>
+</body>
+</html>
