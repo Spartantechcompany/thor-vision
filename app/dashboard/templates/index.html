@@ -1086,6 +1086,7 @@ try { if (!/[?&](full|tl)=/.test(location.search) && !localStorage.getItem('thor
   <details class="hdr-more" id="hdr-more"><summary class="hdr-btn" title="Más páginas">Más ▾</summary><div class="hdr-more-list">
     <a href="/presencia">Presencia ahora</a><a href="/wifi">Presencia WiFi</a><a href="/evaluacion">Evaluación de YOLO</a><a href="/conocimiento">Conocimiento</a>
   </div></details>
+  <a class="hdr-btn" id="btn-hogar" href="http://192.168.0.10:8095" target="_blank" rel="noopener" title="OXM Hogar: luces y dispositivos" aria-label="OXM Hogar" style="display:none;align-items:center;gap:4px;text-decoration:none;font-size:11px;font-weight:600"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V17h5v-1.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3Z"/></svg><span id="hogar-n"></span></a>
   <button class="hdr-btn" id="btn-history" title="Histórico de eventos" aria-label="Histórico de eventos"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
   <button class="hdr-btn" id="btn-spot" title="Cómo funciona OXM Vision (animación)" aria-label="Cómo funciona OXM Vision (animación)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg></button>
   <a class="hdr-btn" id="btn-ppl" href="/identidades" title="Identidades: empleados, invitados y asistencia" aria-label="Identidades" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="17.5" cy="9" r="2.4"/><path d="M16 14c3 0 5 1.8 5 4.5"/></svg></a>
@@ -4114,6 +4115,22 @@ setTimeout(_loadChatHistory, 300);
   };
   const poll = () => fetch('/api/arming', {cache: 'no-store'}).then(r => r.json()).then(paint).catch(() => {});
   poll(); setInterval(poll, 10000);
+})();
+
+// ── Reflejo de OXM Hogar: cuántas luces hay prendidas (el panel completo vive aparte, en su propio puerto) ──
+(function hogarChip(){
+  const a = document.getElementById('btn-hogar'), n = document.getElementById('hogar-n');
+  if (!a || !n) return;
+  async function tick(){
+    try {
+      const r = await fetch('/api/hogar/resumen'); if (!r.ok) return;
+      const j = await r.json(); if (!j.ok) { a.style.display = 'none'; return; }
+      a.href = j.url; a.style.display = 'inline-flex';
+      n.textContent = j.lights_on + '/' + j.lights;
+      a.title = 'OXM Hogar: ' + j.lights_on + ' de ' + j.lights + ' luces encendidas' + (j.next ? ' · próximo: ' + j.next.name + ' ' + j.next.at : '') + (j.offline ? ' · ' + j.offline + ' equipos sin conexión' : '');
+    } catch (e) {}
+  }
+  tick(); setInterval(tick, 30000);
 })();
 </script>
 </body>

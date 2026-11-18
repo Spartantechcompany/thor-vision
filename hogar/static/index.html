@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E1117">
+<title>OXM Hogar</title>
+<style>
+:root{--bg:#0E1117;--card:#161B24;--panel:#1C2130;--borde:#252C3A;--texto:#E8EDF3;--sec:#8B949E;--apagado:#484F58;
+--acento:#76B900;--acento-glow:rgba(118,185,0,.35);--error:#F85149;--aviso:#D29922;--logo:#1E78C2;--radio:12px}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--texto);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input,select{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:5;background:rgba(14,17,23,.86);backdrop-filter:blur(10px);border-bottom:1px solid var(--borde)}
+.top{display:flex;align-items:center;gap:12px;padding:10px 16px;max-width:1280px;margin:0 auto}
+.marca{font-weight:700;letter-spacing:-.4px;font-size:1.1rem;white-space:nowrap}
+.marca .oxm{color:#8a8a8a}.marca .tech{color:var(--logo)}.marca .app{color:var(--texto);font-weight:600}
+.top .esp{flex:1}
+.chip{font-size:.75rem;padding:3px 9px;border-radius:999px;border:1px solid var(--borde);color:var(--sec);white-space:nowrap}
+.chip.ok{color:var(--acento);border-color:rgba(118,185,0,.5)}.chip.mal{color:var(--error);border-color:rgba(248,81,73,.5)}
+nav{display:flex;gap:4px;overflow-x:auto;padding:0 12px 8px;max-width:1280px;margin:0 auto;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav button{background:none;border:0;padding:8px 14px;border-radius:999px;color:var(--sec);cursor:pointer;white-space:nowrap;min-height:40px}
+nav button.on{background:var(--panel);color:var(--texto);box-shadow:inset 0 0 0 1px var(--borde)}
+main{max-width:1280px;margin:0 auto;padding:16px 16px 80px}
+h2{font-size:.78rem;text-transform:uppercase;letter-spacing:.7px;color:var(--sec);margin:22px 0 10px;font-weight:600}
+h2:first-child{margin-top:4px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--borde);border-radius:var(--radio);padding:14px;display:flex;flex-direction:column;gap:10px;
+transition:border-color .2s,box-shadow .2s,transform .2s;position:relative;min-width:0}
+.card:hover{transform:translateY(-1px)}
+.card.on{border-color:rgba(118,185,0,.55);box-shadow:0 0 0 1px rgba(118,185,0,.15),0 8px 24px -12px var(--acento-glow)}
+.card.off-line{opacity:.55}
+.fila{display:flex;align-items:center;gap:10px;min-width:0}
+.fila .nom{flex:1;min-width:0}
+.nom b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nom small{color:var(--sec);font-size:.78rem}
+.ico{width:40px;height:40px;flex:none;border-radius:10px;background:var(--panel);display:grid;place-items:center}
+.ico svg{width:24px;height:24px}
+.tog{appearance:none;width:46px;height:28px;border-radius:999px;background:var(--apagado);position:relative;cursor:pointer;flex:none;border:0;transition:background .2s}
+.tog::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .2s}
+.tog:checked{background:var(--acento)}.tog:checked::after{transform:translateX(18px)}
+.tog:disabled{opacity:.4;cursor:not-allowed}
+.gangs{display:flex;gap:8px;flex-wrap:wrap}
+.gang{flex:1;min-width:64px;min-height:44px;border-radius:10px;border:1px solid var(--borde);background:var(--panel);cursor:pointer;color:var(--sec);font-size:.8rem;padding:6px}
+.gang.on{background:rgba(118,185,0,.16);border-color:var(--acento);color:var(--texto);box-shadow:0 0 14px -4px var(--acento-glow)}
+.gang:disabled{opacity:.45;cursor:not-allowed}
+input[type=range]{width:100%;accent-color:var(--acento);min-height:28px}
+input[type=color]{width:44px;height:36px;border:1px solid var(--borde);border-radius:8px;background:var(--panel);padding:2px;cursor:pointer}
+.btn{min-height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--borde);background:var(--panel);cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--acento)}
+.btn.pri{background:var(--acento);border-color:var(--acento);color:#0b0e12;font-weight:600}
+.btn.pel{color:var(--error);border-color:rgba(248,81,73,.5);background:none}
+.btn.sm{min-height:32px;padding:0 10px;font-size:.82rem}
+.btns{display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:.68rem;padding:1px 6px;border-radius:6px;background:var(--panel);color:var(--sec);border:1px solid var(--borde);vertical-align:1px}
+.tag.ha{color:#41BDF5;border-color:rgba(65,189,245,.4)}.tag.tuya{color:#FF6A00;border-color:rgba(255,106,0,.4)}
+.muted{color:var(--sec)}.err{color:var(--error)}
+.stat{display:flex;flex-direction:column;gap:2px}
+.stat .n{font-size:1.9rem;font-weight:700;letter-spacing:-1px}
+.stat .l{color:var(--sec);font-size:.82rem}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.vacio{border:1px dashed var(--borde);border-radius:var(--radio);padding:20px;color:var(--sec);text-align:center}
+label.f{display:flex;flex-direction:column;gap:6px;font-size:.78rem;color:var(--sec);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.in,select.in{min-height:42px;background:var(--bg);border:1px solid var(--borde);border-radius:8px;padding:0 12px;text-transform:none;letter-spacing:normal;font-weight:400;color:var(--texto);width:100%}
+.in:focus{outline:none;border-color:var(--acento)}
+.form{display:grid;gap:12px;max-width:640px}
+.dias{display:flex;gap:6px;flex-wrap:wrap}
+.dias label{display:flex;align-items:center;gap:4px;padding:6px 10px;border:1px solid var(--borde);border-radius:8px;cursor:pointer;font-size:.85rem}
+.acc{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:8px;border:1px solid var(--borde);border-radius:10px;background:var(--panel)}
+.lista{display:flex;flex-direction:column;gap:8px}
+.log{font-size:.85rem;display:grid;grid-template-columns:auto 1fr;gap:4px 12px}
+.log time{color:var(--sec);white-space:nowrap}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--borde);padding:10px 16px;border-radius:10px;
+z-index:20;max-width:min(92vw,520px);box-shadow:0 10px 30px rgba(0,0,0,.5);display:none}
+.toast.mal{border-color:var(--error)}
+.nota{background:var(--panel);border:1px solid var(--borde);border-left:3px solid var(--acento);border-radius:10px;padding:12px 14px;font-size:.9rem}
+.nota code{background:var(--bg);padding:1px 6px;border-radius:4px}
+.media-t{font-size:.85rem;color:var(--sec);min-height:1.2em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:520px){.grid{grid-template-columns:1fr}.top{padding:10px 12px}main{padding:12px 12px 80px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <div class="marca"><span class="oxm">oxm</span><span class="tech">tech</span> · <span class="app">Hogar</span></div>
+    <span class="esp"></span>
+    <span id="c-ha" class="chip">HA</span>
+    <span id="c-tuya" class="chip">Tuya</span>
+    <span id="c-user" class="chip"></span>
+    <a class="chip" href="/logout" title="Cerrar sesión">Salir</a>
+  </div>
+  <nav id="tabs">
+    <button data-t="inicio" class="on">Inicio</button>
+    <button data-t="luces">Luces</button>
+    <button data-t="medios">Medios</button>
+    <button data-t="sensores">Sensores y puertas</button>
+    <button data-t="escenas">Escenas y horarios</button>
+    <button data-t="ajustes">Ajustes</button>
+    <button data-t="bitacora">Bitácora</button>
+  </nav>
+</header>
+<main id="main"><p class="muted">Cargando…</p></main>
+<div id="toast" class="toast"></div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let TAB = (() => { try { return localStorage.getItem('hogar_tab') || 'inicio'; } catch (e) { return 'inicio'; } })();
+let S = null, SC = {scenes: [], schedules: [], next: null}, AJ = null, BUSY = 0, DRAFT = null;
+
+function toast(msg, bad){ const t = $('#toast'); t.textContent = msg; t.className = 'toast' + (bad ? ' mal' : ''); t.style.display = 'block';
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', 3500); }
+
+async function api(path, opts){
+  const o = Object.assign({headers: {'Content-Type': 'application/json'}}, opts || {});
+  if (o.body && typeof o.body !== 'string') o.body = JSON.stringify(o.body);
+  const r = await fetch(path, o);
+  if (r.status === 401) { location.href = '/login'; throw new Error('sesión'); }
+  let j = {}; try { j = await r.json(); } catch (e) {}
+  if (!r.ok || j.ok === false) throw new Error(j.error || j.result || ('error ' + r.status));
+  return j;
+}
+
+// ── íconos ───────────────────────────────────────────────────────
+const IC = {
+  bulb: on => `<svg viewBox="0 0 24 24" fill="none" stroke="${on ? '#76B900' : '#8B949E'}" stroke-width="1.8"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V17h5v-1.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3Z" ${on ? 'fill="rgba(118,185,0,.25)"' : ''}/></svg>`,
+  sw: on => `<svg viewBox="0 0 24 24" fill="none" stroke="${on ? '#76B900' : '#8B949E'}" stroke-width="1.8"><rect x="5" y="3" width="14" height="18" rx="3"/><rect x="9" y="${on ? 6 : 12}" width="6" height="6" rx="1.5" ${on ? 'fill="rgba(118,185,0,.35)"' : ''}/></svg>`,
+  spk: on => `<svg viewBox="0 0 24 24" fill="none" stroke="${on ? '#76B900' : '#8B949E'}" stroke-width="1.8"><rect x="6" y="2" width="12" height="20" rx="2.5"/><circle cx="12" cy="14" r="3.2"/><circle cx="12" cy="6.5" r="1"/></svg>`,
+  tv: on => `<svg viewBox="0 0 24 24" fill="none" stroke="${on ? '#76B900' : '#8B949E'}" stroke-width="1.8"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 20h8"/></svg>`,
+  door: open => `<svg viewBox="0 0 24 24" fill="none" stroke="${open ? '#D29922' : '#8B949E'}" stroke-width="1.8"><path d="M5 21V4a1 1 0 0 1 1-1h9v18M3 21h18"/>${open ? '<path d="M15 3l4 2v16l-4-2" fill="rgba(210,153,34,.2)"/>' : ''}<circle cx="12.5" cy="12" r=".9" fill="currentColor"/></svg>`,
+  curtain: () => `<svg viewBox="0 0 24 24" fill="none" stroke="#8B949E" stroke-width="1.8"><path d="M3 4h18M5 4c0 6 2 12 5 16M19 4c0 6-2 12-5 16"/></svg>`,
+  sensor: () => `<svg viewBox="0 0 24 24" fill="none" stroke="#8B949E" stroke-width="1.8"><path d="M12 3v11"/><circle cx="12" cy="17" r="4"/></svg>`,
+  person: on => `<svg viewBox="0 0 24 24" fill="none" stroke="${on ? '#76B900' : '#8B949E'}" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>`,
+};
+
+// ── datos derivados ──────────────────────────────────────────────
+const haEnt = d => (S?.ha?.entities || []).filter(e => e.domain === d);
+const bulbBy = id => (S?.tuya?.bulbs || []).find(b => b.id === id);
+function tuyaLights(){
+  return (S?.tuya?.devices || []).filter(d => d.kind === 'light');
+}
+function lightsOn(){
+  let n = haEnt('light').filter(e => e.state === 'on').length + haEnt('switch').filter(e => e.state === 'on').length;
+  for (const d of tuyaLights()){
+    const b = bulbBy(d.device_id);
+    if (b && b.reachable) { n += b.on ? 1 : 0; continue; }
+    if (d.online !== false && d.switches && Object.values(d.switches).some(Boolean)) n++;
+  }
+  return n;
+}
+
+// ── tarjetas ─────────────────────────────────────────────────────
+function cardHaLight(e){
+  const on = e.state === 'on', na = e.state === 'unavailable';
+  const pct = e.brightness != null ? Math.round(e.brightness / 2.55) : 100;
+  const rgb = e.rgb ? '#' + e.rgb.map(v => v.toString(16).padStart(2, '0')).join('') : '#ffffff';
+  const color = (e.modes || []).some(m => ['rgb', 'hs', 'xy', 'rgbw', 'rgbww'].includes(m));
+  const k = (e.modes || []).includes('color_temp');
+  return `<div class="card ${on ? 'on' : ''} ${na ? 'off-line' : ''}">
+    <div class="fila"><div class="ico">${IC.bulb(on)}</div><div class="nom"><b>${esc(e.name)}</b><small><span class="tag ha">HA</span> ${na ? 'sin conexión' : on ? pct + ' %' : 'apagada'}</small></div>
+    <input type="checkbox" class="tog" ${on ? 'checked' : ''} ${na ? 'disabled' : ''} data-ha="light" data-e="${esc(e.id)}"></div>
+    ${!na ? `<input type="range" min="1" max="100" value="${pct}" data-habr="${esc(e.id)}" aria-label="Brillo">
+    <div class="btns">${color ? `<input type="color" value="${rgb}" data-harg="${esc(e.id)}" aria-label="Color">` : ''}
+    ${k ? `<button class="btn sm" data-hak="${esc(e.id)}" data-v="2700">Cálida</button><button class="btn sm" data-hak="${esc(e.id)}" data-v="4000">Neutra</button><button class="btn sm" data-hak="${esc(e.id)}" data-v="6000">Fría</button>` : ''}</div>` : ''}
+  </div>`;
+}
+function cardHaSwitch(e){
+  const on = e.state === 'on', na = e.state === 'unavailable';
+  return `<div class="card ${on ? 'on' : ''} ${na ? 'off-line' : ''}"><div class="fila"><div class="ico">${IC.sw(on)}</div>
+    <div class="nom"><b>${esc(e.name)}</b><small><span class="tag ha">HA</span> ${na ? 'sin conexión' : on ? 'encendido' : 'apagado'}</small></div>
+    <input type="checkbox" class="tog" ${on ? 'checked' : ''} ${na ? 'disabled' : ''} data-ha="switch" data-e="${esc(e.id)}"></div></div>`;
+}
+function cardTuyaLight(d){
+  const off = d.online === false;
+  if (d.type === 'foco'){
+    const b = bulbBy(d.device_id), reach = b && b.reachable;
+    const on = reach ? b.on : !!(d.switches && d.switches.switch_led);
+    const dis = off && !reach;
+    return `<div class="card ${on && !dis ? 'on' : ''} ${dis ? 'off-line' : ''}">
+      <div class="fila"><div class="ico">${IC.bulb(on && !dis)}</div><div class="nom"><b>${esc(d.name)}</b><small><span class="tag tuya">Tuya</span> ${dis ? 'sin conexión' : reach ? (on ? (b.brightness || '') + ' %' : 'apagado') + ' · red local' : 'por la nube'}</small></div>
+      <input type="checkbox" class="tog" ${on ? 'checked' : ''} ${dis ? 'disabled' : ''} data-tuya="${esc(d.device_id)}" data-code="switch_led"></div>
+      ${reach ? `<input type="range" min="1" max="100" value="${b.brightness || 100}" data-tbr="${esc(d.device_id)}" aria-label="Brillo">
+      <div class="btns"><input type="color" value="${esc(b.colour || '#ffffff')}" data-tcol="${esc(d.device_id)}" aria-label="Color">
+      <button class="btn sm" data-tw="${esc(d.device_id)}" data-v="0">Cálida</button><button class="btn sm" data-tw="${esc(d.device_id)}" data-v="50">Neutra</button><button class="btn sm" data-tw="${esc(d.device_id)}" data-v="100">Fría</button></div>` : ''}
+    </div>`;
+  }
+  const sw = d.switches || {};
+  const codes = d.type === 'interruptor' ? Array.from({length: Math.max(1, Math.min(6, +d.gangs || Object.keys(sw).length || 1))}, (_, i) => 'switch_' + (i + 1)) : (Object.keys(sw).length ? Object.keys(sw) : ['switch_1']);
+  const anyOn = codes.some(c => sw[c]);
+  const names = d.gang_names || [];
+  return `<div class="card ${anyOn && !off ? 'on' : ''} ${off ? 'off-line' : ''}">
+    <div class="fila"><div class="ico">${IC.sw(anyOn && !off)}</div><div class="nom"><b>${esc(d.name)}</b><small><span class="tag tuya">Tuya</span> ${off ? 'sin conexión' : esc(d.type || '')}</small></div></div>
+    <div class="gangs">${codes.map((c, i) => `<button class="gang ${sw[c] ? 'on' : ''}" ${off ? 'disabled' : ''} data-tuya="${esc(d.device_id)}" data-code="${c}" data-val="${sw[c] ? 'false' : 'true'}">${esc(names[i] || (codes.length > 1 ? 'Botón ' + (i + 1) : (sw[c] ? 'Encendido' : 'Apagado')))}</button>`).join('')}</div>
+  </div>`;
+}
+function cardMedia(e, tts){
+  const na = e.state === 'unavailable', playing = e.state === 'playing', on = !['off', 'unavailable', 'standby'].includes(e.state);
+  const vol = e.volume != null ? Math.round(e.volume * 100) : null;
+  const tv = /tv|apple|fire/i.test(e.name + e.id) || (e.sources || []).length;
+  return `<div class="card ${playing ? 'on' : ''} ${na ? 'off-line' : ''}">
+    <div class="fila"><div class="ico">${(tv ? IC.tv : IC.spk)(on && !na)}</div><div class="nom"><b>${esc(e.name)}</b><small><span class="tag ha">HA</span> ${esc(na ? 'sin conexión' : e.state)}${e.app ? ' · ' + esc(e.app) : ''}</small></div></div>
+    ${!na ? `<div class="media-t">${esc([e.title, e.artist].filter(Boolean).join(' — '))}</div>
+    <div class="btns"><button class="btn sm" data-ham="${esc(e.id)}" data-s="media_previous_track" aria-label="Anterior">⏮</button>
+    <button class="btn sm" data-ham="${esc(e.id)}" data-s="media_play_pause" aria-label="Reproducir o pausar">${playing ? '⏸' : '▶'}</button>
+    <button class="btn sm" data-ham="${esc(e.id)}" data-s="media_next_track" aria-label="Siguiente">⏭</button>
+    <button class="btn sm" data-ham="${esc(e.id)}" data-s="${on ? 'turn_off' : 'turn_on'}">${on ? 'Apagar' : 'Encender'}</button></div>
+    ${vol != null ? `<input type="range" min="0" max="100" value="${vol}" data-havol="${esc(e.id)}" aria-label="Volumen">` : ''}
+    ${(e.sources || []).length ? `<select class="in" data-hasrc="${esc(e.id)}"><option value="">Fuente / app…</option>${e.sources.map(s => `<option ${s === e.source ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>` : ''}
+    ${tts && !tv ? `<div class="fila"><input class="in" placeholder="Anunciar un mensaje…" data-say="${esc(e.id)}" maxlength="300"><button class="btn sm" data-sayb="${esc(e.id)}">Decir</button></div>` : ''}` : ''}
+  </div>`;
+}
+function cardDoor(d){
+  const off = d.online === false;
+  const open = d.open === true;
+  const lbl = {door: 'Puerta', window: 'Ventana', garage: 'Portón'}[d.kind] || d.kind;
+  return `<div class="card ${off ? 'off-line' : ''}"><div class="fila"><div class="ico">${IC.door(open && !off)}</div>
+    <div class="nom"><b>${esc(d.name)}</b><small><span class="tag tuya">Tuya</span> ${esc(lbl)} · ${off ? 'sin conexión' : d.open == null ? 'sin dato' : open ? 'abierta' : 'cerrada'}${d.battery != null ? ' · batería ' + d.battery + ' %' : ''}</small></div></div>
+    ${d.cam_name ? `<small class="muted">Cámara: ${esc(d.cam_name)}</small>` : ''}</div>`;
+}
+function cardCurtain(d){
+  const off = d.online === false;
+  return `<div class="card ${off ? 'off-line' : ''}"><div class="fila"><div class="ico">${IC.curtain()}</div>
+    <div class="nom"><b>${esc(d.name)}</b><small><span class="tag tuya">Tuya</span> Cortina${d.percent != null ? ' · ' + d.percent + ' %' : ''}</small></div></div>
+    <div class="btns"><button class="btn sm" data-tuya="${esc(d.device_id)}" data-code="control" data-val="open">Abrir</button>
+    <button class="btn sm" data-tuya="${esc(d.device_id)}" data-code="control" data-val="stop">Detener</button>
+    <button class="btn sm" data-tuya="${esc(d.device_id)}" data-code="control" data-val="close">Cerrar</button></div></div>`;
+}
+function cardSensor(e){
+  return `<div class="card ${e.state === 'unavailable' ? 'off-line' : ''}"><div class="fila"><div class="ico">${e.domain === 'person' ? IC.person(e.state === 'home') : IC.sensor()}</div>
+    <div class="nom"><b>${esc(e.name)}</b><small><span class="tag ha">HA</span> ${esc(e.domain === 'person' ? (e.state === 'home' ? 'en casa' : e.state === 'not_home' ? 'fuera' : e.state) : e.state + (e.unit ? ' ' + e.unit : ''))}</small></div></div></div>`;
+}
+
+// ── pestañas ─────────────────────────────────────────────────────
+function vInicio(){
+  const tl = tuyaLights(), lon = lightsOn();
+  const total = tl.length + haEnt('light').length + haEnt('switch').length;
+  const open = (S.tuya.devices || []).filter(d => ['door', 'window', 'garage'].includes(d.kind) && d.open === true && d.online !== false);
+  const offline = (S.tuya.devices || []).filter(d => d.online === false).length + (S.ha.entities || []).filter(e => e.state === 'unavailable').length;
+  const playing = haEnt('media_player').filter(e => e.state === 'playing');
+  return `<div class="tiles">
+    <div class="card stat"><span class="n">${lon}<span class="muted" style="font-size:1rem"> / ${total}</span></span><span class="l">luces encendidas</span></div>
+    <div class="card stat"><span class="n">${open.length}</span><span class="l">puertas o ventanas abiertas</span></div>
+    <div class="card stat"><span class="n">${playing.length}</span><span class="l">reproduciendo</span></div>
+    <div class="card stat"><span class="n">${offline}</span><span class="l">sin conexión</span></div>
+  </div>
+  <h2>Escenas</h2>${SC.scenes.length ? `<div class="btns">${SC.scenes.map(s => `<button class="btn" data-run="${esc(s.id)}">${esc(s.icon || '✦')} ${esc(s.name)}</button>`).join('')}</div>` : `<div class="vacio">Aún no hay escenas. Créalas en «Escenas y horarios».</div>`}
+  ${SC.next ? `<p class="muted">Próximo horario: <b>${esc(SC.next.name)}</b> · ${esc(SC.next.at)}</p>` : ''}
+  <h2>Todos los focos Tuya (red local)</h2>
+  <div class="card"><div class="btns"><button class="btn pri" data-all="on">Encender todos</button><button class="btn" data-all="off">Apagar todos</button>
+    <input type="color" value="#ffffff" data-allcol aria-label="Color de todos"><button class="btn sm" data-allw="0">Cálida</button><button class="btn sm" data-allw="100">Fría</button></div>
+    <input type="range" min="1" max="100" value="80" data-allbr aria-label="Brillo de todos"></div>
+  ${open.length ? `<h2>Abiertas ahora</h2><div class="grid">${open.map(cardDoor).join('')}</div>` : ''}
+  ${playing.length ? `<h2>Reproduciendo</h2><div class="grid">${playing.map(e => cardMedia(e, haEnt('tts')[0])).join('')}</div>` : ''}`;
+}
+function vLuces(){
+  const tl = tuyaLights();
+  const sort = arr => arr.slice().sort((a, b) => (a.online === false) - (b.online === false) || String(a.name).localeCompare(String(b.name)));
+  const hl = haEnt('light'), hs = haEnt('switch');
+  return `<h2>Tuya · interruptores y enchufes</h2><div class="grid">${sort(tl.filter(d => d.type !== 'foco')).map(cardTuyaLight).join('') || '<div class="vacio">Sin datos de thor-vision</div>'}</div>
+    <h2>Tuya · focos</h2><div class="grid">${sort(tl.filter(d => d.type === 'foco')).map(cardTuyaLight).join('') || '<div class="vacio">Sin focos</div>'}</div>
+    <h2>Home Assistant</h2><div class="grid">${hl.map(cardHaLight).join('')}${hs.map(cardHaSwitch).join('') || ''}${!hl.length && !hs.length ? `<div class="vacio">${S.ha.ok ? 'Home Assistant no tiene luces' : esc(S.ha.error || '')}</div>` : ''}</div>
+    ${(S.tuya.devices || []).some(d => d.kind === 'curtain') ? `<h2>Cortinas</h2><div class="grid">${S.tuya.devices.filter(d => d.kind === 'curtain').map(cardCurtain).join('')}</div>` : ''}`;
+}
+function vMedios(){
+  const m = haEnt('media_player').slice().sort((a, b) => (a.state === 'unavailable') - (b.state === 'unavailable') || a.name.localeCompare(b.name));
+  const tts = haEnt('tts')[0];
+  return `<h2>Bocinas, Apple TV y Fire TV</h2><div class="grid">${m.map(e => cardMedia(e, tts)).join('') || `<div class="vacio">${esc(S.ha.ok ? 'Sin reproductores' : S.ha.error || '')}</div>`}</div>
+  <h2>Alexa</h2><div class="nota">Home Assistant todavía no tiene Alexa. Para que aparezca aquí, instala en Home Assistant la integración <b>Alexa Media Player</b> (por HACS): cada Echo aparecerá como reproductor con anuncios y rutinas. El Fire TV aparece cuando se active la integración <b>Android Debug Bridge</b> con la depuración ADB del Fire TV encendida.</div>`;
+}
+function vSensores(){
+  const ds = (S.tuya.devices || []).filter(d => ['door', 'window', 'garage'].includes(d.kind));
+  const otros = (S.tuya.devices || []).filter(d => ['alarm', 'panel', 'gateway', 'camera'].includes(d.kind));
+  const hs = (S.ha.entities || []).filter(e => ['sensor', 'binary_sensor', 'person', 'weather'].includes(e.domain));
+  return `<h2>Puertas, ventanas y portón</h2><div class="grid">${ds.map(cardDoor).join('') || '<div class="vacio">Sin datos</div>'}</div>
+    <h2>Otros equipos Tuya</h2><div class="grid">${otros.map(d => `<div class="card ${d.online === false ? 'off-line' : ''}"><div class="fila"><div class="ico">${IC.sensor()}</div><div class="nom"><b>${esc(d.name)}</b><small><span class="tag tuya">Tuya</span> ${esc(d.type || d.kind)} · ${d.online === false ? 'sin conexión' : 'en línea'}</small></div></div></div>`).join('')}</div>
+    <h2>Home Assistant</h2><div class="grid">${hs.map(cardSensor).join('') || '<div class="vacio">Sin sensores</div>'}</div>`;
+}
+
+// editor de escenas: lista de dispositivos posibles
+function targets(){
+  const out = [];
+  for (const d of tuyaLights()){
+    if (d.type === 'foco') out.push({k: 't:' + d.device_id + ':switch_led', label: d.name + ' (foco)', foco: d.device_id});
+    else {
+      const n = d.type === 'interruptor' ? Math.max(1, +d.gangs || 1) : 1;
+      for (let i = 1; i <= n; i++) out.push({k: 't:' + d.device_id + ':switch_' + i, label: d.name + (n > 1 ? ' · botón ' + i : '')});
+    }
+  }
+  for (const e of haEnt('light')) out.push({k: 'h:light:' + e.id, label: e.name + ' (HA)'});
+  for (const e of haEnt('switch')) out.push({k: 'h:switch:' + e.id, label: e.name + ' (HA)'});
+  for (const e of haEnt('media_player')) out.push({k: 'h:media_player:' + e.id, label: e.name + ' (medios)'});
+  return out.sort((a, b) => a.label.localeCompare(b.label));
+}
+function actionLabel(a){
+  if (a.t === 'focos') return `Todos los focos: ${a.action.on === false ? 'apagar' : 'encender'}${a.action.brightness ? ' al ' + a.action.brightness + ' %' : ''}${a.action.colour ? ' ' + a.action.colour : ''}`;
+  if (a.t === 'espera') return `Esperar ${a.s} s`;
+  if (a.t === 'tuya'){ const d = (S.tuya.devices || []).find(x => x.device_id === a.device_id); return `${d ? d.name : a.device_id} · ${a.code} → ${a.value}`; }
+  const e = (S.ha.entities || []).find(x => x.id === a.entity_id);
+  return `${e ? e.name : a.entity_id} · ${a.service}${a.data && a.data.brightness_pct ? ' ' + a.data.brightness_pct + ' %' : ''}`;
+}
+function vEscenas(){
+  const d = DRAFT;
+  const tg = targets();
+  const dias = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+  return `<h2>Escenas</h2>${SC.scenes.length ? `<div class="lista">${SC.scenes.map(s => `<div class="acc"><div><b>${esc(s.icon || '✦')} ${esc(s.name)}</b><br><small class="muted">${s.actions.length} órdenes</small></div>
+      <button class="btn sm pri" data-run="${esc(s.id)}">Ejecutar</button><div class="btns"><button class="btn sm" data-edit="${esc(s.id)}">Editar</button><button class="btn sm pel" data-del="${esc(s.id)}">Borrar</button></div></div>`).join('')}</div>` : '<div class="vacio">Sin escenas todavía</div>'}
+  <h2>${d && d.id ? 'Editar escena' : 'Nueva escena'}</h2>
+  <div class="card form">
+    <label class="f">Nombre<input class="in" id="sc-name" maxlength="60" value="${esc(d?.name || '')}" placeholder="Ej. Llegada en la noche"></label>
+    <div class="lista">${(d?.actions || []).map((a, i) => `<div class="acc"><span>${esc(actionLabel(a))}</span><span></span><button class="btn sm pel" data-rma="${i}">Quitar</button></div>`).join('') || '<small class="muted">Agrega órdenes abajo.</small>'}</div>
+    <div class="fila" style="flex-wrap:wrap"><select class="in" id="sc-dev" style="flex:2;min-width:200px"><option value="">Dispositivo…</option><option value="focos">✦ Todos los focos Tuya</option>
+      ${tg.map(t => `<option value="${esc(t.k)}" ${t.foco ? 'data-foco="' + esc(t.foco) + '"' : ''}>${esc(t.label)}</option>`).join('')}</select>
+      <select class="in" id="sc-on" style="flex:1;min-width:110px"><option value="on">Encender</option><option value="off">Apagar</option></select>
+      <input class="in" id="sc-br" type="number" min="1" max="100" placeholder="Brillo %" style="flex:1;min-width:90px">
+      <input type="color" id="sc-col" value="#ffffff" title="Color (solo focos)"><label class="muted" style="font-size:.8rem"><input type="checkbox" id="sc-usecol"> color</label>
+      <button class="btn" id="sc-add">Agregar</button><button class="btn sm" id="sc-wait">+ Esperar 5 s</button></div>
+    <div class="btns"><button class="btn pri" id="sc-save">Guardar escena</button>${d ? '<button class="btn" id="sc-cancel">Descartar</button>' : ''}</div>
+  </div>
+  <h2>Horarios</h2>
+  ${SC.schedules.length ? `<div class="lista">${SC.schedules.map(h => { const s = SC.scenes.find(x => x.id === h.scene_id);
+      return `<div class="acc"><div><b>${esc(h.name)}</b><br><small class="muted">${esc(h.when)} · ${h.days.map(i => dias[i]).join(' ')} → ${esc(s ? s.name : '?')}${h.last_run ? ' · última ' + esc(h.last_run) : ''}</small></div>
+      <input type="checkbox" class="tog" ${h.enabled ? 'checked' : ''} data-hen="${esc(h.id)}" aria-label="Activo"><button class="btn sm pel" data-hdel="${esc(h.id)}">Borrar</button></div>`; }).join('')}</div>` : '<div class="vacio">Sin horarios</div>'}
+  <div class="card form" style="margin-top:12px">
+    <label class="f">Nombre<input class="in" id="h-name" maxlength="60" placeholder="Ej. Luces del jardín al atardecer"></label>
+    <div class="fila" style="flex-wrap:wrap"><label class="f" style="flex:1;min-width:140px">Cuándo<select class="in" id="h-tipo"><option value="hora">A una hora</option><option value="atardecer">Al atardecer</option><option value="amanecer">Al amanecer</option></select></label>
+      <label class="f" style="flex:1;min-width:120px">Hora<input class="in" id="h-hora" type="time" value="19:00"></label>
+      <label class="f" style="flex:1;min-width:120px">Desfase (min)<input class="in" id="h-off" type="number" value="0" min="-180" max="180"></label></div>
+    <div class="dias">${dias.map((x, i) => `<label><input type="checkbox" class="h-dia" value="${i}" checked> ${x}</label>`).join('')}</div>
+    <label class="f">Escena<select class="in" id="h-scene">${SC.scenes.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('')}</select></label>
+    <div class="btns"><button class="btn pri" id="h-save" ${SC.scenes.length ? '' : 'disabled'}>Guardar horario</button></div>
+  </div>`;
+}
+function vAjustes(){
+  if (!AJ) return '<p class="muted">Cargando…</p>';
+  const h = AJ.ha, admin = AJ.role === 'admin';
+  return `<h2>Home Assistant</h2><div class="card form">
+    <p>${h.configured ? `Conectado a <code>${esc(h.url)}</code>${h.token_hint ? ' · token ' + esc(h.token_hint) : ''}${h.saved_by ? ' · guardado por ' + esc(h.saved_by) : ''}` : 'Sin conectar.'}
+    ${h.last_error ? `<br><span class="err">${esc(h.last_error)}</span>` : ''}</p>
+    ${admin ? `<label class="f">Dirección<input class="in" id="a-url" value="${esc(h.url || 'http://192.168.0.110:8123')}" autocomplete="off"></label>
+    <label class="f">Token de acceso de larga duración<input class="in" id="a-tok" type="password" autocomplete="new-password" placeholder="${h.configured ? 'Pega uno nuevo para reemplazarlo' : 'Pega el token'}"></label>
+    <div class="btns"><button class="btn pri" id="a-save">Probar y guardar</button>${h.configured ? '<button class="btn pel" id="a-del">Desconectar</button>' : ''}</div>
+    <small class="muted">El token se guarda solo en el servidor (archivo con permisos 600) y nunca vuelve al navegador. Créalo en Home Assistant → tu perfil → Seguridad → Tokens de acceso de larga duración, con un nombre como «oxm-hogar».</small>`
+    : '<small class="muted">Solo un administrador puede cambiar la conexión.</small>'}
+  </div>
+  <h2>Tuya</h2><div class="card"><p>Servicio de control: <code>${esc(AJ.tuya_service)}</code><br>Estado de los equipos: <code>${esc(AJ.vision)}</code> (thor-vision)</p>
+  <small class="muted">Los focos se manejan por la red local; los interruptores y cortinas, por la nube de Tuya. Solo aparecen los equipos de la casa Patricio 10.</small></div>
+  ${admin ? '<h2>Cuentas</h2><div class="card"><p>Usuarios, roles y bloqueos: <a href="/admin" style="color:var(--acento)">panel de administración</a>.</p></div>' : ''}`;
+}
+async function vBitacora(){
+  const j = await api('/api/bitacora');
+  return `<h2>Últimas acciones</h2>${j.items.length ? `<div class="card log">${j.items.map(x => `<time>${new Date(x.ts * 1000).toLocaleString('es-MX', {dateStyle: 'short', timeStyle: 'short'})}</time><span><b>${esc(x.who)}</b> · ${esc(x.what)} <span class="muted">${esc(x.result)}</span></span>`).join('')}</div>` : '<div class="vacio">Sin acciones todavía</div>'}`;
+}
+
+async function render(force){
+  if (!S || (BUSY && !force)) return;
+  const views = {inicio: vInicio, luces: vLuces, medios: vMedios, sensores: vSensores, escenas: vEscenas, ajustes: vAjustes, bitacora: vBitacora};
+  const act = document.activeElement;
+  if (!force && act && act.closest && act.closest('main') && ['INPUT', 'SELECT'].includes(act.tagName) && act.type !== 'checkbox') return;  // no pisar lo que se está escribiendo
+  $('#main').innerHTML = await views[TAB]();
+}
+function chips(){
+  const ch = $('#c-ha'), ct = $('#c-tuya');
+  ch.className = 'chip ' + (S.ha.ok ? 'ok' : 'mal'); ch.title = S.ha.error || 'Home Assistant conectado';
+  ct.className = 'chip ' + (S.tuya.ok ? 'ok' : 'mal'); ct.title = S.tuya.error || 'Tuya conectado';
+  $('#c-user').textContent = S.user.name + ' · ' + (S.user.role || '');
+}
+async function poll(){
+  if (document.hidden) return;
+  try { S = await api('/api/estado'); chips(); render(); } catch (e) { if (e.message !== 'sesión') toast('Sin conexión con el servidor: ' + e.message, true); }
+}
+async function loadScenes(){ try { SC = await api('/api/escenas'); } catch (e) {} }
+async function loadAjustes(){ try { AJ = await api('/api/ajustes'); } catch (e) {} }
+
+// ── acciones ─────────────────────────────────────────────────────
+async function doHa(domain, service, entity_id, data){
+  try { await api('/api/ha/accion', {method: 'POST', body: {domain, service, entity_id, data: data || {}}}); setTimeout(poll, 400); }
+  catch (e) { toast(e.message, true); poll(); }
+}
+async function doTuya(device_id, code, value){
+  try { const r = await api('/api/tuya/control', {method: 'POST', body: {device_id, code, value}}); toast(r.result || 'ok'); setTimeout(poll, 800); }
+  catch (e) { toast(e.message, true); poll(); }
+}
+async function doFocos(action){
+  toast('Enviando a todos los focos…');
+  try { const r = await api('/api/tuya/focos', {method: 'POST', body: {ids: 'all', action}}); toast(r.result || 'ok'); }
+  catch (e) { toast(e.message, true); }
+}
+const hexToRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+
+document.addEventListener('click', async ev => {
+  const t = ev.target.closest('button, input[type=checkbox]');
+  if (!t) return;
+  const ds = t.dataset;
+  if (t.closest('#tabs')){ TAB = ds.t; try { localStorage.setItem('hogar_tab', TAB); } catch (e) {}
+    document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b === t));
+    if (TAB === 'escenas') await loadScenes(); if (TAB === 'ajustes') await loadAjustes(); render(true); return; }
+  if (ds.ha){ doHa(ds.ha, t.checked ? 'turn_on' : 'turn_off', ds.e); return; }
+  if (ds.tuya){ const v = ds.val === undefined ? t.checked : ds.val === 'true' ? true : ds.val === 'false' ? false : ds.val; doTuya(ds.tuya, ds.code, v); return; }
+  if (ds.hak){ doHa('light', 'turn_on', ds.hak, {color_temp_kelvin: +ds.v}); return; }
+  if (ds.tw){ doTuya(ds.tw, 'white_pct', +ds.v); return; }
+  if (ds.ham){ doHa('media_player', ds.s, ds.ham); return; }
+  if (ds.sayb){ const inp = document.querySelector(`[data-say="${CSS.escape(ds.sayb)}"]`); const msg = (inp?.value || '').trim(); if (!msg) return;
+    const tts = haEnt('tts')[0]; doHa('tts', 'speak', tts.id, {media_player_entity_id: ds.sayb, message: msg, language: 'es'}); inp.value = ''; toast('Anunciando…'); return; }
+  if (ds.all){ doFocos({on: ds.all === 'on'}); return; }
+  if (ds.allw !== undefined){ doFocos({on: true, white: +ds.allw}); return; }
+  if (ds.run){ toast('Ejecutando escena…'); try { const r = await api(`/api/escenas/${encodeURIComponent(ds.run)}/ejecutar`, {method: 'POST'});
+      const ok = r.results.filter(x => x.ok).length; toast(`Escena lista: ${ok} de ${r.results.length} órdenes`, ok < r.results.length); setTimeout(poll, 800); }
+    catch (e) { toast(e.message, true); } return; }
+  if (ds.edit){ DRAFT = JSON.parse(JSON.stringify(SC.scenes.find(s => s.id === ds.edit))); render(true); return; }
+  if (ds.del){ if (!confirm('¿Borrar la escena y sus horarios?')) return; await api('/api/escenas/' + encodeURIComponent(ds.del), {method: 'DELETE'}).catch(e => toast(e.message, true)); await loadScenes(); render(true); return; }
+  if (ds.rma !== undefined){ DRAFT.actions.splice(+ds.rma, 1); render(true); return; }
+  if (ds.hdel){ await api('/api/horarios/' + encodeURIComponent(ds.hdel), {method: 'DELETE'}).catch(e => toast(e.message, true)); await loadScenes(); render(true); return; }
+  if (ds.hen){ const h = SC.schedules.find(x => x.id === ds.hen); try { await api('/api/horarios', {method: 'POST', body: Object.assign({}, h, {enabled: t.checked})}); } catch (e) { toast(e.message, true); } await loadScenes(); render(true); return; }
+  switch (t.id){
+    case 'sc-add': {
+      const dev = $('#sc-dev').value, on = $('#sc-on').value === 'on', br = +$('#sc-br').value || null, col = $('#sc-usecol').checked ? $('#sc-col').value : null;
+      if (!dev) return toast('Elige un dispositivo', true);
+      DRAFT = DRAFT || {name: '', actions: []}; DRAFT.name = $('#sc-name').value;
+      if (dev === 'focos'){ const a = {on}; if (on && br) a.brightness = br; if (on && col) a.colour = col; DRAFT.actions.push({t: 'focos', ids: 'all', action: a}); }
+      else if (dev.startsWith('t:')){ const [, id, code] = dev.split(':');
+        DRAFT.actions.push({t: 'tuya', device_id: id, code, value: on});
+        const foco = $('#sc-dev').selectedOptions[0].dataset.foco;
+        if (foco && on && br) DRAFT.actions.push({t: 'tuya', device_id: id, code: 'brightness_pct', value: br});
+        if (foco && on && col) DRAFT.actions.push({t: 'tuya', device_id: id, code: 'colour_hex', value: col}); }
+      else { const [, dom, ...rest] = dev.split(':'); const id = rest.join(':'); const data = {};
+        if (dom === 'light' && on && br) data.brightness_pct = br; if (dom === 'light' && on && col) data.rgb_color = hexToRgb(col);
+        DRAFT.actions.push({t: 'ha', domain: dom, service: on ? 'turn_on' : 'turn_off', entity_id: id, data}); }
+      render(true); return; }
+    case 'sc-wait': DRAFT = DRAFT || {name: '', actions: []}; DRAFT.name = $('#sc-name').value; DRAFT.actions.push({t: 'espera', s: 5}); render(true); return;
+    case 'sc-cancel': DRAFT = null; render(true); return;
+    case 'sc-save': { const body = Object.assign({}, DRAFT || {actions: []}, {name: $('#sc-name').value});
+      try { await api('/api/escenas', {method: 'POST', body}); DRAFT = null; toast('Escena guardada'); await loadScenes(); render(true); } catch (e) { toast(e.message, true); } return; }
+    case 'h-save': { const tipo = $('#h-tipo').value, off = +$('#h-off').value || 0;
+      const when = tipo === 'hora' ? $('#h-hora').value : tipo + (off ? (off > 0 ? '+' : '') + off : '');
+      const body = {name: $('#h-name').value, when, days: [...document.querySelectorAll('.h-dia:checked')].map(x => +x.value), scene_id: $('#h-scene').value, enabled: true};
+      try { await api('/api/horarios', {method: 'POST', body}); toast('Horario guardado'); await loadScenes(); render(true); } catch (e) { toast(e.message, true); } return; }
+    case 'a-save': try { const r = await api('/api/ajustes/ha', {method: 'POST', body: {url: $('#a-url').value, token: $('#a-tok').value}});
+        toast(`Conectado: ${r.location || ''} ${r.version || ''}`); await loadAjustes(); poll(); render(true); } catch (e) { toast(e.message, true); } return;
+    case 'a-del': if (!confirm('¿Desconectar Home Assistant y borrar el token del servidor?')) return;
+      try { await api('/api/ajustes/ha', {method: 'DELETE'}); await loadAjustes(); poll(); render(true); } catch (e) { toast(e.message, true); } return;
+  }
+});
+// deslizadores y selectores: se envía al soltar
+document.addEventListener('pointerdown', ev => { if (ev.target.matches('input[type=range]')) BUSY++; });
+document.addEventListener('change', ev => {
+  const t = ev.target, ds = t.dataset;
+  if (t.matches('input[type=range]')) setTimeout(() => { BUSY = Math.max(0, BUSY - 1); }, 1500);
+  if (ds.habr) doHa('light', 'turn_on', ds.habr, {brightness_pct: +t.value});
+  else if (ds.harg) doHa('light', 'turn_on', ds.harg, {rgb_color: hexToRgb(t.value)});
+  else if (ds.havol) doHa('media_player', 'volume_set', ds.havol, {volume_level: +t.value / 100});
+  else if (ds.hasrc && t.value) doHa('media_player', 'select_source', ds.hasrc, {source: t.value});
+  else if (ds.tbr) doTuya(ds.tbr, 'brightness_pct', +t.value);
+  else if (ds.tcol) doTuya(ds.tcol, 'colour_hex', t.value);
+  else if (t.matches('[data-allbr]')) doFocos({on: true, brightness: +t.value});
+  else if (t.matches('[data-allcol]')) doFocos({on: true, colour: t.value});
+  else if (t.id === 'h-tipo'){ $('#h-hora').disabled = t.value !== 'hora'; }
+});
+document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.dataset.say !== undefined){ document.querySelector(`[data-sayb="${CSS.escape(ev.target.dataset.say)}"]`)?.click(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
+
+document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === TAB));
+(async () => { await Promise.all([loadScenes(), loadAjustes()]); await poll(); setInterval(poll, 4000); })();
+</script>
+</body>
+</html>

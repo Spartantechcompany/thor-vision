@@ -2,6 +2,7 @@
 
 import html
 import io
+import os
 import time
 from urllib.parse import parse_qs, urlsplit
 
@@ -9,10 +10,11 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from app.auth import limiter, passwords, sessions, store, totp
-from app.auth.guard import COOKIE_FULL
+from app.auth.guard import COOKIE_FULL, COOKIE_PREFIX
 
 router = APIRouter()
-COOKIE_PASO = "thor_paso"
+COOKIE_PASO = f"{COOKIE_PREFIX}_paso"
+APP_NAME = os.environ.get("THOR_APP_NAME", "THOR Vision")
 _DUMMY = []
 
 
@@ -59,7 +61,7 @@ th{color:var(--secundario);font-size:.72rem;text-transform:uppercase;letter-spac
 a{color:var(--acento)}
 @media(max-width:600px){th:nth-child(n+4),td:nth-child(n+4){display:none}}
 """
-MARCA = '<div class="marca"><span class="oxm">oxm</span><span class="tech">tech</span> &middot; THOR Vision</div>'
+MARCA = '<div class="marca"><span class="oxm">oxm</span><span class="tech">tech</span> &middot; ' + html.escape(APP_NAME) + '</div>'
 
 
 def _page(titulo: str, cuerpo: str, status: int = 200) -> HTMLResponse:
@@ -71,7 +73,7 @@ def _page(titulo: str, cuerpo: str, status: int = 200) -> HTMLResponse:
 
 def _login_form(error: str | None = None, status: int = 200) -> HTMLResponse:
     err = f'<p class="err" role="alert">{html.escape(error)}</p>' if error else ""
-    return _page("Acceso · THOR Vision", f"""<form method="post" action="/login" class="caja">
+    return _page(f"Acceso · {APP_NAME}", f"""<form method="post" action="/login" class="caja">
 {MARCA}<h1>Acceso al panel</h1>{err}
 <label>Usuario <input name="usuario" autocomplete="username" required maxlength="40"></label>
 <label>Contraseña <input name="password" type="password" autocomplete="current-password" required maxlength="200"></label>
@@ -162,7 +164,7 @@ async def login(request: Request):
 def codigo_page(request: Request):
     if _current_stage(request, sessions.PWD_MFA) is None:
         return RedirectResponse("/login", status_code=303)
-    return _page("Código · THOR Vision", f"""<form method="post" action="/codigo" class="caja">
+    return _page(f"Código · {APP_NAME}", f"""<form method="post" action="/codigo" class="caja">
 {MARCA}<h1>Código de verificación</h1>
 <label>Código de 6 dígitos de tu app <input name="codigo" inputmode="numeric" autocomplete="one-time-code"
 pattern="[0-9]{{6}}" required maxlength="6"></label><button type="submit">Verificar</button>
@@ -203,7 +205,7 @@ def enrolar_page(request: Request):
         store.set_pending_secret(usuario, totp.new_secret())
         cuenta = store.get_user(usuario)
     clave = html.escape(cuenta["totp_secret"])
-    return _page("Registrar autenticador · THOR Vision", f"""<div class="caja">
+    return _page(f"Registrar autenticador · {APP_NAME}", f"""<div class="caja">
 {MARCA}<h1>Registra tu autenticador</h1>
 <p class="pequeno">Cuenta: {html.escape(usuario)}. Hazlo una sola vez. Escanea el QR con Google o Microsoft Authenticator
 (cuenta «basada en hora»).</p>
@@ -222,7 +224,7 @@ def enrolar_qr(request: Request):
     if not cuenta or not cuenta["totp_secret"]:
         return Response(status_code=404)
     buf = io.BytesIO()
-    segno.make(totp.provisioning_uri(cuenta["username"], cuenta["totp_secret"]), error="m").save(
+    segno.make(totp.provisioning_uri(cuenta["username"], cuenta["totp_secret"], APP_NAME), error="m").save(
         buf, kind="svg", scale=6, border=2)
     return Response(buf.getvalue(), media_type="image/svg+xml", headers={"Cache-Control": "no-store"})
 

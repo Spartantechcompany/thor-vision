@@ -28,3 +28,30 @@ def config(request: Request):
 def events(request: Request, device_id: str = "", limit: int = 100, sync: bool = False):
     """Registro de eventos de los dispositivos Tuya. sync=true incluye las sincronizaciones de la nube y todos los codigos internos."""
     return {"events": _l(request).recent(device_id, limit, sync=sync)}
+
+
+_HOGAR = {"ts": 0.0, "data": None}
+
+
+@router.get("/api/hogar/resumen")
+def hogar_resumen():
+    """Reflejo ligero de OXM Hogar (panel aparte de luces y dispositivos): se consulta con su token de máquina y se guarda 15 s."""
+    import os
+    import time
+
+    import httpx
+    url = os.environ.get("HOGAR_URL", "http://127.0.0.1:8095").rstrip("/")
+    public = os.environ.get("HOGAR_PUBLIC_URL", "http://192.168.0.10:8095")
+    tok = os.environ.get("HOGAR_TOKEN", "")
+    if not tok:
+        return {"ok": False, "url": public, "error": "sin HOGAR_TOKEN"}
+    if time.time() - _HOGAR["ts"] < 15 and _HOGAR["data"] is not None:
+        return _HOGAR["data"]
+    try:
+        r = httpx.get(url + "/api/resumen", headers={"Authorization": f"Bearer {tok}"}, timeout=4)
+        r.raise_for_status()
+        data = {"ok": True, "url": public, **r.json()}
+    except (httpx.HTTPError, ValueError) as exc:
+        data = {"ok": False, "url": public, "error": type(exc).__name__}
+    _HOGAR.update(ts=time.time(), data=data)
+    return data

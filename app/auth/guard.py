@@ -11,10 +11,11 @@ from http.cookies import SimpleCookie
 from app.auth import sessions, store
 
 PUBLIC = {"/login", "/codigo", "/enrolar", "/enrolar/qr.svg", "/logout"}
-MACHINE_PREFIXES = ("/api/detections", "/api/cameras")
+MACHINE_PREFIXES = ("/api/detections", "/api/cameras") + tuple(p.strip() for p in os.environ.get("THOR_MACHINE_EXTRA", "").split(",") if p.strip())
 ADMIN_PREFIX = "/admin"
 LOOPBACK = {"127.0.0.1", "::1"}
-COOKIE_FULL = "thor_sesion"
+COOKIE_PREFIX = os.environ.get("THOR_COOKIE_PREFIX", "thor")      # otra app en el mismo host (OXM Hogar) usa su propio prefijo: las cookies no distinguen puerto
+COOKIE_FULL = f"{COOKIE_PREFIX}_sesion"
 
 
 def _cookies(scope) -> dict:

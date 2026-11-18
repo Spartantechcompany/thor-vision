@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from app.auth import limiter, sessions, store
 from app.auth.guard import COOKIE_FULL
-from app.auth.routes import MARCA, _form_fields, _ip, _page, _same_origin
+from app.auth.routes import APP_NAME, MARCA, _form_fields, _ip, _page, _same_origin
 
 router = APIRouter(prefix="/admin")
 ESTILO_PANEL = """<style>
@@ -35,7 +35,7 @@ def _admin(request: Request) -> dict | None:
 
 
 def _aviso(texto: str, status: int = 409) -> HTMLResponse:
-    return _page("Administración · THOR Vision", f'<div class="caja">{MARCA}<p class="err">{html.escape(texto)}</p>'
+    return _page(f"Administración · {APP_NAME}", f'<div class="caja">{MARCA}<p class="err">{html.escape(texto)}</p>'
                                                  '<p><a href="/admin">Volver al panel</a></p></div>', status)
 
 
@@ -118,7 +118,7 @@ def panel(request: Request):
 <form method="post" action="/logout"><button type="submit" class="secundario">Salir</button></form></div>
 <h1>Administración de acceso</h1>
 {_tabla_usuarios(admin)}{_tabla_bloqueos()}{_tabla_bitacora()}</div>"""
-    return _page("Administración · THOR Vision", cuerpo)
+    return _page(f"Administración · {APP_NAME}", cuerpo)
 
 
 @router.post("/rol")
