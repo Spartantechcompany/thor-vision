@@ -115,3 +115,18 @@ Muestra en vivo el registro técnico (llamadas a Home Assistant y a Tuya con su 
 por nivel y fuente, búsqueda, pausa y seguimiento. Botones de diagnóstico que **no cambian ningún dispositivo**: Sincronizar Tuya,
 Probar HA, Probar Tuya, Probar MQTT. Se guarda también en `data/consola.log` (rotativo, 2 MB × 3). No registra tokens ni claves.
 La **bitácora** (pestaña Bitácora) es otra cosa: quién ordenó qué.
+
+## API de usuario de Tuya (OpenClaw skills)
+
+La nube del proyecto de Tuya solo controla los equipos de su «cupo» (hoy 24); el resto responde «quota is insufficient» o «permission deny».
+La **API de usuario final** (la de los *OpenClaw skills*, github.com/tuya/tuya-openclaw-skills) actúa como el usuario de la app y no
+usa ese cupo. En **Ajustes → Tuya · API de usuario** se pega la API Key (`sk-…`):
+
+- Se prueba antes de guardarse (lee casas y equipos; no cambia nada) y queda en `data/tuya_user.json` con permisos 600. Nunca vuelve al navegador ni se escribe en la consola.
+- El país sale de las dos letras tras `sk-` (AZ = `openapi.tuyaus.com`); el endpoint se puede cambiar a mano.
+- Solo se usan las casas `PATCC_TUYA_HOME` / `PATCC_TUYA_HOME_NAME` (Patricio 10). Coworking540 no se consulta.
+- Enrutado de las órdenes: focos → red local; equipos **con cupo** → servicio Tuya de siempre; equipos **sin cupo** → API de usuario
+  (`POST /v1.0/end-user/devices/{id}/shadow/properties/issue`, valor validado contra el modelo del equipo, sin reintentos automáticos).
+  Si la nube del proyecto rechaza una orden por cupo o permiso, se intenta una vez por la API de usuario.
+- Límites del lado de Tuya (fase de prueba, sin cifras publicadas): puede haber cuotas y límites de frecuencia. Solo propiedades booleanas, enteras, de lista o texto (no cámaras ni cerraduras).
+- Si la clave se pegó en un chat o correo, genera una nueva en la plataforma de Tuya y reemplázala aquí.

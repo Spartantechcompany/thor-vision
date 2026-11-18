@@ -181,8 +181,8 @@ function cardHaSwitch(e){
     <input type="checkbox" class="tog" ${on ? 'checked' : ''} ${na ? 'disabled' : ''} data-ha="switch" data-e="${esc(e.id)}"></div></div>`;
 }
 const NUBE = {sin_cupo: 'sin cupo en la nube', retirado: 'retirado'};
-const bloqueado = d => d.type !== 'foco' && (d.nube === 'sin_cupo' || d.nube === 'retirado');
-const nubeTag = d => NUBE[d.nube] ? ` <span class="tag nube" title="La nube de Tuya rechaza las órdenes de este equipo (cupo de control agotado). Hace falta control por red local.">${NUBE[d.nube]}</span>` : '';
+const bloqueado = d => d.type !== 'foco' && (d.nube === 'retirado' || (d.nube === 'sin_cupo' && !d.usuario));
+const nubeTag = d => (d.nube === 'sin_cupo' && d.usuario) ? ' <span class="tag tuya" title="La nube del proyecto lo rechaza; se controla por la API de usuario">vía API de usuario</span>' : NUBE[d.nube] ? ` <span class="tag nube" title="La nube de Tuya rechaza las órdenes de este equipo (cupo de control agotado). Hace falta control por red local.">${NUBE[d.nube]}</span>` : '';
 function cardTuyaLight(d){
   const off = d.online === false;
   if (d.type === 'foco'){
@@ -382,6 +382,14 @@ function vAjustes(){
     <h2 style="margin:6px 0 2px">Cambios detectados</h2>
     ${rg.cambios.length ? `<div class="lista-c">${rg.cambios.slice(0, 15).map(c => `<div class="c"><time>${fdate(c.ts)}</time><span><b>${esc(c.nombre || c.device_id)}</b> · ${esc(CHG[c.tipo] || c.tipo)}${c.antes || c.despues ? ` <span class="muted">${esc(c.antes || '')} → ${esc(c.despues || '')}</span>` : ''}</span></div>`).join('')}</div>` : '<small class="muted">Sin cambios todavía: el primer registro es la línea base.</small>'}` : '<p class="muted">Cargando…</p>'}
   </div>
+  <h2>Tuya · API de usuario (OpenClaw)</h2><div class="card form">
+    ${(() => { const t = AJ.tuya_user || {}; return `<p>${t.configured ? `<span class="dot ${t.last_error ? 'bad' : 'ok'}"></span> ${t.last_error ? 'Con error' : 'Conectada'} · clave ${esc(t.key_hint)} · <code>${esc(t.endpoint)}</code><br>
+      <span class="muted">Casa ${esc(t.home)} · ${t.devices} equipos alcanzables${t.saved_by ? ' · guardada por ' + esc(t.saved_by) + ' el ' + fdate(t.saved_ts) : ''}</span>${t.last_error ? `<br><span class="err">${esc(t.last_error)}</span>` : ''}` : 'Sin conectar. Con esta clave, los equipos que la nube del proyecto rechaza (sin cupo) se pueden controlar igual.'}</p>
+    ${admin ? `<label class="f">API Key (empieza con sk-)<input class="in" id="u-key" type="password" autocomplete="new-password" placeholder="${t.configured ? 'Pega una nueva para reemplazarla' : 'sk-…'}"></label>
+    <label class="f">Endpoint (opcional; se deduce de la clave)<input class="in" id="u-ep" value="" placeholder="${esc(t.endpoint || 'https://openapi.tuyaus.com')}" autocomplete="off"></label>
+    <div class="btns"><button class="btn pri" id="u-save">Probar y guardar</button>${t.configured ? '<button class="btn pel" id="u-del">Desconectar</button>' : ''}</div>
+    <small class="muted">Se prueba antes de guardarse (lee las casas y equipos, sin cambiar nada). Queda solo en el servidor, con permisos 600, y nunca vuelve al navegador. Solo se usan los equipos de la casa ${esc(t.home)}. Créala en la plataforma de Tuya → API Keys; si la pegaste en un chat o correo, genera una nueva.</small>` : ''}`; })()}
+  </div>
   <h2>Tuya · servicios</h2><div class="card"><p>Servicio de control: <code>${esc(AJ.tuya_service)}</code><br>Estado de los equipos: <code>${esc(AJ.vision)}</code> (thor-vision)</p>
   <small class="muted">Los focos se manejan por la red local; los interruptores y cortinas, por la nube de Tuya, que solo acepta los equipos dentro del cupo de control del proyecto.</small></div>
   ${admin && AJ.auth ? '<h2>Cuentas</h2><div class="card"><p>Usuarios, roles y bloqueos: <a href="/admin" style="color:var(--acento)">panel de administración</a>.</p></div>' : ''}`;
@@ -478,6 +486,10 @@ document.addEventListener('click', async ev => {
       try { await api('/api/horarios', {method: 'POST', body}); toast('Horario guardado'); await loadScenes(); render(true); } catch (e) { toast(e.message, true); } return; }
     case 'cx-refresh': CX = null; render(true); loadConx(); return;
     case 'rg-sync': toast('Sincronizando con la nube de Tuya…'); try { const r = await api('/api/registro/sync', {method: 'POST'}); RG = r; toast('Sincronizado: ' + r.result); await loadConx(); poll(); render(true); } catch (e) { toast(e.message, true); } return;
+    case 'u-save': try { const r = await api('/api/ajustes/tuya-usuario', {method: 'POST', body: {key: $('#u-key').value, endpoint: $('#u-ep').value}});
+        toast(`Conectada: ${r.homes.join(', ')} · ${r.devices} equipos`); await loadAjustes(); poll(); render(true); } catch (e) { toast(e.message, true); } return;
+    case 'u-del': if (!confirm('¿Desconectar la API de usuario de Tuya y borrar la clave del servidor?')) return;
+      try { await api('/api/ajustes/tuya-usuario', {method: 'DELETE'}); await loadAjustes(); poll(); render(true); } catch (e) { toast(e.message, true); } return;
     case 'a-save': try { const r = await api('/api/ajustes/ha', {method: 'POST', body: {url: $('#a-url').value, token: $('#a-tok').value}});
         toast(`Conectado: ${r.location || ''} ${r.version || ''}`); await loadAjustes(); poll(); render(true); } catch (e) { toast(e.message, true); } return;
     case 'a-del': if (!confirm('¿Desconectar Home Assistant y borrar el token del servidor?')) return;

@@ -34,6 +34,11 @@
         "area": "Vision",
         "title": "iot_listener expone retired",
         "text": "El estado de /api/iot/devices incluye retired (iot.yml)."
+      },
+      {
+        "area": "PAT·CC",
+        "title": "API de usuario de Tuya",
+        "text": "patcc/tuyauser.py: API Key sk-… (OpenClaw skills) en Ajustes; controla los equipos sin cupo del proyecto de la nube por /v1.0/end-user/…; solo la casa Patricio 10; clave 600 y nunca devuelta."
       }
     ]
   },

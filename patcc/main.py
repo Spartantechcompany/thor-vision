@@ -21,6 +21,7 @@ from app.auth.routes import _same_origin
 from app.auth.routes import router as auth_router
 from patcc import automation, consola, files
 from patcc.registro import Registro
+from patcc.tuyauser import TuyaUserError
 from patcc.ha import HA, HAError
 from patcc.tuya import Tuya
 
@@ -251,7 +252,7 @@ def ajustes(request: Request):
     else:
         info["token"] = ha.token_info()
     from patcc import tuya as tmod
-    return {"ha": info, "tuya_service": tmod.SVC, "vision": tmod.VISION, "role": u.get("role"), "auth": AUTH}
+    return {"ha": info, "tuya_user": tuya.user.info(), "tuya_service": tmod.SVC, "vision": tmod.VISION, "role": u.get("role"), "auth": AUTH}
 
 
 @app.post("/api/ajustes/ha")
@@ -268,6 +269,33 @@ async def ajustes_ha(request: Request):
         return _err(502, f"no se guardó: {exc}")
     files.log(u["username"], "conectó Home Assistant", f"{r.get('location')} {r.get('version')}")
     return {"ok": True, **r}
+
+
+@app.post("/api/ajustes/tuya-usuario")
+async def ajustes_tuya_usuario(request: Request):
+    u, e = _who(request, write=True, admin=True)
+    if e:
+        return e
+    b = await _json(request)
+    try:
+        r = tuya.user.save(str(b.get("key") or ""), str(b.get("endpoint") or ""), u["username"])
+    except ValueError as exc:
+        return _err(400, str(exc))
+    except TuyaUserError as exc:
+        return _err(502, f"no se guardó: {exc}")
+    files.log(u["username"], "conectó la API de usuario de Tuya", f"{', '.join(r['homes'])} · {r['devices']} equipos")
+    consola.log("info", "tuya-usuario", f"API de usuario conectada por {u['username']}: {r['devices']} equipos en {', '.join(r['homes'])}")
+    return {"ok": True, **r}
+
+
+@app.delete("/api/ajustes/tuya-usuario")
+def ajustes_tuya_usuario_borrar(request: Request):
+    u, e = _who(request, write=True, admin=True)
+    if e:
+        return e
+    tuya.user.forget()
+    files.log(u["username"], "borró la API Key de usuario de Tuya", "ok")
+    return {"ok": True}
 
 
 @app.delete("/api/ajustes/ha")
@@ -340,6 +368,18 @@ def conexiones(request: Request):
                     "detail": f"{len(j.get('devices') or [])} equipos en el cupo de la nube · leído hace {round(age / 60)} min" + (f" · {j['error']}" if j.get("error") else "")})
     except (httpx.HTTPError, ValueError) as exc:
         out.append({"id": "tuya", "name": "Servicio Tuya (oapc-devops)", "state": "bad", "detail": f"no responde: {type(exc).__name__}"})
+    # API de usuario de Tuya (sk-…)
+    if not tuya.user.configured:
+        out.append({"id": "tuyau", "name": "Tuya · API de usuario", "state": "warn", "detail": "sin configurar: pega la API Key en Ajustes para controlar los equipos sin cupo"})
+    else:
+        t0 = time.time()
+        devs = tuya.user.devices(max_age=0)
+        if tuya.user.last_error:
+            out.append({"id": "tuyau", "name": "Tuya · API de usuario", "state": "bad", "detail": tuya.user.last_error})
+        else:
+            on = sum(1 for d in devs.values() if d["online"])
+            out.append({"id": "tuyau", "name": "Tuya · API de usuario", "state": "ok", "ms": round((time.time() - t0) * 1000),
+                        "detail": f"{tuya.user.info()['home']} · {len(devs)} equipos, {on} en línea"})
     # focos por red local
     st = tuya.stats()
     if st["focos"] == 0:
@@ -393,12 +433,12 @@ def consola_datos(request: Request, since: int = 0, level: str = "debug", src: s
     return {"entries": consola.entries(since, level, src[:20], q[:60], min(max(limit, 1), 1000)), "sources": consola.sources()}
 
 
-CMDS = ("sync", "ha", "tuya", "mqtt")
+CMDS = ("sync", "ha", "tuya", "tuyau", "mqtt")
 
 
 @app.post("/api/consola/cmd")
 async def consola_cmd(request: Request):
-    """Comandos de diagnóstico permitidos (nada que cambie dispositivos): sync, ha, tuya, mqtt."""
+    """Comandos de diagnóstico permitidos (nada que cambie dispositivos): sync, ha, tuya, tuyau, mqtt."""
     u, e = _who(request, write=True)
     if e:
         return e

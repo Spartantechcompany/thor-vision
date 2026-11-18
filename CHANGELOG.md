@@ -12,6 +12,7 @@ Nuevo PAT Control Center (PAT·CC; puerto 8095, contenedor propio) para controla
 - **PAT·CC · Registro de la nube y filtro por casa**: patcc/registro.py (SQLite): equipos, cambios y sincronizaciones; GET /registry y POST /registry/sync en el servicio Tuya; estado de nube por equipo (cupo, sin cupo, retirado); solo la casa PATCC_TUYA_HOME.
 - **PAT·CC · Conexiones, token y consola**: /api/conexiones (HA, Tuya, focos, MQTT, nube) con tiempos; vigencia del token leída del JWT; consola de devops en /consola con log y comandos de diagnóstico.
 - **Vision · iot_listener expone retired**: El estado de /api/iot/devices incluye retired (iot.yml).
+- **PAT·CC · API de usuario de Tuya**: patcc/tuyauser.py: API Key sk-… (OpenClaw skills) en Ajustes; controla los equipos sin cupo del proyecto de la nube por /v1.0/end-user/…; solo la casa Patricio 10; clave 600 y nunca devuelta.
 
 ## v2.48.0 — Login de producción y menos llamadas al modelo, juntos (2026-11-11)
 

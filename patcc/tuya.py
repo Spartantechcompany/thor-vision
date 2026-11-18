@@ -10,6 +10,7 @@ import httpx
 
 from patcc import consola
 from patcc import registro as reg_mod
+from patcc.tuyauser import USER_CODES, TuyaUser, TuyaUserError
 
 SVC = os.environ.get("TUYA_SERVICE_URL", "http://192.168.0.194:8765").rstrip("/")
 VISION = os.environ.get("VISION_URL", "http://127.0.0.1:8080").rstrip("/")
@@ -29,6 +30,7 @@ class Tuya:
         self._bulbs: list = []
         self._bulbs_ts = 0.0
         self.last_error = ""
+        self.user = TuyaUser()             # API de usuario (sk-…): control sin el cupo del proyecto de la nube
         self.registro = None               # patcc.registro.Registro: estado de nube por equipo y filtro por casa
         self._stop = threading.Event()
 
@@ -96,11 +98,15 @@ class Tuya:
         if dev is None:
             consola.log("warn", "tuya", f"orden a un equipo que no es de esta casa o no existe: {dev_id}")
             return {"ok": False, "result": "ese equipo no pertenece a Patricio 10"}
+        via_user = self.user.configured and dev["nube"] != "retirado" and code in USER_CODES and self.user.has(dev_id)
+        if dev["type"] != "foco" and dev["nube"] == "sin_cupo" and via_user:
+            return self._user_issue(name, dev_id, code, value)                # la nube del proyecto lo rechazaría: va por la API de usuario
         if dev["type"] != "foco" and dev["nube"] in ("sin_cupo", "retirado"):
             why = ("ya no existe en la nube de Tuya (retirado)" if dev["nube"] == "retirado"
                    else "no está dentro del cupo de control de la nube de Tuya, que rechaza sus órdenes («quota is insufficient» o «permission deny»)")
             consola.log("warn", "tuya", f"{name} {code}={value} no enviada: {why}")
-            return {"ok": False, "result": f"«{name}» {why}. Hace falta controlarlo por la red local."}
+            hint = "Agrega la API Key de usuario en Ajustes para controlarlo." if dev["nube"] == "sin_cupo" and not self.user.configured else "Hace falta controlarlo por la red local."
+            return {"ok": False, "result": f"«{name}» {why}. {hint}"}
         t0 = time.time()
         try:
             r = httpx.post(f"{SVC}/control/{dev_id}", json={"code": code, "value": value}, timeout=15)
@@ -109,9 +115,24 @@ class Tuya:
             consola.log("error", "tuya", f"{name} {code}={value}: servicio Tuya no responde ({type(exc).__name__})")
             return {"ok": False, "result": f"servicio Tuya no responde: {type(exc).__name__}"}
         consola.log("info" if out.get("ok") else "warn", "tuya", f"{name} {code}={value} → {out.get('result')} ({round((time.time() - t0) * 1000)} ms)")
+        res = str(out.get("result")).lower()
+        if not out.get("ok") and via_user and ("quota" in res or "permission" in res):
+            return self._user_issue(name, dev_id, code, value)                # la nube del proyecto rechazó: segundo intento por la API de usuario
         with self._lock:
             self._devices_ts = 0.0
         return out
+
+    def _user_issue(self, name: str, dev_id: str, code: str, value) -> dict:
+        t0 = time.time()
+        try:
+            self.user.issue(dev_id, code, value)
+        except TuyaUserError as exc:
+            consola.log("warn", "tuya", f"{name} {code}={value} por API de usuario: {exc}")
+            return {"ok": False, "result": f"«{name}»: {exc}"}
+        consola.log("info", "tuya", f"{name} {code}={value} → ok por API de usuario ({round((time.time() - t0) * 1000)} ms)")
+        with self._lock:
+            self._devices_ts = 0.0
+        return {"ok": True, "result": "ok (API de usuario)"}
 
     def group(self, ids, action: dict) -> dict:
         """Varios focos a la vez por la red local: ids = 'all' o lista; action = {on, brightness, colour, white}."""
@@ -150,6 +171,13 @@ class Tuya:
                                           "gang_names", "percent", "cam_name", "last_ts", "cloud")}
             item["retired"] = bool(d.get("retired")) or d.get("device_id") in RETIRED_IDS
             item["nube"] = nube
+            item["usuario"] = self.user.configured and d.get("device_id") in self.user._list["devices"]
+            ov = self.user.overlay.get(d.get("device_id"))
+            if ov and (d.get("last_ts") or 0) < ov["ts"] and isinstance(item.get("switches"), dict | type(None)):
+                sw = {k: v for k, v in ov["props"].items() if k.startswith("switch") and isinstance(v, bool)}
+                if sw:
+                    item["switches"] = {**(item["switches"] or {}), **sw}
+                item["online"] = ov["online"]
             out.append(item)
         return out
 

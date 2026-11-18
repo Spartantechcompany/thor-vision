@@ -315,3 +315,126 @@ def test_consola_y_registro_responden_en_la_app(tmp_path, monkeypatch):
     assert c.get("/api/registro").json()["home"] == "153519480"
     monkeypatch.undo()
     _reload_auth()
+
+
+# ── API de usuario de Tuya (sk-…) ─────────────────────────────────────
+KEY = "sk-AZ" + "k" * 40
+
+
+class _R:
+    def __init__(self, result, ok=True, code=None, status=200):
+        self._j, self.status_code = {"success": ok, "result": result, "code": code, "msg": "x"}, status
+
+    def json(self):
+        return self._j
+
+
+def _api_fake(calls, homes=None, devices=None, model=None, issue_ok=True):
+    homes = homes if homes is not None else [{"home_id": "153519480", "name": "Patricio 10"}, {"home_id": "195128033", "name": "Coworking540"}]
+    devices = devices if devices is not None else {"153519480": [{"device_id": "bbb222", "name": "Pasillo", "online": True, "category": "kg"}],
+                                                   "195128033": [{"device_id": "eee555", "name": "Barra", "online": True, "category": "kg"}]}
+    model = model or {"services": [{"properties": [{"code": "switch_1", "accessMode": "rw", "typeSpec": {"type": "bool"}},
+                                                    {"code": "mode", "accessMode": "ro", "typeSpec": {"type": "enum", "range": ["a"]}}]}]}
+
+    def request(method, url, headers=None, json=None, timeout=None):
+        calls.append((method, url.split(".com")[-1], (headers or {}).get("Authorization"), json))
+        if url.endswith("/homes/all"):
+            return _R({"homes": homes})
+        for hid, devs in devices.items():
+            if url.endswith(f"/homes/{hid}/devices"):
+                return _R({"devices": devs})
+        if url.endswith("/model"):
+            return _R({"model": __import__("json").dumps(model)})
+        if url.endswith("/properties/issue"):
+            return _R({}, ok=issue_ok, code=None if issue_ok else 1010)
+        if url.endswith("/detail"):
+            return _R({"online": True, "properties": {"switch_1": True}})
+        return _R(None, ok=False, status=404)
+    return request
+
+
+@pytest.fixture
+def tu(tmp_path, monkeypatch):
+    monkeypatch.setenv("PATCC_DATA", str(tmp_path / "data"))
+    for mod in ("patcc.files", "patcc.consola", "patcc.tuyauser"):
+        importlib.reload(importlib.import_module(mod))
+    from patcc import tuyauser
+    yield tuyauser, monkeypatch
+    monkeypatch.undo()
+
+
+def test_api_usuario_region_y_clave_invalida(tu):
+    tuyauser, mp = tu
+    assert tuyauser.region_url(KEY) == "https://openapi.tuyaus.com"
+    assert tuyauser.region_url("sk-EU" + "x" * 30) == "https://openapi.tuyaeu.com"
+    for mala in ("abc", "sk-ZZ" + "x" * 30, "sk-AZ"):
+        with pytest.raises(ValueError):
+            tuyauser.region_url(mala)
+
+
+def test_api_usuario_guarda_solo_la_casa_de_patricio_10_y_nunca_devuelve_la_clave(tu):
+    tuyauser, mp = tu
+    calls = []
+    mp.setattr(tuyauser.httpx, "request", _api_fake(calls))
+    t = tuyauser.TuyaUser()
+    r = t.save(KEY, "", "ana")
+    assert r["devices"] == 1 and r["homes"] == ["Patricio 10"]                 # Coworking540 no se consulta
+    assert not any("195128033" in c[1] for c in calls)
+    assert all(c[2] == f"Bearer {KEY}" for c in calls)
+    import json, os
+    from patcc import files
+    assert oct(os.stat(files.path("tuya_user.json")).st_mode)[-3:] == "600"
+    assert KEY not in json.dumps(t.info()) and t.info()["key_hint"] == "…" + KEY[-4:]
+    assert t.has("bbb222") and not t.has("eee555")
+
+
+def test_api_usuario_no_guarda_si_la_prueba_falla(tu):
+    tuyauser, mp = tu
+    mp.setattr(tuyauser.httpx, "request", _api_fake([], homes=[{"home_id": "1", "name": "Otra casa"}]))
+    t = tuyauser.TuyaUser()
+    with pytest.raises(ValueError):
+        t.save(KEY, "", "ana")
+    assert not t.configured
+
+
+def test_api_usuario_valida_contra_el_modelo_y_no_reintenta(tu):
+    tuyauser, mp = tu
+    calls = []
+    mp.setattr(tuyauser.httpx, "request", _api_fake(calls))
+    t = tuyauser.TuyaUser()
+    t.save(KEY, "", "ana")
+    for code, val in (("switch_1", "si"), ("switch_2", True), ("percent_control", 50), ("rm", True)):
+        with pytest.raises(tuyauser.TuyaUserError):
+            t.issue("bbb222", code, val)
+    with pytest.raises(tuyauser.TuyaUserError):
+        t.issue("eee555", "switch_1", True)                                     # de otra casa
+    n = len([c for c in calls if c[1].endswith("/issue")])
+    assert n == 0
+    assert t.issue("bbb222", "switch_1", True) == "ok"
+    envio = [c for c in calls if c[1].endswith("/issue")]
+    assert len(envio) == 1 and envio[0][3] == {"properties": '{"switch_1": true}'}      # propiedades como texto JSON, como pide Tuya
+
+
+def test_control_enruta_por_la_api_de_usuario_los_equipos_sin_cupo(tu, tmp_path):
+    tuyauser, mp = tu
+    for mod in ("patcc.registro", "patcc.tuya"):
+        importlib.reload(importlib.import_module(mod))
+    from patcc import tuya as tmod
+    calls = []
+    t = tmod.Tuya()
+    mp.setattr(tuyauser.httpx, "request", _api_fake(calls))
+    t.user.save(KEY, "", "ana")
+    class Reg:
+        def states(self): return {"bbb222": {"nube": "sin_cupo", "casa": CASA}, "aaa111": {"nube": "cupo", "casa": CASA}, "ccc333": {"nube": "retirado", "casa": CASA}}
+    t.registro = Reg()
+    devs = [{"device_id": "bbb222", "name": "Pasillo", "kind": "light", "type": "interruptor"},
+            {"device_id": "aaa111", "name": "Cocina", "kind": "light", "type": "interruptor"},
+            {"device_id": "ccc333", "name": "Viejo", "kind": "light", "type": "interruptor", "retired": True}]
+    mp.setattr(t, "devices", lambda max_age=4.0: devs)
+    servicio = []
+    mp.setattr(tmod.httpx, "post", lambda *a, **k: servicio.append(a) or type("R", (), {"json": lambda s: {"ok": True, "result": "ok"}})())
+    r = t.control("bbb222", "switch_1", True)
+    assert r == {"ok": True, "result": "ok (API de usuario)"} and not servicio     # sin cupo → API de usuario, no el servicio del proyecto
+    assert t.control("aaa111", "switch_1", True)["ok"] and len(servicio) == 1       # con cupo → el servicio de siempre
+    assert "retirado" in t.control("ccc333", "switch_1", True)["result"]
+    assert any(d["usuario"] for d in t.view() if d["name"] == "Pasillo")
