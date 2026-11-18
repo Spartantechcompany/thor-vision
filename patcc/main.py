@@ -8,6 +8,7 @@ Acceso: por defecto SIN login (red local de confianza, PATCC_AUTH=off); con PATC
 """
 import os
 import pathlib
+import re
 import time
 from contextlib import asynccontextmanager
 
@@ -118,6 +119,9 @@ def depurar_ha(entities: list, tuya_all: list):
                 oculto["otra_casa"] += 1
                 continue
             dev = e.get("dev") or ""
+            if re.fullmatch(r"channel \d+", dev.strip().lower()):          # el equipo se llama «Channel 1»: se usa el nombre real de la cuenta
+                real = (tuya.user.devices(max_age=600).get(tid) or {}).get("name") or e.get("area") or ""
+                dev = real.strip()
             if dev and dev.lower() not in e["name"].lower():
                 e = {**e, "name": f"{dev} · {e['name']}"}
         elif e["domain"] == "switch" and e["id"] not in SWITCH_ALLOW:
