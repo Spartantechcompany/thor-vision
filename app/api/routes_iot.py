@@ -42,13 +42,11 @@ def hogar_resumen():
     import httpx
     url = os.environ.get("HOGAR_URL", "http://127.0.0.1:8095").rstrip("/")
     public = os.environ.get("HOGAR_PUBLIC_URL", "http://192.168.0.10:8095")
-    tok = os.environ.get("HOGAR_TOKEN", "")
-    if not tok:
-        return {"ok": False, "url": public, "error": "sin HOGAR_TOKEN"}
+    tok = os.environ.get("HOGAR_TOKEN", "")          # solo hace falta si Hogar corre con HOGAR_AUTH=on
     if time.time() - _HOGAR["ts"] < 15 and _HOGAR["data"] is not None:
         return _HOGAR["data"]
     try:
-        r = httpx.get(url + "/api/resumen", headers={"Authorization": f"Bearer {tok}"}, timeout=4)
+        r = httpx.get(url + "/api/resumen", headers={"Authorization": f"Bearer {tok}"} if tok else {}, timeout=4)
         r.raise_for_status()
         data = {"ok": True, "url": public, **r.json()}
     except (httpx.HTTPError, ValueError) as exc:

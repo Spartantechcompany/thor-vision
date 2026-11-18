@@ -3,7 +3,8 @@
 Arranque:  uvicorn hogar.main:app --host 0.0.0.0 --port 8095
 Variables: HOGAR_DATA, THOR_AUTH_DB, THOR_SESSION_SECRET, THOR_COOKIE_PREFIX=hogar, THOR_APP_NAME="OXM Hogar",
            THOR_MACHINE_TOKEN + THOR_MACHINE_EXTRA=/api/resumen (para el reflejo en thor-vision), TUYA_SERVICE_URL, VISION_URL.
-Roles: operador y admin controlan y crean escenas; solo admin cambia la conexión con Home Assistant.
+Acceso: por defecto SIN login (red local de confianza, HOGAR_AUTH=off); con HOGAR_AUTH=on vuelve el login de app/auth y los roles
+(operador y admin controlan y crean escenas; solo admin cambia la conexión con Home Assistant).
 """
 import os
 import pathlib
@@ -23,6 +24,7 @@ from hogar.ha import HA, HAError
 from hogar.tuya import Tuya
 
 PAGE = pathlib.Path(__file__).parent / "static" / "index.html"
+AUTH = os.environ.get("HOGAR_AUTH", "off").lower() in ("on", "1", "true", "si")
 
 ha = HA()
 tuya = Tuya()
@@ -42,6 +44,9 @@ app = FastAPI(title="OXM Hogar", docs_url=None, redoc_url=None, openapi_url=None
 
 # ── sesión y permisos ──────────────────────────────────────────────
 def _user(request: Request) -> dict | None:
+    if not AUTH:        # red local de confianza: cualquiera que llegue es administrador; la bitácora anota desde qué dirección
+        ip = request.client.host if request.client else "desconocida"
+        return {"username": f"red local ({ip})", "role": "admin", "active": 1}
     v = sessions.verify(request.cookies.get(COOKIE_FULL))
     if not v or v[1] != sessions.FULL:
         return None
@@ -85,7 +90,7 @@ def estado(request: Request):
     u, e = _who(request)
     if e:
         return e
-    out = {"ts": time.time(), "user": {"name": u["username"], "role": u.get("role")}}
+    out = {"ts": time.time(), "auth": AUTH, "user": {"name": u["username"], "role": u.get("role")}}
     try:
         out["ha"] = {"ok": True, "entities": ha.view()}
     except HAError as exc:
@@ -236,7 +241,7 @@ def ajustes(request: Request):
     if u.get("role") != "admin":
         info = {"configured": info["configured"], "url": info["url"]}
     from hogar import tuya as tmod
-    return {"ha": info, "tuya_service": tmod.SVC, "vision": tmod.VISION, "role": u.get("role")}
+    return {"ha": info, "tuya_service": tmod.SVC, "vision": tmod.VISION, "role": u.get("role"), "auth": AUTH}
 
 
 @app.post("/api/ajustes/ha")
@@ -271,7 +276,8 @@ def bitacora(request: Request):
     return e or {"items": files.recent_log(150)}
 
 
-# Acceso: mismas pantallas y reglas que thor-vision, con cuentas y cookies propias. Al final = capa externa.
-app.include_router(auth_router)
-app.include_router(admin_auth_router)
-app.add_middleware(AuthGuard)
+# Acceso (solo con HOGAR_AUTH=on): mismas pantallas y reglas que thor-vision, con cuentas y cookies propias. Al final = capa externa.
+if AUTH:
+    app.include_router(auth_router)
+    app.include_router(admin_auth_router)
+    app.add_middleware(AuthGuard)

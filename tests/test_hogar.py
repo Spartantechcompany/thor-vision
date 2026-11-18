@@ -24,6 +24,7 @@ def hogar(tmp_path, monkeypatch):
     monkeypatch.setenv("THOR_MACHINE_TOKEN", MACHINE)
     monkeypatch.setenv("THOR_MACHINE_EXTRA", "/api/resumen")
     monkeypatch.setenv("THOR_COOKIE_PREFIX", "hogar")
+    monkeypatch.setenv("HOGAR_AUTH", "on")
     monkeypatch.setenv("THOR_APP_NAME", "OXM Hogar")
     monkeypatch.setenv("HOGAR_DATA", str(tmp_path / "data"))
     monkeypatch.setenv("HOGAR_NO_THREADS", "1")
@@ -152,3 +153,28 @@ def test_horario_corre_una_sola_vez(hogar, monkeypatch):
     assert len(tu.calls) == 1
     assert au.next_run(datetime(2026, 11, 17, 8, 0))["name"] == "Mañana"
     assert au.delete_scene(s["id"]) and au.schedules() == []      # borrar la escena quita sus horarios
+
+
+def test_sin_login_por_defecto_entra_cualquiera_de_la_red(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOGAR_DATA", str(tmp_path / "data"))
+    monkeypatch.setenv("HOGAR_NO_THREADS", "1")
+    monkeypatch.delenv("HOGAR_AUTH", raising=False)
+    for mod in ("hogar.files", "hogar.ha", "hogar.tuya", "hogar.automation", "hogar.main"):
+        importlib.reload(importlib.import_module(mod))
+    from hogar import files, main
+    monkeypatch.setattr(main.ha, "view", lambda: [])
+    monkeypatch.setattr(main.tuya, "view", lambda: [])
+    c = TestClient(main.app)
+    j = c.get("/api/estado").json()
+    assert j["auth"] is False and j["user"]["role"] == "admin" and j["user"]["name"].startswith("red local")
+    assert c.get("/", headers={"accept": "text/html"}).status_code == 200            # sin redirección a /login
+    assert c.get("/api/resumen").status_code == 200
+    assert c.get("/login").status_code == 404
+    # sigue exigiendo mismo origen para ordenar y sigue sin devolver el token
+    assert c.post("/api/ajustes/ha", json={"url": "http://x:1", "token": "t" * 40},
+                  headers={"sec-fetch-site": "cross-site", "origin": "http://otra.pagina"}).status_code == 403
+    assert "token" not in c.get("/api/ajustes").text.replace("token_hint", "")
+    c.post("/api/escenas", json={"name": "x", "actions": [{"t": "espera", "s": 1}]}, headers=SAME)
+    assert files.recent_log() == [] or files.recent_log()[0]["who"].startswith("red local")
+    monkeypatch.undo()
+    _reload_auth()

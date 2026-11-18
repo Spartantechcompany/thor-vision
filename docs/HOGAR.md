@@ -6,18 +6,15 @@ thor-vision solo muestra un reflejo ligero (un indicador con las luces encendida
 
 ## Cómo entrar
 
-- Dirección: `http://192.168.0.10:8095`
-- Cuentas propias (no son las de thor-vision). La primera se crea desde una terminal en la Thor, para que ninguna contraseña
-  pase por el navegador:
+- Dirección: `http://192.168.0.10:8095`. **No pide cuenta**: entra quien esté en la red local (decisión del dueño, mientras el
+  proyecto está empezando). En la bitácora cada acción queda con la dirección desde donde se ordenó.
+- Para volver a pedir login (usuario, contraseña y código, con roles): poner `HOGAR_AUTH=on` en `~/oxm-hogar/hogar.env`,
+  recrear el contenedor y crear la primera cuenta:
 
 ```bash
-ssh -t thor docker exec -it oxm-hogar python3 -m app.auth.admin add Nombre.Apellido     # pide la contraseña (mínimo 12)
+ssh -t thor docker exec -it oxm-hogar python3 -m app.auth.admin add Nombre.Apellido
 ssh -t thor docker exec -it oxm-hogar python3 -m app.auth.admin rol Nombre.Apellido admin
 ```
-
-- Al primer inicio de sesión se muestra un QR para el autenticador (Google Authenticator, 1Password...). Después, cada entrada
-  pide usuario + contraseña y luego el código de 6 dígitos.
-- Más cuentas, roles y bloqueos: `http://192.168.0.10:8095/admin` (solo admin).
 
 ## Qué hace
 
@@ -33,14 +30,16 @@ ssh -t thor docker exec -it oxm-hogar python3 -m app.auth.admin rol Nombre.Apell
 
 ## Seguridad
 
+- **Sin login por defecto:** cualquier equipo de la red local puede controlar los dispositivos y cambiar el token de Home Assistant.
+  Conviene que el puerto 8095 no se publique fuera de la red (sin reenvío de puertos en el UDM).
 - El token de Home Assistant se pega en **Ajustes**; se prueba antes de guardarse, queda en `data/ha.json` con permisos 600
-  y nunca se devuelve al navegador (solo los últimos 4 caracteres). Solo el rol admin lo puede cambiar o borrar.
+  y nunca se devuelve al navegador (solo los últimos 4 caracteres). Con login activo, solo el rol admin lo cambia o borra.
 - Solo se permiten acciones de control (luces, enchufes, medios, cortinas, escenas, scripts, anuncios). No se puede reiniciar
   Home Assistant ni presionar botones de equipos (el NAS expone «reboot» y «shutdown»).
 - Las órdenes que cambian algo exigen mismo origen: otra página abierta en el navegador no puede ordenar por ti.
 - Tuya: el servicio de oapc-devops solo acepta los equipos de `config/iot.yml` (casa Patricio 10) y como mucho una orden por
   segundo por equipo.
-- Cookies propias (`hogar_sesion`): iniciar o cerrar sesión aquí no afecta a thor-vision, aunque estén en el mismo host.
+- Con login activo, las cookies son propias (`hogar_sesion`): iniciar o cerrar sesión aquí no afecta a thor-vision.
 
 ## Despliegue en la Thor
 
@@ -59,14 +58,15 @@ Variables de `hogar.env`:
 | Variable | Valor |
 |---|---|
 | `HOGAR_DATA` / `THOR_AUTH_DB` | `/srv/data` / `/srv/data/auth.db` |
-| `THOR_SESSION_SECRET` | aleatorio, 64 caracteres (distinto del de thor-vision) |
+| `HOGAR_AUTH` | `off` (por defecto, sin login) o `on` |
+| `THOR_SESSION_SECRET` | aleatorio, 64 caracteres (solo se usa con `HOGAR_AUTH=on`) |
 | `THOR_COOKIE_PREFIX` / `THOR_APP_NAME` | `hogar` / `OXM Hogar` |
 | `THOR_MACHINE_TOKEN` + `THOR_MACHINE_EXTRA=/api/resumen` | token para que thor-vision lea el resumen |
 | `TUYA_SERVICE_URL` | `http://192.168.0.194:8765` (servicio de control en oapc-devops) |
 | `VISION_URL` (+ `VISION_TOKEN`) | `http://127.0.0.1:8080`; con el login de thor-vision activo hace falta su token de máquina y agregar `/api/iot` a su `THOR_MACHINE_EXTRA` |
 
-Reflejo en thor-vision: `HOGAR_TOKEN` (= `THOR_MACHINE_TOKEN` de Hogar) y opcionalmente `HOGAR_URL` / `HOGAR_PUBLIC_URL` en su
-`docker-compose.yml`. Sin `HOGAR_TOKEN` el indicador simplemente no aparece.
+Reflejo en thor-vision: sin login no hace falta configurar nada (opcionalmente `HOGAR_URL` / `HOGAR_PUBLIC_URL`); con `HOGAR_AUTH=on`
+se necesita `HOGAR_TOKEN` (= `THOR_MACHINE_TOKEN` de Hogar).
 
 ## Alexa y Fire TV
 
