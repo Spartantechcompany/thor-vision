@@ -272,7 +272,7 @@ function vLuces(){
   const hl = haEnt('light'), hs = haEnt('switch');
   return `<h2>Tuya · interruptores y enchufes</h2><div class="grid">${sort(tl.filter(d => d.type !== 'foco')).map(cardTuyaLight).join('') || '<div class="vacio">Sin datos de thor-vision</div>'}</div>
     <h2>Tuya · focos</h2><div class="grid">${sort(tl.filter(d => d.type === 'foco')).map(cardTuyaLight).join('') || '<div class="vacio">Sin focos</div>'}</div>
-    <h2>Home Assistant</h2><div class="grid">${hl.map(cardHaLight).join('')}${hs.map(cardHaSwitch).join('') || ''}${!hl.length && !hs.length ? `<div class="vacio">${S.ha.ok ? 'Home Assistant no tiene luces' : esc(S.ha.error || '')}</div>` : ''}</div>
+    <h2>Home Assistant</h2>${(() => { const h = S.ha.hidden || {}; const n = (h.duplicados || 0) + (h.otra_casa || 0) + (h.no_luces || 0); return n ? `<small class="muted">Ocultos para no repetir: ${h.duplicados || 0} ya salen de Tuya · ${h.otra_casa || 0} de otra casa · ${h.no_luces || 0} que no son luces.</small>` : ''; })()}<div class="grid">${hl.map(cardHaLight).join('')}${hs.map(cardHaSwitch).join('') || ''}${!hl.length && !hs.length ? `<div class="vacio">${S.ha.ok ? 'Home Assistant no tiene luces' : esc(S.ha.error || '')}</div>` : ''}</div>
     ${(S.tuya.devices || []).some(d => d.kind === 'curtain') ? `<h2>Cortinas</h2><div class="grid">${S.tuya.devices.filter(d => d.kind === 'curtain').map(cardCurtain).join('')}</div>` : ''}`;
 }
 function vMedios(){

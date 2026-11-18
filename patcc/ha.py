@@ -3,6 +3,8 @@
 Solo se permiten acciones de control de dispositivos (luces, enchufes, medios, cortinas...). Nada de reiniciar Home Assistant,
 botones de equipos (el NAS tiene "reboot"/"shutdown") ni cambios de configuración.
 """
+import json
+import os
 import threading
 import time
 from urllib.parse import urlsplit
@@ -34,6 +36,12 @@ SHOWN = {"light", "switch", "fan", "cover", "media_player", "remote", "scene", "
 SENSOR_CLASSES = {"temperature", "humidity", "battery", "power", "energy", "illuminance", "carbon_dioxide", "pm25", "voltage", "current"}
 
 
+# switches de Home Assistant que NO son iluminación y sí se muestran (lista de entity_id separada por comas); por defecto ninguno
+SWITCH_ALLOW = {x.strip() for x in os.environ.get("PATCC_HA_SWITCHES", "").split(",") if x.strip()}
+_DEVINFO_TPL = """{% set o = namespace(r=[]) %}{% for s in (states.light | list) + (states.switch | list) %}{% set e = s.entity_id %}
+{% set o.r = o.r + [{'id': e, 'dev': device_attr(e,'name'), 'ids': (device_attr(e,'identifiers') | list), 'area': area_name(e), 'tuya': e in integration_entities('tuya')}] %}{% endfor %}{{ o.r | tojson }}"""
+
+
 class HAError(Exception):
     pass
 
@@ -52,6 +60,7 @@ class HA:
         self._states: list = []
         self._states_ts = 0.0
         self.last_error = ""
+        self._dev = {"ts": 0.0, "map": {}}
 
     # ── configuración ──────────────────────────────────────────────
     @staticmethod
@@ -188,6 +197,29 @@ class HA:
             self._states_ts = 0.0                       # el siguiente sondeo trae el estado nuevo
         return r.json() if r.content else []
 
+    def devinfo(self, max_age: float = 60.0) -> dict:
+        """entity_id -> {dev, tuya_id, area} de las luces e interruptores, según el registro de dispositivos de Home Assistant."""
+        with self._lock:
+            if time.time() - self._dev["ts"] < max_age:
+                return self._dev["map"]
+        url, tok = self._conn()
+        t0 = time.time()
+        try:
+            r = httpx.post(url + "/api/template", json={"template": _DEVINFO_TPL}, headers={"Authorization": f"Bearer {tok}"}, timeout=TIMEOUT)
+            r.raise_for_status()
+            rows = json.loads(r.text)
+        except (httpx.HTTPError, ValueError) as exc:
+            consola.log("warn", "ha", f"no se pudo leer el registro de dispositivos: {type(exc).__name__}")
+            return self._dev["map"]
+        out = {}
+        for x in rows:
+            tid = next((i[1] for i in x.get("ids") or [] if len(i) == 2 and i[0] == "tuya"), None)
+            out[x["id"]] = {"dev": (x.get("dev") or "").strip(), "tuya_id": tid, "area": x.get("area")}
+        with self._lock:
+            self._dev = {"ts": time.time(), "map": out}
+        consola.log("debug", "ha", f"registro de dispositivos: {len(out)} entidades ({round((time.time() - t0) * 1000)} ms)")
+        return out
+
     # ── vista para el panel ────────────────────────────────────────
     def view(self) -> list:
         out = []
@@ -201,6 +233,10 @@ class HA:
                 continue
             item = {"id": eid, "domain": dom, "name": a.get("friendly_name") or eid, "state": e.get("state"),
                     "class": a.get("device_class"), "unit": a.get("unit_of_measurement")}
+            if dom in ("light", "switch"):
+                di = self.devinfo().get(eid) if self.configured else None
+                if di:
+                    item["dev"], item["tuya_id"], item["area"] = di["dev"], di["tuya_id"], di["area"]
             if dom == "light":
                 item.update(brightness=a.get("brightness"), rgb=a.get("rgb_color"), modes=a.get("supported_color_modes"),
                             kelvin=a.get("color_temp_kelvin"), min_k=a.get("min_color_temp_kelvin"), max_k=a.get("max_color_temp_kelvin"))

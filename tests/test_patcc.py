@@ -39,7 +39,7 @@ def patcc(tmp_path, monkeypatch):
     ents = [{"id": "light.p1", "domain": "light", "name": "P1", "state": "off"},
             {"id": "switch.bomba", "domain": "switch", "name": "Bomba", "state": "on"}]
     monkeypatch.setattr(main.ha, "view", lambda: ents)
-    monkeypatch.setattr(main.tuya, "view", lambda: [{"device_id": "abc123", "name": "Cocina", "kind": "light", "type": "interruptor",
+    monkeypatch.setattr(main.tuya, "view", lambda all_=False: [{"device_id": "abc123", "name": "Cocina", "kind": "light", "type": "interruptor",
                                                       "online": True, "switches": {"switch_1": True, "switch_2": False}}])
 
     def client(user=None):
@@ -163,7 +163,7 @@ def test_sin_login_por_defecto_entra_cualquiera_de_la_red(tmp_path, monkeypatch)
         importlib.reload(importlib.import_module(mod))
     from patcc import files, main
     monkeypatch.setattr(main.ha, "view", lambda: [])
-    monkeypatch.setattr(main.tuya, "view", lambda: [])
+    monkeypatch.setattr(main.tuya, "view", lambda all_=False: [])
     c = TestClient(main.app)
     j = c.get("/api/estado").json()
     assert j["auth"] is False and j["user"]["role"] == "admin" and j["user"]["name"].startswith("red local")
@@ -438,3 +438,30 @@ def test_control_enruta_por_la_api_de_usuario_los_equipos_sin_cupo(tu, tmp_path)
     assert t.control("aaa111", "switch_1", True)["ok"] and len(servicio) == 1       # con cupo → el servicio de siempre
     assert "retirado" in t.control("ccc333", "switch_1", True)["result"]
     assert any(d["usuario"] for d in t.view() if d["name"] == "Pasillo")
+
+
+def test_depurar_ha_quita_duplicados_otra_casa_y_switches_que_no_son_luces(tmp_path, monkeypatch):
+    monkeypatch.setenv("PATCC_DATA", str(tmp_path / "data"))
+    monkeypatch.setenv("PATCC_NO_THREADS", "1")
+    monkeypatch.delenv("PATCC_AUTH", raising=False)
+    for mod in ("patcc.files", "patcc.consola", "patcc.ha", "patcc.registro", "patcc.tuyauser", "patcc.tuya", "patcc.automation", "patcc.main"):
+        importlib.reload(importlib.import_module(mod))
+    from patcc import main
+    tuya_casa = [{"device_id": "aaa111", "name": "Cocina"}, {"device_id": "cam999", "name": "Cámara garaje"}]
+    main.registro.states = lambda: {"nuevo77": {"nube": "fuera_de_lista", "casa": "153519480"}}        # de Patricio 10, aún no agregado
+    ents = [
+        {"id": "switch.cocina_ch1", "domain": "switch", "name": "Channel 1 Switch", "state": "off", "tuya_id": "aaa111", "dev": "Cocina"},      # ya sale de Tuya
+        {"id": "switch.cam_flip", "domain": "switch", "name": "Flip", "state": "off", "tuya_id": "cam999", "dev": "Cámara garaje"},              # ajuste de cámara, ya sale de Tuya
+        {"id": "switch.barra", "domain": "switch", "name": "Barra Switch", "state": "off", "tuya_id": "otra123", "dev": "Barra"},                 # Coworking540
+        {"id": "light.security", "domain": "light", "name": "Security Camera Floodlight", "state": "off", "tuya_id": "otra456", "dev": "Security Camera"},
+        {"id": "switch.pasillo_nuevo", "domain": "switch", "name": "Channel 1 Switch", "state": "off", "tuya_id": "nuevo77", "dev": "Pasillo 2"},  # de la casa y sin tarjeta: se queda con nombre
+        {"id": "switch.oxmtech_drive_home_mode", "domain": "switch", "name": "OXMTECH_DRIVE Surveillance Station Home mode", "state": "off"},      # NAS
+        {"id": "light.tp_link", "domain": "light", "name": "P1", "state": "off"},                                                                  # luz de otra marca: se queda
+        {"id": "media_player.sala", "domain": "media_player", "name": "Sala", "state": "idle"},
+    ]
+    out, oculto = main.depurar_ha(ents, tuya_casa)
+    assert [e["id"] for e in out] == ["switch.pasillo_nuevo", "light.tp_link", "media_player.sala"]
+    assert out[0]["name"] == "Pasillo 2 · Channel 1 Switch"
+    assert oculto == {"duplicados": 2, "otra_casa": 2, "no_luces": 1}
+    monkeypatch.undo()
+    _reload_auth()

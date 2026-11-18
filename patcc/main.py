@@ -21,6 +21,7 @@ from app.auth.routes import _same_origin
 from app.auth.routes import router as auth_router
 from patcc import automation, consola, files
 from patcc.registro import Registro
+from patcc.ha import SWITCH_ALLOW
 from patcc.tuyauser import TuyaUserError
 from patcc.ha import HA, HAError
 from patcc.tuya import Tuya
@@ -94,6 +95,38 @@ def index():
 
 
 # ── estado ─────────────────────────────────────────────────────────
+def depurar_ha(entities: list, tuya_all: list):
+    """Quita de las luces e interruptores de Home Assistant lo que sobra: duplicados de equipos que ya salen de Tuya, equipos de otra casa
+    (Coworking540) y switches que no son iluminación. Devuelve (entidades, cuántas se ocultaron por motivo)."""
+    from patcc import registro as reg_mod
+    shown = {d["device_id"] for d in tuya_all}
+    casa = set(shown) | set(tuya.user.devices(max_age=600) if tuya.user.configured else {})
+    for i, st in registro.states().items():
+        if str(st.get("casa")) == reg_mod.HOME and st.get("nube") not in ("otra_casa",):
+            casa.add(i)
+    out, oculto = [], {"duplicados": 0, "otra_casa": 0, "no_luces": 0}
+    for e in entities:
+        if e["domain"] not in ("light", "switch"):
+            out.append(e)
+            continue
+        tid = e.get("tuya_id")
+        if tid:
+            if tid in shown:
+                oculto["duplicados"] += 1
+                continue
+            if tid not in casa:
+                oculto["otra_casa"] += 1
+                continue
+            dev = e.get("dev") or ""
+            if dev and dev.lower() not in e["name"].lower():
+                e = {**e, "name": f"{dev} · {e['name']}"}
+        elif e["domain"] == "switch" and e["id"] not in SWITCH_ALLOW:
+            oculto["no_luces"] += 1
+            continue
+        out.append(e)
+    return out, oculto
+
+
 @app.get("/api/estado")
 def estado(request: Request):
     u, e = _who(request)
@@ -101,7 +134,8 @@ def estado(request: Request):
         return e
     out = {"ts": time.time(), "auth": AUTH, "user": {"name": u["username"], "role": u.get("role")}}
     try:
-        out["ha"] = {"ok": True, "entities": ha.view()}
+        ents, oculto = depurar_ha(ha.view(), tuya.view(all_=True))
+        out["ha"] = {"ok": True, "entities": ents, "hidden": oculto}
     except HAError as exc:
         out["ha"] = {"ok": False, "error": str(exc), "entities": [], "configured": ha.configured}
     devs = tuya.view()
